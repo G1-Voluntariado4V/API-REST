@@ -1,0 +1,633 @@
+openapi: 3.0.3
+info:
+  title: API Gestión de Voluntariado
+  description: >
+    API REST para la gestión integral de la plataforma de voluntariado.
+    
+    **Características:**
+    - Autenticación delegada en **Firebase**.
+    - Gestión de estados basada en Reglas de Negocio SQL (Triggers y Constraints).
+    - Soporte para borrado lógico (Soft Delete) y restauración.
+  version: 1.0.0
+
+# Seguridad Global: Se requiere token en casi todo salvo en catálogos públicos.
+security:
+  - firebaseAuth: []
+
+tags:
+  - name: Autenticación
+    description: Login y verificación de cuentas
+  - name: Voluntarios
+    description: Gestión de perfiles de estudiantes
+  - name: Organizaciones
+    description: Gestión de entidades y ONGs
+  - name: Actividades
+    description: CRUD de actividades y gestión de imágenes
+  - name: Inscripciones
+    description: Flujo de solicitudes (Voluntario) y aprobaciones (Organización)
+  - name: Catálogos
+    description: Maestros (ODS, Idiomas, Cursos, Tipos)
+  - name: Administración
+    description: Dashboard y métricas globales
+
+paths:
+  # ============================================================
+  # AUTENTICACIÓN
+  # ============================================================
+  /auth/login:
+    post:
+      tags: [Autenticación]
+      summary: Login con Firebase
+      description: >
+        Verifica el token de Firebase. Si el usuario existe en SQL, devuelve sus datos y rol.
+        Si no existe, devuelve 404 para indicar al frontend que redirija al Registro.
+      responses:
+        '200':
+          description: Usuario autenticado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsuarioSesion'
+        '404':
+          description: Usuario no registrado. Requiere registro.
+        '401':
+          description: Token inválido.
+
+  # ============================================================
+  # GESTIÓN DE VOLUNTARIOS
+  # ============================================================
+  /voluntarios:
+    get:
+      tags: [Voluntarios]
+      summary: Listar voluntarios activos
+      description: Basado en VW_Voluntarios_Activos.
+      responses:
+        '200':
+          description: Lista de voluntarios activos.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/VoluntarioPerfil'
+    post:
+      tags: [Voluntarios]
+      summary: Registrar nuevo voluntario
+      description: Crea usuario y perfil. Vincula idiomas y preferencias.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VoluntarioInput'
+      responses:
+        '201':
+          description: Creado exitosamente.
+
+  /voluntarios/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+    get:
+      tags: [Voluntarios]
+      summary: Obtener perfil completo
+      responses:
+        '200':
+          description: Perfil completo del voluntario.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VoluntarioPerfil'
+    put:
+      tags: [Voluntarios]
+      summary: Actualizar datos
+      description: Actualiza datos personales, curso, idiomas y preferencias.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VoluntarioInput'
+      responses:
+        '200':
+          description: Perfil actualizado.
+    delete:
+      tags: [Voluntarios]
+      summary: Eliminar cuenta (Soft Delete)
+      description: Ejecuta SP_SoftDelete_Usuario.
+      responses:
+        '204':
+          description: Usuario bloqueado y marcado como borrado.
+
+  /voluntarios/{id}/restaurar:
+    post:
+      tags: [Voluntarios]
+      summary: Restaurar cuenta eliminada
+      description: Ejecuta SP_Restore_Usuario.
+      responses:
+        '200':
+          description: Cuenta reactivada a estado Pendiente.
+
+  # ============================================================
+  # GESTIÓN DE ORGANIZACIONES
+  # ============================================================
+  /organizaciones:
+    get:
+      tags: [Organizaciones]
+      summary: Listar organizaciones
+      responses:
+        '200':
+          description: Lista de organizaciones.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OrganizacionPerfil'
+    post:
+      tags: [Organizaciones]
+      summary: Registrar organización
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrganizacionInput'
+      responses:
+        '201':
+          description: Organización creada.
+
+  /organizaciones/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+    get:
+      tags: [Organizaciones]
+      summary: Ver perfil organización
+      responses:
+        '200':
+          description: Perfil organización.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizacionPerfil'
+    put:
+      tags: [Organizaciones]
+      summary: Actualizar perfil organización
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrganizacionInput'
+      responses:
+        '200':
+          description: Datos actualizados.
+    delete:
+      tags: [Organizaciones]
+      summary: Eliminar organización (Soft Delete)
+      responses:
+        '204':
+          description: Organización eliminada.
+
+  # ============================================================
+  # GESTIÓN DE ACTIVIDADES
+  # ============================================================
+  /actividades:
+    get:
+      tags: [Actividades]
+      security: [] # Público
+      summary: Catálogo de actividades
+      description: Lista actividades 'Publicadas' no eliminadas.
+      parameters:
+        - name: ods_id
+          in: query
+          schema:
+            type: integer
+          description: Filtrar por ODS
+        - name: tipo_id
+          in: query
+          schema:
+            type: integer
+          description: Filtrar por tipo de voluntariado
+      responses:
+        '200':
+          description: Lista actividades.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ActividadCard'
+    post:
+      tags: [Actividades]
+      summary: Crear actividad (Solo Organizaciones)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActividadInput'
+      responses:
+        '201':
+          description: Actividad creada (Estado En revisión).
+
+  /actividades/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+    get:
+      tags: [Actividades]
+      security: []
+      summary: Detalle completo de actividad
+      responses:
+        '200':
+          description: Detalle actividad.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActividadDetalle'
+    put:
+      tags: [Actividades]
+      summary: Editar actividad
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActividadInput'
+      responses:
+        '200':
+          description: Actividad modificada.
+    delete:
+      tags: [Actividades]
+      summary: Cancelar actividad (Soft Delete)
+      responses:
+        '204':
+          description: Actividad cancelada.
+
+  /actividades/{id}/imagenes:
+    post:
+      tags: [Actividades]
+      summary: Añadir imagen a galería
+      description: Inserta en tabla IMAGEN_ACTIVIDAD.
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                url_imagen:
+                  type: string
+                descripcion:
+                  type: string
+      responses:
+        '201':
+          description: Imagen añadida.
+
+  # ============================================================
+  # GESTIÓN DE INSCRIPCIONES
+  # ============================================================
+  
+  # El voluntario solicita unirse
+  /actividades/{id}/inscripciones:
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+    post:
+      tags: [Inscripciones]
+      summary: Inscribirse (Voluntario)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id_voluntario:
+                  type: integer
+      responses:
+        '201':
+          description: Solicitud enviada (Pendiente).
+        '409':
+          description: Error (Ya inscrito o Cupo lleno).
+
+    # La organización ve quién se ha apuntado
+    get:
+      tags: [Inscripciones]
+      summary: Ver aspirantes (Organización)
+      description: Lista inscripciones de esta actividad.
+      responses:
+        '200':
+          description: Lista inscripciones.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/InscripcionOrgView'
+
+  # Gestión de estado (Aceptar, Rechazar, Cancelar)
+  /actividades/{id_actividad}/inscripciones/{id_voluntario}:
+    parameters:
+      - name: id_actividad
+        in: path
+        required: true
+        schema: { type: integer }
+      - name: id_voluntario
+        in: path
+        required: true
+        schema: { type: integer }
+    patch:
+      tags: [Inscripciones]
+      summary: Cambiar estado solicitud
+      description: >
+        - Org: Cambia a 'Aceptada' o 'Rechazada'.
+        - Voluntario: Cambia a 'Cancelada'.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                estado:
+                  type: string
+                  enum: [Aceptada, Rechazada, Cancelada]
+      responses:
+        '200':
+          description: Estado actualizado.
+        '409':
+          description: Conflicto (ej. Cupo lleno al intentar aceptar).
+
+  # Historial del voluntario
+  /voluntarios/{id}/inscripciones:
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+    get:
+      tags: [Inscripciones]
+      summary: Mis inscripciones
+      responses:
+        '200':
+          description: Lista inscripciones.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/InscripcionVolView'
+
+  # ============================================================
+  # CATÁLOGOS (DATOS MAESTROS)
+  # ============================================================
+  /catalogos/ods:
+    get:
+      tags: [Catálogos]
+      security: []
+      responses:
+        '200':
+          description: Lista ODS.
+          content:
+            application/json:
+              schema: 
+                type: array
+                items: { $ref: '#/components/schemas/ODS' }
+
+  /catalogos/cursos:
+    get:
+      tags: [Catálogos]
+      security: []
+      responses:
+        '200':
+          description: Lista cursos.
+          content:
+            application/json:
+              schema: 
+                type: array
+                items: { $ref: '#/components/schemas/Curso' }
+
+  /catalogos/idiomas:
+    get:
+      tags: [Catálogos]
+      security: []
+      responses:
+        '200':
+          description: Lista idiomas.
+          content:
+            application/json:
+              schema: 
+                type: array
+                items: { $ref: '#/components/schemas/Idioma' }
+
+  /catalogos/tipos-voluntariado:
+    get:
+      tags: [Catálogos]
+      security: []
+      responses:
+        '200':
+          description: Lista tipos de voluntariado.
+          content:
+            application/json:
+              schema: 
+                type: array
+                items: { $ref: '#/components/schemas/TipoVoluntariado' }
+
+  # ============================================================
+  # ADMINISTRACIÓN
+  # ============================================================
+  /admin/stats:
+    get:
+      tags: [Administración]
+      summary: Dashboard Stats
+      responses:
+        '200':
+          description: Dashboard Stats.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardStats'
+
+# ============================================================
+# COMPONENTES / SCHEMAS
+# ============================================================
+components:
+  securitySchemes:
+    firebaseAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    IdParam:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+
+  schemas:
+    # AUTH
+    UsuarioSesion:
+      type: object
+      properties:
+        id_usuario: { type: integer }
+        google_id: { type: string }
+        correo: { type: string }
+        rol: { type: string }
+        estado: { type: string }
+
+    # VOLUNTARIOS
+    VoluntarioInput:
+      type: object
+      required: [google_id, correo, nombre, apellidos]
+      properties:
+        google_id: { type: string }
+        correo: { type: string }
+        nombre: { type: string }
+        apellidos: { type: string }
+        dni: { type: string }
+        telefono: { type: string }
+        fecha_nac: { type: string, format: date }
+        carnet_conducir: { type: boolean }
+        id_curso_actual: { type: integer }
+        idiomas_ids: 
+          type: array
+          items: { type: integer }
+        preferencias_ids:
+          type: array
+          items: { type: integer }
+
+    VoluntarioPerfil:
+      type: object
+      properties:
+        id_usuario: { type: integer }
+        nombre_completo: { type: string }
+        curso_academico: { $ref: '#/components/schemas/Curso' }
+        idiomas: 
+          type: array
+          items: { $ref: '#/components/schemas/Idioma' }
+        preferencias:
+          type: array
+          items: { $ref: '#/components/schemas/TipoVoluntariado' }
+
+    # ORGANIZACIONES
+    OrganizacionInput:
+      type: object
+      required: [google_id, correo, nombre, cif]
+      properties:
+        google_id: { type: string }
+        correo: { type: string }
+        nombre: { type: string }
+        cif: { type: string }
+        descripcion: { type: string }
+        direccion: { type: string }
+        sitio_web: { type: string }
+        telefono: { type: string }
+
+    OrganizacionPerfil:
+      type: object
+      properties:
+        id_usuario: { type: integer }
+        nombre: { type: string }
+        descripcion: { type: string }
+        contacto: 
+          type: object
+          properties:
+            web: { type: string }
+            telefono: { type: string }
+            direccion: { type: string }
+
+    # ACTIVIDADES
+    ActividadInput:
+      type: object
+      required: [id_organizacion, titulo, cupo_maximo]
+      properties:
+        id_organizacion: { type: integer }
+        titulo: { type: string }
+        descripcion: { type: string }
+        cupo_maximo: { type: integer }
+        fecha_inicio: { type: string, format: date-time }
+        duracion_horas: { type: integer }
+        ubicacion: { type: string }
+        ods_ids:
+          type: array
+          items: { type: integer }
+        tipo_ids:
+          type: array
+          items: { type: integer }
+
+    ActividadCard:
+      type: object
+      description: Vista resumen para listados
+      properties:
+        id_actividad: { type: integer }
+        titulo: { type: string }
+        organizacion: { type: string }
+        img_principal: { type: string }
+        cupo_restante: { type: integer }
+        fecha_inicio: { type: string, format: date-time }
+
+    ActividadDetalle:
+      allOf:
+        - $ref: '#/components/schemas/ActividadCard'
+        - type: object
+          properties:
+            descripcion: { type: string }
+            ubicacion: { type: string }
+            imagenes_galeria:
+              type: array
+              items: { type: string }
+            ods:
+              type: array
+              items: { $ref: '#/components/schemas/ODS' }
+            tipos:
+              type: array
+              items: { $ref: '#/components/schemas/TipoVoluntariado' }
+
+    # INSCRIPCIONES
+    InscripcionOrgView:
+      type: object
+      description: Lo que ve la ONG
+      properties:
+        id_voluntario: { type: integer }
+        nombre_completo: { type: string }
+        fecha_solicitud: { type: string, format: date-time }
+        estado: 
+          type: string
+          enum: [Pendiente, Aceptada, Rechazada]
+
+    InscripcionVolView:
+      type: object
+      description: Lo que ve el Voluntario
+      properties:
+        id_actividad: { type: integer }
+        titulo_actividad: { type: string }
+        fecha_actividad: { type: string, format: date-time }
+        estado: 
+          type: string
+          enum: [Pendiente, Aceptada, Rechazada, Cancelada, Finalizada]
+
+    # CATÁLOGOS
+    ODS:
+      type: object
+      properties:
+        id_ods: { type: integer }
+        nombre: { type: string }
+
+    Curso:
+      type: object
+      properties:
+        id_curso: { type: integer }
+        nombre: { type: string }
+        grado: { type: string }
+
+    Idioma:
+      type: object
+      properties:
+        id_idioma: { type: integer }
+        nombre: { type: string }
+
+    TipoVoluntariado:
+      type: object
+      properties:
+        id_tipo: { type: integer }
+        nombre: { type: string }
+
+    # ADMINISTRACIÓN
+    DashboardStats:
+      type: object
+      properties:
+        voluntarios_activos: { type: integer }
+        organizaciones_activas: { type: integer }
+        actividades_publicadas: { type: integer }
+        inscripciones_pendientes: { type: integer }
