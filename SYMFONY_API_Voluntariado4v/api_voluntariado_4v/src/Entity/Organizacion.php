@@ -1,0 +1,155 @@
+<?php
+
+namespace App\Entity;
+
+use App\Repository\OrganizacionRepository;
+use Doctrine\DBAL\Types\Types;
+use Doctrine\ORM\Mapping as ORM;
+
+#[ORM\Entity(repositoryClass: OrganizacionRepository::class)]
+#[ORM\Table(name: 'ORGANIZACION')] // Nombre exacto en SQL Server
+class Organizacion
+{
+    #[ORM\Id]
+    #[ORM\OneToOne(targetEntity: Usuario::class, cascade: ['persist', 'remove'])]
+    #[ORM\JoinColumn(
+        name: 'id_usuario',
+        referencedColumnName: 'id_usuario',
+        nullable: false,
+        onDelete: 'CASCADE' // <--- AÑADIR ESTO
+    )]
+    private ?Usuario $usuario = null;
+
+    // --- DATOS DE LA EMPRESA / ONG ---
+
+    #[ORM\Column(length: 20, unique: true, nullable: true)]
+    private ?string $cif = null;
+
+    #[ORM\Column(length: 100, nullable: true)]
+    private ?string $nombre = null; // Nombre comercial de la ONG
+
+    #[ORM\Column(type: Types::TEXT, nullable: true)]
+    private ?string $descripcion = null; // Texto largo (nvarchar(MAX))
+
+    #[ORM\Column(type: Types::TEXT, nullable: true)]
+    private ?string $direccion = null;   // Texto largo (nvarchar(MAX))
+
+    #[ORM\Column(length: 200, nullable: true, name: 'sitio_web')]
+    private ?string $sitioWeb = null;
+
+    #[ORM\Column(length: 20, nullable: true)]
+    private ?string $telefono = null;
+
+    #[ORM\Column(length: 255, nullable: true, name: 'img_perfil')]
+    private ?string $imgPerfil = null;
+
+    #[ORM\Column(type: Types::DATETIME_MUTABLE, nullable: true, name: 'updated_at')]
+    private ?\DateTimeInterface $updatedAt = null;
+
+    // --- GETTERS Y SETTERS ---
+
+    // Este getter es un "atajo" para obtener el ID del usuario vinculado
+    public function getId(): ?int
+    {
+        return $this->usuario?->getId();
+    }
+
+    public function getUsuario(): ?Usuario
+    {
+        return $this->usuario;
+    }
+
+    public function setUsuario(Usuario $usuario): static
+    {
+        $this->usuario = $usuario;
+        return $this;
+    }
+
+    public function getCif(): ?string
+    {
+        return $this->cif;
+    }
+
+    public function setCif(?string $cif): static
+    {
+        $this->cif = $cif;
+        return $this;
+    }
+
+    public function getNombre(): ?string
+    {
+        return $this->nombre;
+    }
+
+    public function setNombre(?string $nombre): static
+    {
+        $this->nombre = $nombre;
+        return $this;
+    }
+
+    public function getDescripcion(): ?string
+    {
+        return $this->descripcion;
+    }
+
+    public function setDescripcion(?string $descripcion): static
+    {
+        $this->descripcion = $descripcion;
+        return $this;
+    }
+
+    public function getDireccion(): ?string
+    {
+        return $this->direccion;
+    }
+
+    public function setDireccion(?string $direccion): static
+    {
+        $this->direccion = $direccion;
+        return $this;
+    }
+
+    public function getSitioWeb(): ?string
+    {
+        return $this->sitioWeb;
+    }
+
+    public function setSitioWeb(?string $sitioWeb): static
+    {
+        $this->sitioWeb = $sitioWeb;
+        return $this;
+    }
+
+    public function getTelefono(): ?string
+    {
+        return $this->telefono;
+    }
+
+    public function setTelefono(?string $telefono): static
+    {
+        $this->telefono = $telefono;
+        return $this;
+    }
+
+    public function getImgPerfil(): ?string
+    {
+        return $this->imgPerfil;
+    }
+
+    public function setImgPerfil(?string $imgPerfil): static
+    {
+        $this->imgPerfil = $imgPerfil;
+        return $this;
+    }
+
+    public function getUpdatedAt(): ?\DateTimeInterface
+    {
+        return $this->updatedAt;
+    }
+
+    public function setUpdatedAt(?\DateTimeInterface $updatedAt): static
+    {
+        $this->updatedAt = $updatedAt;
+        return $this;
+    }
+}
