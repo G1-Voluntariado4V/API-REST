@@ -1,5 +1,5 @@
 <?php
-
+//BORRAR EN CASCADA
 declare(strict_types=1);
 
 namespace DoctrineMigrations;
