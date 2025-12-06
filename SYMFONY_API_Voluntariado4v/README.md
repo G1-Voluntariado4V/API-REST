@@ -14,7 +14,10 @@ Antes de empezar, asegúrate de tener instalado en tu máquina:
 6.  **Drivers PHP para SQL Server**:
     - Debes descargar las DLLs (`php_sqlsrv` y `php_pdo_sqlsrv`) correspondientes a tu versión de PHP.
     - Pegarlas en la carpeta `ext` de tu PHP.
-    - Activarlas en el `php.ini` (`extension=php_sqlsrv...`).
+    - Activarlas en el `php.ini`:
+      `extension=php_sqlsrv_82_ts_x64.dll`
+      `extension=php_pdo_sqlsrv_82_ts_x64.dll`
+      `extension=intl`
 
 ---
 
@@ -45,7 +48,7 @@ GO
 -- Crear Login y Usuario
 IF NOT EXISTS (SELECT * FROM sys.server_principals WHERE name = 'symfony_app')
 BEGIN
-    CREATE LOGIN symfony_app WITH PASSWORD = 'TuPasswordFuerte1!';
+    CREATE LOGIN symfony_app WITH PASSWORD = 'Symfony2025!';
     ALTER LOGIN symfony_app ENABLE;
 END
 GO
@@ -113,36 +116,39 @@ php bin/console doctrine:dbal:run-sql "SELECT @@VERSION"
 
 ---
 
-## 4. Flujo de Trabajo: Base de Datos e Ingenieria Inversa
+## 3. Crear Base de Datos(Migraciones)
 
-### Paso 1: Cargar/Restaurar la BBDD
+Este proyecto usa Code First. No crees tablas manualmente.
 
-Si la base de datos está vacía o desactualizada:
+### Paso 1: Ejecutar Migraciones:
 
-Abre SSMS.
-
-Ejecuta el script completo MockData_VoluntariadoDB_Query.sql (o el nombre que tenga el script maestro de creación de tablas).
-
-Esto creará todas las tablas (USUARIO, ROL, ACTIVIDAD, etc.) y datos de prueba.
-
-### Paso 2: Generar entidades a partir de la BBDD
-
-Para crear las clases PHP (Entidades) basándonos en las tablas de SQL Server:
-Importar mapeo:
+Este comando crea todas las tablas (USUARIO, VOLUNTARIO, ORGANIZACION...) automáticamente.
 
 ```bash
-php bin/console doctrine:mapping:import "App\Entity" attribute --path=src/Entity
+php bin/console doctrine:migrations:migrate
 ```
 
-Esto crea los archivos básicos en src/Entity.
+## 4. Cargar Datos de Prueba (Fixtures)
 
-Generar Getters y Setters:
+Para poder entrar en la aplicación nada más instalarla, hemos preparado un set de datos.
+
+1. Ejecuta el comando de carga: (Escribe 'yes' cuando pregunte si quieres purgar la base de datos).
 
 ```bash
-php bin/console make:entity --regenerate App\Entity
+php bin/console doctrine:fixtures:load
 ```
 
-Ajustes manuales: Revisa las entidades creadas. A veces Doctrine nombra las clases en plural (ej: Usuarios). Renómbralas a singular si es necesario y ajusta los nombres de archivo.
+2. Usuarios disponibles tras la carga
+   Rol Correo (Login Google) Estado Notas
+   Coordinador maitesolam@gmail.com Activo Usuario Admin Principal
+   Voluntario pepe.voluntario@test.com Activo Usuario Ficticio
+   Organización ayuda@ong.com Activo Usuario Ficticio
+
+⚠️ Nota para Desarrolladores (Frontend):
+
+Para ser Admin: Si queréis entrar como Coordinador con vuestra cuenta de Google, id a src/DataFixtures/AppFixtures.php, cambiad el UID de Maite por el vuestro real y ejecutad de nuevo el comando de fixtures.
+
+Para probar Voluntario/ONG: Usad el formulario de registro del frontend o editad el UID en base de datos para suplantar a los usuarios ficticios.
 
 ## ▶️ 5. Ejecutar el Servidor
 
