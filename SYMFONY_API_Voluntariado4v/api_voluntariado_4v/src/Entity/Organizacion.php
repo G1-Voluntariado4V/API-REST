@@ -5,6 +5,7 @@ namespace App\Entity;
 use App\Repository\OrganizacionRepository;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Component\Serializer\Annotation\Groups;
 
 #[ORM\Entity(repositoryClass: OrganizacionRepository::class)]
 #[ORM\Table(name: 'ORGANIZACION')] // Nombre exacto en SQL Server
@@ -18,29 +19,36 @@ class Organizacion
         nullable: false,
         onDelete: 'CASCADE' // <--- AÑADIR ESTO
     )]
+    #[Groups(['usuario:read'])]
     private ?Usuario $usuario = null;
 
     // --- DATOS DE LA EMPRESA / ONG ---
 
     #[ORM\Column(length: 20, unique: true, nullable: true)]
+    #[Groups(['usuario:read'])]
     private ?string $cif = null;
 
     #[ORM\Column(length: 100, nullable: true)]
     private ?string $nombre = null; // Nombre comercial de la ONG
 
     #[ORM\Column(type: Types::TEXT, nullable: true)]
+    #[Groups(['usuario:read'])]
     private ?string $descripcion = null; // Texto largo (nvarchar(MAX))
 
     #[ORM\Column(type: Types::TEXT, nullable: true)]
+    #[Groups(['usuario:read'])]
     private ?string $direccion = null;   // Texto largo (nvarchar(MAX))
 
     #[ORM\Column(length: 200, nullable: true, name: 'sitio_web')]
+    #[Groups(['usuario:read'])]
     private ?string $sitioWeb = null;
 
     #[ORM\Column(length: 20, nullable: true)]
+    #[Groups(['usuario:read'])]
     private ?string $telefono = null;
 
     #[ORM\Column(length: 255, nullable: true, name: 'img_perfil')]
+    #[Groups(['usuario:read'])]
     private ?string $imgPerfil = null;
 
     #[ORM\Column(type: Types::DATETIME_MUTABLE, nullable: true, name: 'updated_at')]

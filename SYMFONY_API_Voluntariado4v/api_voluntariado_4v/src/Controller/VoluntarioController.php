@@ -6,11 +6,15 @@ use App\Entity\Usuario;
 use App\Entity\Voluntario;
 use App\Repository\RolRepository;
 use App\Repository\CursoRepository;
+use App\Entity\Idioma;
+use App\Entity\VoluntarioIdioma;
+use App\Repository\IdiomaRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface; // <--- 1. IMPORTE NECESARIO
 
 #[Route('/api', name: 'api_')]
 final class VoluntarioController extends AbstractController
@@ -20,101 +24,95 @@ final class VoluntarioController extends AbstractController
         Request $request,
         EntityManagerInterface $entityManager,
         RolRepository $rolRepository,
-        CursoRepository $cursoRepository // Inyección de dependencia para buscar cursos
+        CursoRepository $cursoRepository,
+        IdiomaRepository $idiomaRepository,
+        UserPasswordHasherInterface $hasher // <--- 2. INYECCIÓN DEL HASHER
     ): JsonResponse {
 
-        // 1. Decodificar el JSON que envía el Frontend
+        // 1. Decodificar el JSON
         $data = json_decode($request->getContent(), true);
 
-        // 2. Validaciones básicas (Campos obligatorios)
-        // Nota: DNI y Teléfono son opcionales en la BBDD, pero nombre/apellidos/email son vitales.
+        // 2. Validaciones básicas
         if (!isset($data['google_id'], $data['correo'], $data['nombre'], $data['apellidos'])) {
-            return $this->json(['error' => 'Faltan datos obligatorios (google_id, correo, nombre, apellidos)'], 400);
+            return $this->json(['error' => 'Faltan datos obligatorios'], 400);
         }
 
-        // 3. Iniciar Transacción (Seguridad de Datos)
-        // Si falla la creación del Voluntario, se deshace la creación del Usuario.
+        // 3. Transacción
         $entityManager->beginTransaction();
 
         try {
             // ======================================================
-            // PASO A: Crear el USUARIO (Cuenta base para Login)
+            // PASO A: Crear el USUARIO
             // ======================================================
             $usuario = new Usuario();
             $usuario->setCorreo($data['correo']);
             $usuario->setGoogleId($data['google_id']);
 
-            // Asignar Rol: Buscamos el ID 2 (Voluntario)
+            // --- AÑADIDO: CORRECCIÓN DE SEGURIDAD BBDD ---
+            // Estos campos son NOT NULL en la base de datos, hay que rellenarlos
+            $usuario->setEstadoCuenta('Pendiente');
+            $passwordAleatoria = bin2hex(random_bytes(10)); // Genera algo como "a1b2c3d4e5"
+            $usuario->setPassword($hasher->hashPassword($usuario, $passwordAleatoria));
+            // ---------------------------------------------
+
+            // Asignar Rol Voluntario (ID 2)
             $rolVoluntario = $rolRepository->find(2);
-            if (!$rolVoluntario) {
-                throw new \Exception("El rol de Voluntario (ID 2) no existe en la base de datos.");
-            }
+            if (!$rolVoluntario) throw new \Exception("Rol Voluntario no encontrado");
+
             $usuario->setRol($rolVoluntario);
 
-            // Guardamos el usuario primero para que SQL Server genere su ID
             $entityManager->persist($usuario);
             $entityManager->flush();
 
             // ======================================================
-            // PASO B: Crear el VOLUNTARIO (Perfil detallado)
+            // PASO B: Crear el VOLUNTARIO
             // ======================================================
             $voluntario = new Voluntario();
-
-            // Vinculación 1 a 1: El voluntario usa el ID del usuario recién creado
             $voluntario->setUsuario($usuario);
-
-            // Datos Personales básicos
             $voluntario->setNombre($data['nombre']);
             $voluntario->setApellidos($data['apellidos']);
-            $voluntario->setTelefono($data['telefono'] ?? null); // Operador ?? por si viene null
+            $voluntario->setTelefono($data['telefono'] ?? null);
             $voluntario->setDni($data['dni'] ?? null);
-
-            // --- CAMPOS AVANZADOS ---
-
-            // 1. Carnet Conducir (Boolean)
             $voluntario->setCarnetConducir($data['carnet_conducir'] ?? false);
 
-            // 2. Fecha Nacimiento (String 'YYYY-MM-DD' -> DateTime)
+            // Fecha nacimiento
             if (!empty($data['fecha_nac'])) {
                 try {
-                    // Intentamos convertir el string a objeto fecha
                     $voluntario->setFechaNac(new \DateTime($data['fecha_nac']));
                 } catch (\Exception $e) {
-                    // Si la fecha es inválida, se queda en null (no bloqueamos el registro)
                 }
             }
 
-            // 3. Imagen de Perfil (String URL de Firebase)
             $voluntario->setImgPerfil($data['img_perfil'] ?? null);
 
-            // 4. Curso Actual (Relación ManyToOne)
+            // Curso
             if (!empty($data['id_curso_actual'])) {
                 $curso = $cursoRepository->find($data['id_curso_actual']);
-                if ($curso) {
-                    $voluntario->setCursoActual($curso);
-                } else {
-                    // Opcional: Podríamos lanzar error si el curso ID no existe
-                    // throw new \Exception("El curso especificado no existe");
+                if ($curso) $voluntario->setCursoActual($curso);
+            }
+
+            // Idiomas
+            if (!empty($data['idiomas']) && is_array($data['idiomas'])) {
+                foreach ($data['idiomas'] as $idiomaData) {
+                    $idiomaEntity = $idiomaRepository->find($idiomaData['id_idioma']);
+                    if ($idiomaEntity) {
+                        $voluntarioIdioma = new VoluntarioIdioma();
+                        $voluntarioIdioma->setVoluntario($voluntario);
+                        $voluntarioIdioma->setIdioma($idiomaEntity);
+                        $voluntarioIdioma->setNivel($idiomaData['nivel'] ?? 'Básico');
+                        $entityManager->persist($voluntarioIdioma);
+                    }
                 }
             }
 
             $entityManager->persist($voluntario);
             $entityManager->flush();
 
-            // ======================================================
-            // PASO C: Confirmar todo (Commit)
-            // ======================================================
             $entityManager->commit();
 
-            return $this->json([
-                'mensaje' => 'Voluntario registrado correctamente',
-                'id_usuario' => $usuario->getId(),
-                'curso' => $voluntario->getCursoActual()?->getNombre() // Devolvemos info extra útil
-            ], 201);
+            return $this->json($voluntario, 201, [], ['groups' => 'usuario:read']);
         } catch (\Exception $e) {
-            // ¡ERROR CRÍTICO! Deshacemos todo lo hecho en BBDD
             $entityManager->rollback();
-
             return $this->json(['error' => 'Error al registrar: ' . $e->getMessage()], 500);
         }
     }

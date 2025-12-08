@@ -4,6 +4,7 @@ namespace App\Entity;
 
 use App\Repository\RolRepository;
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Component\Serializer\Annotation\Groups;
 
 #[ORM\Entity(repositoryClass: RolRepository::class)]
 #[ORM\Table(name: 'ROL')] // <--- 1. Nombre Tabla en Mayúsculas como en SQL
@@ -15,6 +16,7 @@ class Rol
     private ?int $id = null;
 
     #[ORM\Column(length: 50, name: 'nombre_rol')] // <--- 3. Columna exacta del SQL
+    #[Groups(['usuario:read'])]
     private ?string $nombre = null;
 
     public function getId(): ?int

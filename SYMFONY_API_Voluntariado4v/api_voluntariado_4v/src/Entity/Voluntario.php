@@ -5,6 +5,7 @@ namespace App\Entity;
 use App\Repository\VoluntarioRepository;
 use Doctrine\ORM\Mapping as ORM;
 use Doctrine\DBAL\Types\Types;
+use Symfony\Component\Serializer\Annotation\Groups;
 
 
 #[ORM\Entity(repositoryClass: VoluntarioRepository::class)]
@@ -20,18 +21,23 @@ class Voluntario
         nullable: false,
         onDelete: 'CASCADE' // <--- ¡ESTO ES LA CLAVE!
     )]
+    #[Groups(['usuario:read'])]
     private ?Usuario $usuario = null;
 
     #[ORM\Column(length: 9, unique: true, nullable: true)]
+    #[Groups(['usuario:read'])]
     private ?string $dni = null;
 
     #[ORM\Column(length: 50)]
+    #[Groups(['usuario:read'])]
     private ?string $nombre = null;
 
     #[ORM\Column(length: 100)]
+    #[Groups(['usuario:read'])]
     private ?string $apellidos = null;
 
     #[ORM\Column(length: 20, nullable: true)]
+    #[Groups(['usuario:read'])]
     private ?string $telefono = null;
 
     #[ORM\Column(type: Types::DATE_MUTABLE, nullable: true, name: 'fecha_nac')]
