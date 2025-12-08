@@ -17,7 +17,7 @@ class Organizacion
         name: 'id_usuario',
         referencedColumnName: 'id_usuario',
         nullable: false,
-        onDelete: 'CASCADE' // <--- AÑADIR ESTO
+        onDelete: 'CASCADE'
     )]
     #[Groups(['usuario:read'])]
     private ?Usuario $usuario = null;
@@ -29,15 +29,16 @@ class Organizacion
     private ?string $cif = null;
 
     #[ORM\Column(length: 100, nullable: true)]
-    private ?string $nombre = null; // Nombre comercial de la ONG
+    #[Groups(['usuario:read'])] // <--- ¡ESTO FALTABA! Ahora el nombre saldrá en la API
+    private ?string $nombre = null;
 
     #[ORM\Column(type: Types::TEXT, nullable: true)]
     #[Groups(['usuario:read'])]
-    private ?string $descripcion = null; // Texto largo (nvarchar(MAX))
+    private ?string $descripcion = null;
 
     #[ORM\Column(type: Types::TEXT, nullable: true)]
     #[Groups(['usuario:read'])]
-    private ?string $direccion = null;   // Texto largo (nvarchar(MAX))
+    private ?string $direccion = null;   
 
     #[ORM\Column(length: 200, nullable: true, name: 'sitio_web')]
     #[Groups(['usuario:read'])]
@@ -56,7 +57,6 @@ class Organizacion
 
     // --- GETTERS Y SETTERS ---
 
-    // Este getter es un "atajo" para obtener el ID del usuario vinculado
     public function getId(): ?int
     {
         return $this->usuario?->getId();

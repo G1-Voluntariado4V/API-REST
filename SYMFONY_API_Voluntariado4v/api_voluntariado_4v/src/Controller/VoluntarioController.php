@@ -7,8 +7,11 @@ use App\Entity\Voluntario;
 use App\Repository\RolRepository;
 use App\Repository\CursoRepository;
 use App\Entity\Idioma;
+use App\Repository\UsuarioRepository;
 use App\Entity\VoluntarioIdioma;
 use App\Repository\IdiomaRepository;
+
+
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -115,5 +118,84 @@ final class VoluntarioController extends AbstractController
             $entityManager->rollback();
             return $this->json(['error' => 'Error al registrar: ' . $e->getMessage()], 500);
         }
+    }
+
+
+    // [MÉTODO NUEVO] ACTUALIZAR (PUT)
+    #[Route('/voluntarios/{id}', name: 'actualizar_voluntario', methods: ['PUT'])]
+    public function actualizar(
+        int $id,
+        Request $request,
+        UsuarioRepository $usuarioRepo, // Buscamos por Usuario ID (que es la PK)
+        IdiomaRepository $idiomaRepo,
+        EntityManagerInterface $entityManager
+    ): JsonResponse {
+        // 1. Buscar al voluntario por su ID de Usuario (que es su PK)
+        $usuario = $usuarioRepo->find($id);
+        if (!$usuario) return $this->json(['error' => 'Usuario no encontrado'], 404);
+        
+        // Obtenemos el perfil de voluntario asociado
+        // (Asumiendo que tienes la relación inversa getVoluntario() en Usuario, 
+        //  si no, buscamos en el repositorio de Voluntario)
+        $voluntario = $entityManager->getRepository(Voluntario::class)->findOneBy(['usuario' => $usuario]);
+
+        if (!$voluntario) return $this->json(['error' => 'Perfil de voluntario no encontrado'], 404);
+
+        $data = json_decode($request->getContent(), true);
+
+        // 2. Actualizar Idiomas (Caso Ana: Inglés a C1)
+        if (!empty($data['idiomas']) && is_array($data['idiomas'])) {
+            foreach ($data['idiomas'] as $idiomaData) {
+                $idiomaEntity = $idiomaRepo->find($idiomaData['id_idioma']);
+                if ($idiomaEntity) {
+                    // Buscamos si ya tiene este idioma asignado
+                    $relacionExistente = null;
+                    foreach ($voluntario->getVoluntarioIdiomas() as $vi) {
+                        if ($vi->getIdioma()->getId() === $idiomaEntity->getId()) {
+                            $relacionExistente = $vi;
+                            break;
+                        }
+                    }
+
+                    if ($relacionExistente) {
+                        // ACTUALIZAMOS nivel
+                        $relacionExistente->setNivel($idiomaData['nivel']);
+                    } else {
+                        // CREAMOS relación nueva
+                        $nuevoIdioma = new VoluntarioIdioma();
+                        $nuevoIdioma->setVoluntario($voluntario);
+                        $nuevoIdioma->setIdioma($idiomaEntity);
+                        $nuevoIdioma->setNivel($idiomaData['nivel']);
+                        $entityManager->persist($nuevoIdioma);
+                    }
+                }
+            }
+        }
+
+        // Aquí podrías añadir lógica para actualizar nombre, apellidos, etc.
+
+        $entityManager->flush();
+
+        return $this->json($voluntario, 200, [], ['groups' => 'usuario:read']);
+    }
+
+    // [MÉTODO NUEVO] BORRAR (DELETE - Soft Delete)
+    #[Route('/voluntarios/{id}', name: 'borrar_voluntario', methods: ['DELETE'])]
+    public function eliminar(
+        int $id, 
+        UsuarioRepository $usuarioRepo, 
+        EntityManagerInterface $entityManager
+    ): JsonResponse {
+        $usuario = $usuarioRepo->find($id);
+        if (!$usuario) return $this->json(['error' => 'Usuario no encontrado'], 404);
+
+        // Aplicamos Soft Delete manualmente para ser explícitos en el código
+        // (Aunque tu trigger de BBDD también protege, es mejor hacerlo desde la APP)
+        $usuario->setDeletedAt(new \DateTimeImmutable());
+        $usuario->setEstadoCuenta('Bloqueada'); // O 'Inactiva'
+
+        $entityManager->flush();
+
+        return $this->json(['mensaje' => 'Usuario eliminado correctamente (Soft Delete)'], 200);
     }
 }

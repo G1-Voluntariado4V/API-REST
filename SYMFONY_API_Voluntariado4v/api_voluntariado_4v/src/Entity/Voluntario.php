@@ -6,6 +6,8 @@ use App\Repository\VoluntarioRepository;
 use Doctrine\ORM\Mapping as ORM;
 use Doctrine\DBAL\Types\Types;
 use Symfony\Component\Serializer\Annotation\Groups;
+use Doctrine\Common\Collections\ArrayCollection; 
+use Doctrine\Common\Collections\Collection;
 
 
 #[ORM\Entity(repositoryClass: VoluntarioRepository::class)]
@@ -59,6 +61,16 @@ class Voluntario
 
     #[ORM\Column(type: Types::DATETIME_MUTABLE, nullable: true, name: 'updated_at')]
     private ?\DateTimeInterface $updatedAt = null;
+
+    // --- NUEVA PROPIEDAD PARA IDIOMAS ---
+    #[ORM\OneToMany(mappedBy: 'voluntario', targetEntity: VoluntarioIdioma::class, cascade: ['persist', 'remove'])]
+    #[Groups(['usuario:read'])] // Para que salgan los idiomas al pedir el usuario
+    private Collection $voluntarioIdiomas;
+
+    public function __construct()
+    {
+        $this->voluntarioIdiomas = new ArrayCollection();
+    }
 
     // --- GETTERS Y SETTERS ---
 
@@ -166,4 +178,32 @@ class Voluntario
         $this->updatedAt = $updatedAt;
         return $this;
     }
+
+    /**
+     * @return Collection<int, VoluntarioIdioma>
+     */
+    public function getVoluntarioIdiomas(): Collection
+    {
+        return $this->voluntarioIdiomas;
+    }
+
+    public function addVoluntarioIdioma(VoluntarioIdioma $vi): static
+    {
+        if (!$this->voluntarioIdiomas->contains($vi)) {
+            $this->voluntarioIdiomas->add($vi);
+            $vi->setVoluntario($this);
+        }
+        return $this;
+    }
+
+    public function removeVoluntarioIdioma(VoluntarioIdioma $vi): static
+    {
+        if ($this->voluntarioIdiomas->removeElement($vi)) {
+            if ($vi->getVoluntario() === $this) {
+                $vi->setVoluntario(null);
+            }
+        }
+        return $this;
+    }
+
 }
