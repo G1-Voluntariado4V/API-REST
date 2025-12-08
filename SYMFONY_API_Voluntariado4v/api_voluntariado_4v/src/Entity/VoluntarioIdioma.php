@@ -10,35 +10,71 @@ use Symfony\Component\Serializer\Annotation\Groups;
 #[ORM\Table(name: 'VOLUNTARIO_IDIOMA')]
 class VoluntarioIdioma
 {
-   #[ORM\Id]
-    #[ORM\GeneratedValue]
-    #[ORM\Column]
-    #[Groups(['usuario:read'])]
-    private ?int $id = null;
+    // ------------------------------------------------------------------------
+    // PARTE 1 DE LA CLAVE PRIMARIA (Voluntario)
+    // ------------------------------------------------------------------------
+    #[ORM\Id] // <--- Indica que esto es parte de la PK
+    #[ORM\ManyToOne(inversedBy: 'voluntarioIdiomas')]
+    #[ORM\JoinColumn(
+        name: 'id_voluntario',
+        referencedColumnName: 'id_usuario',
+        nullable: false,
+        onDelete: 'CASCADE'
+    )]
+    private ?Voluntario $voluntario = null;
 
+    // ------------------------------------------------------------------------
+    // PARTE 2 DE LA CLAVE PRIMARIA (Idioma)
+    // ------------------------------------------------------------------------
+    #[ORM\Id] // <--- Indica que esto TAMBIÉN es parte de la PK
+    #[ORM\ManyToOne]
+    #[ORM\JoinColumn(
+        name: 'id_idioma',
+        referencedColumnName: 'id_idioma',
+        nullable: false
+    )]
+    #[Groups(['usuario:read'])] // Para que se vea el detalle del idioma (nombre, iso)
+    private ?Idioma $idioma = null;
+
+    // ------------------------------------------------------------------------
+    // DATOS EXTRA
+    // ------------------------------------------------------------------------
     #[ORM\Column(length: 20, nullable: true)]
     #[Groups(['usuario:read'])]
     private ?string $nivel = null;
 
-    // Relación: Muchos "VoluntarioIdioma" pertenecen a Un "Voluntario"
-    #[ORM\ManyToOne(inversedBy: 'voluntarioIdiomas')]
-    #[ORM\JoinColumn(nullable: false, name: 'id_voluntario', referencedColumnName: 'id_usuario', onDelete: 'CASCADE')]
-    private ?Voluntario $voluntario = null;
+    // --- GETTERS Y SETTERS ---
 
-    // Relación: Muchos "VoluntarioIdioma" apuntan a Un "Idioma"
-    #[ORM\ManyToOne]
-    #[ORM\JoinColumn(nullable: false, name: 'id_idioma', referencedColumnName: 'id_idioma')]
-    #[Groups(['usuario:read'])]
-    private ?Idioma $idioma = null;
+    public function getVoluntario(): ?Voluntario
+    {
+        return $this->voluntario;
+    }
 
-    public function getId(): ?int { return $this->id; }
+    public function setVoluntario(?Voluntario $voluntario): static
+    {
+        $this->voluntario = $voluntario;
+        return $this;
+    }
 
-    public function getNivel(): ?string { return $this->nivel; }
-    public function setNivel(?string $nivel): static { $this->nivel = $nivel; return $this; }
+    public function getIdioma(): ?Idioma
+    {
+        return $this->idioma;
+    }
 
-    public function getVoluntario(): ?Voluntario { return $this->voluntario; }
-    public function setVoluntario(?Voluntario $voluntario): static { $this->voluntario = $voluntario; return $this; }
+    public function setIdioma(?Idioma $idioma): static
+    {
+        $this->idioma = $idioma;
+        return $this;
+    }
 
-    public function getIdioma(): ?Idioma { return $this->idioma; }
-    public function setIdioma(?Idioma $idioma): static { $this->idioma = $idioma; return $this; }
+    public function getNivel(): ?string
+    {
+        return $this->nivel;
+    }
+
+    public function setNivel(?string $nivel): static
+    {
+        $this->nivel = $nivel;
+        return $this;
+    }
 }

@@ -10,18 +10,19 @@ use Symfony\Component\Serializer\Annotation\Groups;
 #[ORM\Entity(repositoryClass: ODSRepository::class)]
 class ODS
 {
-    #[ORM\Id]
-    //Elimino el autogenerador para que los ids coincidan con los ODS de la ONU
+   #[ORM\Id]
     #[ORM\Column]
-    #[Groups(['curso:read'])]
-    private ?int $id;
+    // 👇 AQUÍ ESTÁ EL TRUCO: Ponemos los dos grupos
+    #[Groups(['actividad:read', 'curso:read'])] 
+    private ?int $id = null;
 
     #[ORM\Column(length: 150)]
-    #[Groups(['curso:read'])]
-    private ?string $nombre;
+    // 👇 AQUÍ TAMBIÉN
+    #[Groups(['actividad:read', 'curso:read'])] 
+    private ?string $nombre = null;
 
-    #[ORM\Column(type: Types::TEXT, nullable: true)]
-    #[Groups(['curso:read'])]
+    #[ORM\Column(type: 'text', nullable: true)]
+    #[Groups(['actividad:read', 'curso:read'])]
     private ?string $descripcion = null;
 
     // --- CONSTRUCTOR OPCIONAL (Recomendado para IDs obligatorios) ---

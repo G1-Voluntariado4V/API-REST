@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Entity;
 
 use App\Repository\OrganizacionRepository;
@@ -8,7 +7,7 @@ use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Annotation\Groups;
 
 #[ORM\Entity(repositoryClass: OrganizacionRepository::class)]
-#[ORM\Table(name: 'ORGANIZACION')] // Nombre exacto en SQL Server
+#[ORM\Table(name: 'ORGANIZACION')]
 class Organizacion
 {
     #[ORM\Id]
@@ -19,21 +18,21 @@ class Organizacion
         nullable: false,
         onDelete: 'CASCADE'
     )]
-    #[Groups(['usuario:read'])]
+    #[Groups(['usuario:read'])] // El ID de usuario quizás no hace falta en la actividad, pero mal no hace
     private ?Usuario $usuario = null;
 
     // --- DATOS DE LA EMPRESA / ONG ---
 
     #[ORM\Column(length: 20, unique: true, nullable: true)]
-    #[Groups(['usuario:read'])]
+    #[Groups(['usuario:read'])] // El CIF suele ser dato privado/administrativo, mejor no mostrarlo en actividades públicas
     private ?string $cif = null;
 
     #[ORM\Column(length: 100, nullable: true)]
-    #[Groups(['usuario:read'])] // <--- ¡ESTO FALTABA! Ahora el nombre saldrá en la API
+    #[Groups(['usuario:read', 'actividad:read'])] // <--- AQUÍ ESTÁ EL CAMBIO (Para que salga el nombre en la actividad)
     private ?string $nombre = null;
 
     #[ORM\Column(type: Types::TEXT, nullable: true)]
-    #[Groups(['usuario:read'])]
+    #[Groups(['usuario:read', 'actividad:read'])] // <--- También la descripción si quieres
     private ?string $descripcion = null;
 
     #[ORM\Column(type: Types::TEXT, nullable: true)]
@@ -41,7 +40,7 @@ class Organizacion
     private ?string $direccion = null;   
 
     #[ORM\Column(length: 200, nullable: true, name: 'sitio_web')]
-    #[Groups(['usuario:read'])]
+    #[Groups(['usuario:read', 'actividad:read'])] // <--- Útil para enlazar
     private ?string $sitioWeb = null;
 
     #[ORM\Column(length: 20, nullable: true)]
@@ -49,11 +48,13 @@ class Organizacion
     private ?string $telefono = null;
 
     #[ORM\Column(length: 255, nullable: true, name: 'img_perfil')]
-    #[Groups(['usuario:read'])]
+    #[Groups(['usuario:read', 'actividad:read'])] // <--- Muy importante para la tarjeta de la actividad
     private ?string $imgPerfil = null;
 
     #[ORM\Column(type: Types::DATETIME_MUTABLE, nullable: true, name: 'updated_at')]
     private ?\DateTimeInterface $updatedAt = null;
+
+    // ... (El resto de Getters y Setters se queda igual) ...
 
     // --- GETTERS Y SETTERS ---
 
