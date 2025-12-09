@@ -40,10 +40,6 @@ final class OrganizacionController extends AbstractController
             // 3. CORRECCIÓN CRÍTICA: Rellenar campos obligatorios de BBDD
             $usuario->setEstadoCuenta('Pendiente');
 
-            // Generamos contraseña aleatoria y la hasheamos
-            $randomPassword = bin2hex(random_bytes(10));
-            $usuario->setPassword($hasher->hashPassword($usuario, $randomPassword));
-            // -----------------------------------------------------------
 
             $rolOrg = $rolRepository->find(3); // ID 3 = Organización
             if (!$rolOrg) throw new \Exception("Rol Organización no encontrado");

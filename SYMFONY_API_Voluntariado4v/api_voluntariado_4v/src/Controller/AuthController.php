@@ -42,7 +42,7 @@ final class AuthController extends AbstractController
             'id_usuario' => $usuario->getId(),
             'google_id'  => $usuario->getGoogleId(),
             'correo'     => $usuario->getCorreo(),
-            'rol'        => $usuario->getRol()->getNombre(), // ¡Vital para que el Frontend sepa qué menú mostrar!
+            'rol'        => $usuario->getRol()->getNombre(),
             'estado'     => $usuario->getEstadoCuenta()
         ], 200);
     }

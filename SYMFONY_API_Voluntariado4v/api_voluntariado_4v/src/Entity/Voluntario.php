@@ -6,7 +6,7 @@ use App\Repository\VoluntarioRepository;
 use Doctrine\ORM\Mapping as ORM;
 use Doctrine\DBAL\Types\Types;
 use Symfony\Component\Serializer\Annotation\Groups;
-use Doctrine\Common\Collections\ArrayCollection; 
+use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 
 
@@ -67,9 +67,26 @@ class Voluntario
     #[Groups(['usuario:read'])] // Para que salgan los idiomas al pedir el usuario
     private Collection $voluntarioIdiomas;
 
+    #[ORM\OneToMany(mappedBy: 'voluntario', targetEntity: Inscripcion::class, cascade: ['persist', 'remove'])]
+    #[Groups(['usuario:read'])] // IMPORTANTE: Para ver "Mis inscripciones"
+    private Collection $inscripciones;
+
+    // RELACIÓN: PREFERENCIAS DEL VOLUNTARIO (M:N)
+    #[ORM\ManyToMany(targetEntity: TipoVoluntariado::class)]
+    #[ORM\JoinTable(
+        name: 'PREFERENCIA_VOLUNTARIO', // Nombre de la tabla en SQL Server
+        joinColumns: [new ORM\JoinColumn(name: 'id_voluntario', referencedColumnName: 'id_usuario')],
+        inverseJoinColumns: [new ORM\JoinColumn(name: 'id_tipo', referencedColumnName: 'id_tipo')]
+    )]
+
+    #[Groups(['usuario:read'])] // Para ver tus intereses en el perfil
+    private Collection $preferencias;
+
     public function __construct()
     {
         $this->voluntarioIdiomas = new ArrayCollection();
+        $this->inscripciones = new ArrayCollection();
+        $this->preferencias = new ArrayCollection();
     }
 
     // --- GETTERS Y SETTERS ---
@@ -180,6 +197,33 @@ class Voluntario
     }
 
     /**
+     * @return Collection<int, Inscripcion>
+     */
+    public function getInscripciones(): Collection
+    {
+        return $this->inscripciones;
+    }
+
+    public function addInscripcion(Inscripcion $inscripcion): static
+    {
+        if (!$this->inscripciones->contains($inscripcion)) {
+            $this->inscripciones->add($inscripcion);
+            $inscripcion->setVoluntario($this);
+        }
+        return $this;
+    }
+
+    public function removeInscripcion(Inscripcion $inscripcion): static
+    {
+        if ($this->inscripciones->removeElement($inscripcion)) {
+            if ($inscripcion->getVoluntario() === $this) {
+                $inscripcion->setVoluntario(null);
+            }
+        }
+        return $this;
+    }
+
+    /**
      * @return Collection<int, VoluntarioIdioma>
      */
     public function getVoluntarioIdiomas(): Collection
@@ -206,4 +250,31 @@ class Voluntario
         return $this;
     }
 
+    /**
+     * @return Collection<int, TipoVoluntariado>
+     */
+    public function getPreferencias(): Collection
+    {
+        return $this->preferencias;
+    }
+
+    public function addPreferencia(TipoVoluntariado $preferencia): static
+    {
+        if (!$this->preferencias->contains($preferencia)) {
+            $this->preferencias->add($preferencia);
+        }
+        return $this;
+    }
+
+    public function removePreferencia(TipoVoluntariado $preferencia): static
+    {
+        $this->preferencias->removeElement($preferencia);
+        return $this;
+    }
+
+    public function __toString(): string
+    {
+        // Devolvemos el string del usuario asociado o un texto por defecto
+        return $this->usuario ? (string) $this->usuario->getCorreo() : 'Voluntario sin usuario';
+    }
 }

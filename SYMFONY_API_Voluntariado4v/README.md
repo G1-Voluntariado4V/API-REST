@@ -12,12 +12,11 @@ Antes de empezar, asegúrate de tener instalado en tu máquina:
 4.  **Microsoft SQL Server** (Express o Developer Edition).
 5.  **SQL Server Management Studio (SSMS)**.
 6.  **Drivers PHP para SQL Server**:
-    - Debes descargar las DLLs (`php_sqlsrv` y `php_pdo_sqlsrv`) correspondientes a tu versión de PHP.
+    - Debes descargar las DLLs (`php_sqlsrv` y `php_pdo_sqlsrv`) correspondientes a tu versión de PHP. Puedes descargar desde: https://learn.microsoft.com/en-us/sql/connect/php/download-drivers-php-sql-server?view=sql-server-ver17
     - Pegarlas en la carpeta `ext` de tu PHP.
     - Activarlas en el `php.ini`:
       `extension=php_sqlsrv_82_ts_x64.dll`
       `extension=php_pdo_sqlsrv_82_ts_x64.dll`
-      `extension=intl`
 
 ---
 
@@ -27,12 +26,12 @@ Para que la aplicación conecte, necesitamos configurar el servidor y crear el u
 
 ### A. Habilitar TCP/IP y Modo Mixto
 
-1.  Abre **SQL Server Configuration Manager**.
-2.  Ve a **Configuración de red de SQL Server** > Protocolos.
+1.  Win + R > SQLServerManager16.msc
+2.  Configuración de Red de SQL Server > Protocolos de ['nombreInstancia'] > TCP/IP
 3.  Habilita **TCP/IP**. En propiedades > Direcciones IP > **IPAll**, pon el puerto **1433**.
-4.  Abre **SSMS**, clic derecho en el Servidor > Propiedades > Seguridad.
-5.  Marca **"Modo de autenticación de SQL Server y de Windows"**.
-6.  **Reinicia el servicio de SQL Server**.
+4.  **Reinicia el servicio de SQL Server**.
+5.  Abre **SSMS**, clic derecho en el Servidor > Propiedades > Seguridad.
+6.  Marca **"Modo de autenticación de SQL Server y de Windows"**.
 
 ### B. Ejecutar Script de Instalación
 
@@ -84,18 +83,6 @@ cd api_voluntariado_4v
 composer install
 ```
 
-3. Configurar variables de entorno:
-
-```bash
-cp .env.local .env
-```
-
-# .env.local
-
-# Ajusta 'Symfony2025!' si lo cambiaste en el script SQL.
-
-# Ajusta 'instance=SQLEXPRESS' si tu instancia tiene otro nombre.
-
 DATABASE_URL="sqlsrv://symfony_app:Symfony2025!@127.0.0.1/VoluntariadoDB?instance=SQLEXPRESS&trustServerCertificate=true&charset=UTF-8"
 
 4. En el archivo doctrine.yaml, asegúrate de que el driver esté configurado como 'sqlsrv'.
@@ -111,7 +98,7 @@ doctrine:
 5. Verificar conexión: Ejecuta este comando. Si ves la versión de SQL Server, todo está correcto.
 
 ```bash
-php bin/console doctrine:dbal:run-sql "SELECT @@VERSION"
+php bin/console doctrine:query:sql "SELECT @@VERSION"
 ```
 
 ---

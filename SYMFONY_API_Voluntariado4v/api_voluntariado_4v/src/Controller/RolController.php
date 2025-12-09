@@ -7,7 +7,7 @@ use App\Entity\Rol;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
-use Symfony\Component\HttpFoundation\Request; // <--- Necesario para leer el JSON
+use Symfony\Component\HttpFoundation\Request; 
 use Symfony\Component\Routing\Attribute\Route;
 
 // He añadido la ruta global /api para que sea más profesional

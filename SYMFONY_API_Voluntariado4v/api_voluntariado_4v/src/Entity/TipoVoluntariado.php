@@ -11,7 +11,7 @@ class TipoVoluntariado
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
-    #[ORM\Column]
+    #[ORM\Column(name: 'id_tipo')]
     // 👇 Recuperamos curso:read y mantenemos actividad:read
     #[Groups(['actividad:read', 'curso:read'])]
     private ?int $id = null;

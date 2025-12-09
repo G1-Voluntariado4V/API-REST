@@ -11,7 +11,7 @@ use Symfony\Component\Serializer\Annotation\Groups;
 class ODS
 {
    #[ORM\Id]
-    #[ORM\Column]
+    #[ORM\Column(name: 'id_ods')]
     // 👇 AQUÍ ESTÁ EL TRUCO: Ponemos los dos grupos
     #[Groups(['actividad:read', 'curso:read'])] 
     private ?int $id = null;

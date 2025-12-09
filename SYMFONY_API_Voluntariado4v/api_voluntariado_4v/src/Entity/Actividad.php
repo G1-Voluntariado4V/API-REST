@@ -48,6 +48,7 @@ class Actividad
     #[Groups(['actividad:read'])]
     private ?string $estadoPublicacion = 'En revision';
 
+
     // --- RELACIONES ---
 
     // 1. ORGANIZACIÓN (Dueña de la actividad)
@@ -58,74 +59,200 @@ class Actividad
 
     // 2. ODS (Relación Muchos a Muchos con tabla intermedia específica)
     #[ORM\ManyToMany(targetEntity: ODS::class)]
-    #[ORM\JoinTable(name: 'ACTIVIDAD_ODS', 
+    #[ORM\JoinTable(
+        name: 'ACTIVIDAD_ODS',
         joinColumns: [new ORM\JoinColumn(name: 'id_actividad', referencedColumnName: 'id_actividad')],
-        inverseJoinColumns: [new ORM\JoinColumn(name: 'id_ods', referencedColumnName: 'id')] // Asumiendo que ODS usa 'id' en PHP, o 'id_ods' si lo cambiaste
+        inverseJoinColumns: [new ORM\JoinColumn(name: 'id_ods', referencedColumnName: 'id_ods')] // Asumiendo que ODS usa 'id' en PHP, o 'id_ods' si lo cambiaste
     )]
     #[Groups(['actividad:read'])]
     private Collection $ods;
 
     // 3. TIPO VOLUNTARIADO (Relación Muchos a Muchos)
     #[ORM\ManyToMany(targetEntity: TipoVoluntariado::class)]
-    #[ORM\JoinTable(name: 'ACTIVIDAD_TIPO',
+    #[ORM\JoinTable(
+        name: 'ACTIVIDAD_TIPO',
         joinColumns: [new ORM\JoinColumn(name: 'id_actividad', referencedColumnName: 'id_actividad')],
-        inverseJoinColumns: [new ORM\JoinColumn(name: 'id_tipo', referencedColumnName: 'id')]
+        inverseJoinColumns: [new ORM\JoinColumn(name: 'id_tipo', referencedColumnName: 'id_tipo')]
     )]
     #[Groups(['actividad:read'])]
     private Collection $tiposVoluntariado;
 
     // --- TIMESTAMPS ---
-    
+
     #[ORM\Column(type: Types::DATETIME_MUTABLE, nullable: true, name: 'updated_at')]
     private ?\DateTimeInterface $updatedAt = null;
 
     #[ORM\Column(nullable: true, name: 'deleted_at')]
     private ?\DateTimeImmutable $deletedAt = null;
 
+    #[ORM\OneToMany(mappedBy: 'actividad', targetEntity: Inscripcion::class, cascade: ['persist', 'remove'])]
+    // OJO: No pongas Groups aquí o podrías crear un bucle infinito al serializar 
+    private Collection $inscripciones;
+
     public function __construct()
     {
         $this->ods = new ArrayCollection();
         $this->tiposVoluntariado = new ArrayCollection();
+        $this->inscripciones = new ArrayCollection();
     }
 
     // --- GETTERS Y SETTERS ---
 
-    public function getId(): ?int { return $this->id; }
+    public function getId(): ?int
+    {
+        return $this->id;
+    }
 
-    public function getTitulo(): ?string { return $this->titulo; }
-    public function setTitulo(string $titulo): static { $this->titulo = $titulo; return $this; }
+    public function getTitulo(): ?string
+    {
+        return $this->titulo;
+    }
+    public function setTitulo(string $titulo): static
+    {
+        $this->titulo = $titulo;
+        return $this;
+    }
 
-    public function getDescripcion(): ?string { return $this->descripcion; }
-    public function setDescripcion(?string $descripcion): static { $this->descripcion = $descripcion; return $this; }
+    public function getDescripcion(): ?string
+    {
+        return $this->descripcion;
+    }
+    public function setDescripcion(?string $descripcion): static
+    {
+        $this->descripcion = $descripcion;
+        return $this;
+    }
 
-    public function getFechaInicio(): ?\DateTimeInterface { return $this->fechaInicio; }
-    public function setFechaInicio(\DateTimeInterface $fechaInicio): static { $this->fechaInicio = $fechaInicio; return $this; }
+    public function getFechaInicio(): ?\DateTimeInterface
+    {
+        return $this->fechaInicio;
+    }
+    public function setFechaInicio(\DateTimeInterface $fechaInicio): static
+    {
+        $this->fechaInicio = $fechaInicio;
+        return $this;
+    }
 
-    public function getDuracionHoras(): ?int { return $this->duracionHoras; }
-    public function setDuracionHoras(int $duracionHoras): static { $this->duracionHoras = $duracionHoras; return $this; }
+    public function getDuracionHoras(): ?int
+    {
+        return $this->duracionHoras;
+    }
+    public function setDuracionHoras(int $duracionHoras): static
+    {
+        $this->duracionHoras = $duracionHoras;
+        return $this;
+    }
 
-    public function getCupoMaximo(): ?int { return $this->cupoMaximo; }
-    public function setCupoMaximo(int $cupoMaximo): static { $this->cupoMaximo = $cupoMaximo; return $this; }
+    public function getCupoMaximo(): ?int
+    {
+        return $this->cupoMaximo;
+    }
+    public function setCupoMaximo(int $cupoMaximo): static
+    {
+        $this->cupoMaximo = $cupoMaximo;
+        return $this;
+    }
 
-    public function getUbicacion(): ?string { return $this->ubicacion; }
-    public function setUbicacion(?string $ubicacion): static { $this->ubicacion = $ubicacion; return $this; }
+    public function getUbicacion(): ?string
+    {
+        return $this->ubicacion;
+    }
+    public function setUbicacion(?string $ubicacion): static
+    {
+        $this->ubicacion = $ubicacion;
+        return $this;
+    }
 
-    public function getEstadoPublicacion(): ?string { return $this->estadoPublicacion; }
-    public function setEstadoPublicacion(string $estadoPublicacion): static { $this->estadoPublicacion = $estadoPublicacion; return $this; }
+    public function getEstadoPublicacion(): ?string
+    {
+        return $this->estadoPublicacion;
+    }
+    public function setEstadoPublicacion(string $estadoPublicacion): static
+    {
+        $this->estadoPublicacion = $estadoPublicacion;
+        return $this;
+    }
 
-    public function getOrganizacion(): ?Organizacion { return $this->organizacion; }
-    public function setOrganizacion(?Organizacion $organizacion): static { $this->organizacion = $organizacion; return $this; }
+    public function getOrganizacion(): ?Organizacion
+    {
+        return $this->organizacion;
+    }
+    public function setOrganizacion(?Organizacion $organizacion): static
+    {
+        $this->organizacion = $organizacion;
+        return $this;
+    }
 
     // Colecciones
-    public function getOds(): Collection { return $this->ods; }
-    public function addOd(ODS $od): static { if (!$this->ods->contains($od)) { $this->ods->add($od); } return $this; }
-    public function removeOd(ODS $od): static { $this->ods->removeElement($od); return $this; }
+    public function getOds(): Collection
+    {
+        return $this->ods;
+    }
+    public function addOd(ODS $od): static
+    {
+        if (!$this->ods->contains($od)) {
+            $this->ods->add($od);
+        }
+        return $this;
+    }
+    public function removeOd(ODS $od): static
+    {
+        $this->ods->removeElement($od);
+        return $this;
+    }
 
-    public function getTiposVoluntariado(): Collection { return $this->tiposVoluntariado; }
-    public function addTiposVoluntariado(TipoVoluntariado $tipo): static { if (!$this->tiposVoluntariado->contains($tipo)) { $this->tiposVoluntariado->add($tipo); } return $this; }
-    public function removeTiposVoluntariado(TipoVoluntariado $tipo): static { $this->tiposVoluntariado->removeElement($tipo); return $this; }
-    
+    public function getTiposVoluntariado(): Collection
+    {
+        return $this->tiposVoluntariado;
+    }
+    public function addTiposVoluntariado(TipoVoluntariado $tipo): static
+    {
+        if (!$this->tiposVoluntariado->contains($tipo)) {
+            $this->tiposVoluntariado->add($tipo);
+        }
+        return $this;
+    }
+    public function removeTiposVoluntariado(TipoVoluntariado $tipo): static
+    {
+        $this->tiposVoluntariado->removeElement($tipo);
+        return $this;
+    }
+
+
+    public function getInscripciones(): Collection
+    {
+        return $this->inscripciones;
+    }
+
+    public function addInscripcion(Inscripcion $inscripcion): static
+    {
+        if (!$this->inscripciones->contains($inscripcion)) {
+            $this->inscripciones->add($inscripcion);
+            // CORRECCIÓN: Sincronizar el lado propietario
+            $inscripcion->setActividad($this);
+        }
+        return $this;
+    }
+
+    public function removeInscripcion(Inscripcion $inscripcion): static
+    {
+        if ($this->inscripciones->removeElement($inscripcion)) {
+
+            if ($inscripcion->getActividad() === $this) {
+                $inscripcion->setActividad(null);
+            }
+        }
+        return $this;
+    }
     // Fechas
-    public function setUpdatedAt(?\DateTimeInterface $updatedAt): static { $this->updatedAt = $updatedAt; return $this; }
-    public function setDeletedAt(?\DateTimeImmutable $deletedAt): static { $this->deletedAt = $deletedAt; return $this; }
+    public function setUpdatedAt(?\DateTimeInterface $updatedAt): static
+    {
+        $this->updatedAt = $updatedAt;
+        return $this;
+    }
+    public function setDeletedAt(?\DateTimeImmutable $deletedAt): static
+    {
+        $this->deletedAt = $deletedAt;
+        return $this;
+    }
 }

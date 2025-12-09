@@ -54,10 +54,7 @@ final class VoluntarioController extends AbstractController
             // --- AÑADIDO: CORRECCIÓN DE SEGURIDAD BBDD ---
             // Estos campos son NOT NULL en la base de datos, hay que rellenarlos
             $usuario->setEstadoCuenta('Pendiente');
-            $passwordAleatoria = bin2hex(random_bytes(10)); // Genera algo como "a1b2c3d4e5"
-            $usuario->setPassword($hasher->hashPassword($usuario, $passwordAleatoria));
-            // ---------------------------------------------
-
+           
             // Asignar Rol Voluntario (ID 2)
             $rolVoluntario = $rolRepository->find(2);
             if (!$rolVoluntario) throw new \Exception("Rol Voluntario no encontrado");
