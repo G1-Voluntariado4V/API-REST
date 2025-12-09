@@ -4,68 +4,66 @@ namespace App\Controller;
 
 use App\Entity\Usuario;
 use App\Repository\RolRepository;
-use App\Repository\UsuarioRepository; // Necesario para el GET
+use App\Repository\UsuarioRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface; // <--- NUEVO
 use Symfony\Component\Routing\Attribute\Route;
 
 #[Route('/api', name: 'api_')]
 final class UsuarioController extends AbstractController
 {
     // ========================================================================
-    // MÉTODO NUEVO: LISTAR USUARIOS (GET)
+    // 1. LISTAR USUARIOS (GET) -> Usando Vista SQL
     // ========================================================================
     #[Route('/usuarios', name: 'usuarios_index', methods: ['GET'])]
-    public function index(UsuarioRepository $usuarioRepository): JsonResponse
+    public function index(EntityManagerInterface $em): JsonResponse
     {
-        $usuarios = $usuarioRepository->findAll();
-        // Usamos el grupo para que se vea el rol y se oculte la contraseña
-        return $this->json($usuarios, 200, [], ['groups' => 'usuario:read']);
+        // Usamos la vista SQL para obtener solo usuarios activos y con el nombre del rol ya unido
+        $conn = $em->getConnection();
+        $sql = 'SELECT * FROM VW_Usuarios_Activos';
+
+        try {
+            $usuarios = $conn->executeQuery($sql)->fetchAllAssociative();
+            return $this->json($usuarios);
+        } catch (\Exception $e) {
+            // Si la vista no existe (aún no has migrado), fallback a Doctrine
+            // Esto es útil mientras desarrollas
+            return $this->json(['error' => 'Error al listar usuarios (Vista no encontrada)'], 500);
+        }
     }
 
     // ========================================================================
-    // MÉTODO TUYO ADAPTADO: CREAR USUARIO (POST)
+    // 2. CREAR USUARIO BASE (POST) - Solo para admin/pruebas
+    // Nota: Normalmente se usa /auth/register en VoluntarioController, 
+    // pero este sirve para crear admins u organizaciones a mano.
     // ========================================================================
-    #[Route('/usuario', name: 'crear_usuario', methods: ['POST'])]
+    #[Route('/usuarios', name: 'crear_usuario', methods: ['POST'])]
     public function crear(
         Request $request,
         EntityManagerInterface $entityManager,
-        RolRepository $rolRepository,
-        UserPasswordHasherInterface $hasher // <--- Inyectamos el Hasher
+        RolRepository $rolRepository
     ): JsonResponse {
         $data = json_decode($request->getContent(), true);
 
-        // 1. Validar datos básicos
-        if (!isset($data['correo']) || !isset($data['google_id']) || !isset($data['id_rol'])) {
-            return $this->json(['error' => 'Faltan datos obligatorios (correo, google_id, id_rol)'], 400);
+        // 1. Validaciones
+        if (!isset($data['correo'], $data['google_id'], $data['id_rol'])) {
+            return $this->json(['error' => 'Faltan datos (correo, google_id, id_rol)'], 400);
         }
 
-        // 2. Buscar el Rol
+        // 2. Buscar Rol
         $rol = $rolRepository->find($data['id_rol']);
         if (!$rol) {
             return $this->json(['error' => 'Rol no encontrado'], 404);
         }
 
-        // 3. Crear Usuario
+        // 3. Crear Usuario (Sin password)
         $usuario = new Usuario();
         $usuario->setCorreo($data['correo']);
         $usuario->setGoogleId($data['google_id']);
         $usuario->setRol($rol);
-
-        // --- CAMBIOS NECESARIOS POR SEGURIDAD ---
-
-        // A. Estado de cuenta (Obligatorio en BBDD)
-        $usuario->setEstadoCuenta('Pendiente');
-
-        // B. Contraseña (Obligatoria en BBDD aunque usen Google)
-        // Generamos una contraseña aleatoria interna, ya que entran con Google
-        $randomPassword = bin2hex(random_bytes(10));
-        $usuario->setPassword($hasher->hashPassword($usuario, $randomPassword));
-
-        // ----------------------------------------
+        $usuario->setEstadoCuenta('Pendiente'); // Valor por defecto seguro
 
         try {
             $entityManager->persist($usuario);
@@ -74,7 +72,33 @@ final class UsuarioController extends AbstractController
             return $this->json(['error' => 'Error al guardar: ' . $e->getMessage()], 500);
         }
 
-        // Devolvemos el usuario creado usando los Grupos para que quede bonito
         return $this->json($usuario, 201, [], ['groups' => 'usuario:read']);
+    }
+
+    // ========================================================================
+    // 3. ELIMINAR USUARIO (DELETE) - Soft Delete Manual (o via SP)
+    // ========================================================================
+    #[Route('/usuarios/{id}', name: 'borrar_usuario', methods: ['DELETE'])]
+    public function delete(
+        int $id,
+        UsuarioRepository $repo,
+        EntityManagerInterface $em
+    ): JsonResponse {
+        $usuario = $repo->find($id);
+        if (!$usuario) return $this->json(['error' => 'Usuario no encontrado'], 404);
+
+        // Opción A: Usar el SP de SQL Server (Más robusto)
+        /*
+        $sql = 'EXEC SP_SoftDelete_Usuario @id_usuario = :id';
+        $em->getConnection()->executeStatement($sql, ['id' => $id]);
+        */
+
+        // Opción B: Usar Doctrine (Más portable ahora mismo)
+        $usuario->setDeletedAt(new \DateTimeImmutable());
+        $usuario->setEstadoCuenta('Bloqueada');
+
+        $em->flush();
+
+        return $this->json(['mensaje' => 'Usuario eliminado (Soft Delete)'], 200);
     }
 }

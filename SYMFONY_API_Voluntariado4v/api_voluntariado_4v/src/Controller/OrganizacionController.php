@@ -11,17 +11,30 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Attribute\Route;
-use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 #[Route('/api', name: 'api_')]
 final class OrganizacionController extends AbstractController
 {
+    // [NUEVO] 1. LISTAR (GET) - Vista SQL
+    #[Route('/organizaciones', name: 'listar_organizaciones', methods: ['GET'])]
+    public function index(EntityManagerInterface $em): JsonResponse
+    {
+        $conn = $em->getConnection();
+        $sql = 'SELECT * FROM VW_Organizaciones_Activas';
+        try {
+            $listado = $conn->executeQuery($sql)->fetchAllAssociative();
+            return $this->json($listado);
+        } catch (\Exception $e) {
+            return $this->json(['error' => 'Error al cargar organizaciones'], 500);
+        }
+    }
+
+    // [MODIFICADO] 2. REGISTRAR (POST) - Sin Hasher
     #[Route('/organizaciones', name: 'registro_organizacion', methods: ['POST'])]
     public function registrar(
         Request $request,
         EntityManagerInterface $entityManager,
-        RolRepository $rolRepository,
-        UserPasswordHasherInterface $hasher // 2. IMPORTANTE: Inyectar el hasher aquí
+        RolRepository $rolRepository
     ): JsonResponse {
         $data = json_decode($request->getContent(), true);
 
@@ -32,24 +45,17 @@ final class OrganizacionController extends AbstractController
         $entityManager->beginTransaction();
 
         try {
-            // --- CREAR USUARIO ---
             $usuario = new Usuario();
             $usuario->setCorreo($data['correo']);
             $usuario->setGoogleId($data['google_id']);
+            $usuario->setEstadoCuenta('Pendiente'); // Nace pendiente de validación
 
-            // 3. CORRECCIÓN CRÍTICA: Rellenar campos obligatorios de BBDD
-            $usuario->setEstadoCuenta('Pendiente');
-
-
-            $rolOrg = $rolRepository->find(3); // ID 3 = Organización
-            if (!$rolOrg) throw new \Exception("Rol Organización no encontrado");
-
+            $rolOrg = $rolRepository->findOneBy(['nombre' => 'Organizacion']);
             $usuario->setRol($rolOrg);
 
             $entityManager->persist($usuario);
             $entityManager->flush();
 
-            // --- CREAR ORGANIZACIÓN ---
             $org = new Organizacion();
             $org->setUsuario($usuario);
             $org->setNombre($data['nombre']);
@@ -62,10 +68,8 @@ final class OrganizacionController extends AbstractController
 
             $entityManager->persist($org);
             $entityManager->flush();
-
             $entityManager->commit();
 
-            // Usamos los Groups para devolver todo limpio
             return $this->json($org, 201, [], ['groups' => 'usuario:read']);
         } catch (\Exception $e) {
             $entityManager->rollback();
@@ -73,29 +77,44 @@ final class OrganizacionController extends AbstractController
         }
     }
 
-    // ======================================================
-    // ACTUALIZAR ORGANIZACIÓN (PUT)
-    // ======================================================
-    #[Route('/organizaciones/{id}', name: 'actualizar_organizacion', methods: ['PUT'])]
-    public function actualizar(
-        int $id,
-        Request $request,
-        UsuarioRepository $usuarioRepo,
-        EntityManagerInterface $entityManager
-    ): JsonResponse {
-        // 1. Buscar Usuario
-        $usuario = $usuarioRepo->find($id);
+    // [NUEVO] 3. VALIDAR (PATCH) - Para que el Admin active la cuenta
+    #[Route('/organizaciones/{id}/validar', name: 'validar_organizacion', methods: ['PATCH'])]
+    public function validar(int $id, UsuarioRepository $userRepo, Request $request, EntityManagerInterface $em): JsonResponse
+    {
+        $usuario = $userRepo->find($id);
         if (!$usuario) return $this->json(['error' => 'Usuario no encontrado'], 404);
 
-        // 2. Buscar Perfil Organización
-        $org = $entityManager->getRepository(Organizacion::class)->findOneBy(['usuario' => $usuario]);
-        if (!$org) return $this->json(['error' => 'Perfil de organización no encontrado'], 404);
-
-        // 3. Actualizar datos
         $data = json_decode($request->getContent(), true);
+        $nuevoEstado = $data['estado'] ?? 'Activa'; 
+        
+        $usuario->setEstadoCuenta($nuevoEstado);
+        $em->flush();
 
-        // Solo actualizamos si el dato viene en el JSON (usamos ?? $valorActual no sirve aquí 
-        // porque si no viene, queremos mantener el que estaba. Usamos if isset).
+        return $this->json(['mensaje' => "Estado actualizado a: $nuevoEstado"]);
+    }
+
+    // [MANTENIDO] 4. GET ONE
+    #[Route('/organizaciones/{id}', name: 'get_organizacion', methods: ['GET'])]
+    public function getOne(int $id, UsuarioRepository $userRepo): JsonResponse
+    {
+        $usuario = $userRepo->find($id);
+        if (!$usuario || $usuario->getDeletedAt()) {
+            return $this->json(['error' => 'No encontrada'], 404);
+        }
+        return $this->json($usuario, 200, [], ['groups' => 'usuario:read']);
+    }
+
+    // [MANTENIDO] 5. ACTUALIZAR (PUT)
+    #[Route('/organizaciones/{id}', name: 'actualizar_organizacion', methods: ['PUT'])]
+    public function actualizar(int $id, Request $request, UsuarioRepository $userRepo, EntityManagerInterface $em): JsonResponse 
+    {
+        $usuario = $userRepo->find($id);
+        if (!$usuario) return $this->json(['error' => 'Usuario no encontrado'], 404);
+
+        $org = $em->getRepository(Organizacion::class)->findOneBy(['usuario' => $usuario]);
+        if (!$org) return $this->json(['error' => 'Perfil no encontrado'], 404);
+
+        $data = json_decode($request->getContent(), true);
 
         if (isset($data['nombre'])) $org->setNombre($data['nombre']);
         if (isset($data['descripcion'])) $org->setDescripcion($data['descripcion']);
@@ -104,35 +123,21 @@ final class OrganizacionController extends AbstractController
         if (isset($data['telefono'])) $org->setTelefono($data['telefono']);
         if (isset($data['img_perfil'])) $org->setImgPerfil($data['img_perfil']);
 
-        // El CIF normalmente no se permite cambiar tan fácil por temas legales/fiscales, 
-        // pero si quieres permitirlo:
-        if (isset($data['cif'])) $org->setCif($data['cif']);
-
-        $org->setUpdatedAt(new \DateTime());
-
-        $entityManager->flush();
-
+        $em->flush();
         return $this->json($org, 200, [], ['groups' => 'usuario:read']);
     }
 
-    // ======================================================
-    // ELIMINAR ORGANIZACIÓN (SOFT DELETE)
-    // ======================================================
+    // [MANTENIDO] 6. ELIMINAR (DELETE)
     #[Route('/organizaciones/{id}', name: 'borrar_organizacion', methods: ['DELETE'])]
-    public function eliminar(
-        int $id,
-        UsuarioRepository $usuarioRepo,
-        EntityManagerInterface $entityManager
-    ): JsonResponse {
-        $usuario = $usuarioRepo->find($id);
+    public function eliminar(int $id, UsuarioRepository $userRepo, EntityManagerInterface $em): JsonResponse
+    {
+        $usuario = $userRepo->find($id);
         if (!$usuario) return $this->json(['error' => 'Usuario no encontrado'], 404);
 
-        // Soft Delete: Marcamos fecha de borrado y bloqueamos cuenta
         $usuario->setDeletedAt(new \DateTimeImmutable());
         $usuario->setEstadoCuenta('Bloqueada');
+        $em->flush();
 
-        $entityManager->flush();
-
-        return $this->json(['mensaje' => 'Organización eliminada correctamente (Soft Delete)'], 200);
+        return $this->json(['mensaje' => 'Organización eliminada correctamente'], 200);
     }
 }

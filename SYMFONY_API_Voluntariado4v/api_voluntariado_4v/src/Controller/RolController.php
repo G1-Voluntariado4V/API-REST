@@ -2,47 +2,40 @@
 
 namespace App\Controller;
 
-// 1. IMPORTANTE: Aquí añadimos las herramientas que faltaban
 use App\Entity\Rol;
+use App\Repository\RolRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
-use Symfony\Component\HttpFoundation\Request; 
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Attribute\Route;
 
-// He añadido la ruta global /api para que sea más profesional
-#[Route('/api', name: 'api_')]
+#[Route('/api/roles', name: 'api_roles_')]
 final class RolController extends AbstractController
 {
-    // Cambiamos 'index' por 'crear' y definimos que sea POST
-    #[Route('/rol', name: 'crear_rol', methods: ['POST'])]
-    public function crear(Request $request, EntityManagerInterface $entityManager): JsonResponse
+    // GET: Listar todos los roles
+    #[Route('', name: 'index', methods: ['GET'])]
+    public function index(RolRepository $rolRepo): JsonResponse
     {
-        // A. Leer el JSON que nos envía Postman
+        return $this->json($rolRepo->findAll());
+    }
+
+    // POST: Crear nuevo rol
+    #[Route('', name: 'crear', methods: ['POST'])]
+    public function create(Request $request, EntityManagerInterface $em): JsonResponse
+    {
         $data = json_decode($request->getContent(), true);
 
-        // Validación simple
-        if (!isset($data['nombre'])) {
+        if (empty($data['nombre'])) {
             return $this->json(['error' => 'Falta el nombre del rol'], 400);
         }
 
-        // B. Crear el objeto ROL
         $rol = new Rol();
         $rol->setNombre($data['nombre']);
 
-        // C. Guardar en SQL Server
-        try {
-            $entityManager->persist($rol); // Preparar
-            $entityManager->flush();       // Ejecutar INSERT
-        } catch (\Exception $e) {
-            return $this->json(['error' => 'No se pudo guardar: ' . $e->getMessage()], 500);
-        }
+        $em->persist($rol);
+        $em->flush();
 
-        // D. Responder
-        return $this->json([
-            'mensaje' => 'Rol guardado con éxito',
-            'id' => $rol->getId(),
-            'nombre' => $rol->getNombre()
-        ], 201);
+        return $this->json($rol, 201);
     }
 }
