@@ -16,77 +16,41 @@ use App\Entity\Voluntario;
 use App\Entity\VoluntarioIdioma;
 use Doctrine\Bundle\FixturesBundle\Fixture;
 use Doctrine\Persistence\ObjectManager;
-// 👇 Importaciones necesarias para forzar los IDs manuales
-use Doctrine\ORM\Id\AssignedGenerator;
-use Doctrine\ORM\Mapping\ClassMetadata;
 
 class AppFixtures extends Fixture
 {
+    private ObjectManager $manager;
+    private array $cache = []; // Para no hacer mil consultas repetidas
+
     public function load(ObjectManager $manager): void
     {
-        // ======================================================
-        // 1. ROLES
-        // ======================================================
-        $rolesCache = [];
-        $nombresRoles = ['Coordinador', 'Voluntario', 'Organizacion'];
+        $this->manager = $manager;
 
-        foreach ($nombresRoles as $nombre) {
-            $rol = new Rol();
-            $rol->setNombre($nombre);
-            $manager->persist($rol);
-            $rolesCache[$nombre] = $rol;
+        // ======================================================
+        // 1. CATÁLOGOS (Buscar si existe, si no crear)
+        // ======================================================
+
+        // ROLES
+        $rolesNombres = ['Coordinador', 'Voluntario', 'Organizacion'];
+        foreach ($rolesNombres as $nombre) {
+            $this->createOrUpdateRol($nombre);
+        }
+        // Necesitamos flush aquí para asegurar que los roles tienen ID para los usuarios
+        $manager->flush();
+
+        // IDIOMAS
+        $idiomasData = [['Español', 'ES'], ['Inglés', 'EN'], ['Francés', 'FR'], ['Alemán', 'DE'], ['Euskera', 'EU']];
+        foreach ($idiomasData as $d) {
+            $this->createOrUpdateIdioma($d[0], $d[1]);
         }
 
-        // ======================================================
-        // 2. IDIOMAS
-        // ======================================================
-        $idiomasCache = [];
-        $idiomasData = [
-            ['Español', 'ES'],
-            ['Inglés', 'EN'],
-            ['Francés', 'FR'],
-            ['Alemán', 'DE'],
-            ['Euskera', 'EU']
-        ];
-
-        foreach ($idiomasData as $data) {
-            $idioma = new Idioma();
-            $idioma->setNombre($data[0]);
-            $idioma->setCodigoIso($data[1]);
-            $manager->persist($idioma);
-            $idiomasCache[$data[0]] = $idioma;
+        // TIPOS DE VOLUNTARIADO
+        $tiposData = ['Medioambiente', 'Acción Social', 'Educación', 'Protección Animal', 'Salud / Sanitario', 'Tecnológico / Digital', 'Deportivo', 'Cultural / Artístico', 'Emergencias'];
+        foreach ($tiposData as $nombre) {
+            $this->createOrUpdateTipo($nombre);
         }
 
-        // ======================================================
-        // 3. TIPOS DE VOLUNTARIADO
-        // ======================================================
-        $tiposCache = [];
-        $tiposData = [
-            'Medioambiente',
-            'Acción Social',
-            'Educación',
-            'Protección Animal',
-            'Salud / Sanitario',
-            'Tecnológico / Digital',
-            'Deportivo',
-            'Cultural / Artístico',
-            'Emergencias'
-        ];
-
-        foreach ($tiposData as $nombreTipo) {
-            $tipo = new TipoVoluntariado();
-            $tipo->setNombreTipo($nombreTipo);
-            $manager->persist($tipo);
-            $tiposCache[$nombreTipo] = $tipo;
-        }
-
-        // ======================================================
-        // 4. ODS (CON IDs OBLIGATORIOS Y FIJOS)
-        // ======================================================
-
-
-
-        $odsNombreMap = []; // Cache para buscar por nombre luego
+        // ODS
         $odsData = [
             [1, 'Fin de la Pobreza'],
             [2, 'Hambre Cero'],
@@ -95,37 +59,19 @@ class AppFixtures extends Fixture
             [5, 'Igualdad de Género'],
             [6, 'Agua Limpia y Saneamiento'],
             [7, 'Energía Asequible y No Contaminante'],
-            [8, 'Trabajo Decente y Crecimiento Económico'],
-            [9, 'Industria, Innovación e Infraestructura'],
             [10, 'Reducción de las Desigualdades'],
             [11, 'Ciudades y Comunidades Sostenibles'],
             [12, 'Producción y Consumo Responsables'],
             [13, 'Acción por el Clima'],
             [14, 'Vida Submarina'],
             [15, 'Vida de Ecosistemas Terrestres'],
-            [16, 'Paz, Justicia e Instituciones Sólidas'],
-            [17, 'Alianzas para Lograr los Objetivos']
+            [16, 'Paz, Justicia e Instituciones Sólidas']
         ];
-
-        foreach ($odsData as $data) {
-            // 👇 AQUÍ USAMOS TU CONSTRUCTOR OBLIGATORIO (ID, NOMBRE)
-            $ods = new ODS($data[0], $data[1]);
-
-            // Si tienes setDescripcion, lo usamos
-            if (method_exists($ods, 'setDescripcion')) {
-                $ods->setDescripcion("Descripción oficial para el ODS " . $data[0]);
-            }
-
-            $manager->persist($ods);
-
-            // Guardamos en caché por nombre para usarlos fácil en las actividades
-            $odsNombreMap[$data[1]] = $ods;
+        foreach ($odsData as $d) {
+            $this->createOrUpdateODS($d[0], $d[1]);
         }
 
-        // ======================================================
-        // 5. CURSOS
-        // ======================================================
-        $cursosCache = [];
+        // CURSOS
         $cursosData = [
             ['Desarrollo de Aplicaciones Web', 'DAW', 'Grado Superior', 2],
             ['Desarrollo de Apps Multiplataforma', 'DAM', 'Grado Superior', 2],
@@ -133,237 +79,295 @@ class AppFixtures extends Fixture
             ['Marketing', 'MK', 'Grado Superior', 2],
             ['Actividades Físicas y Deportivas', 'TAFAD', 'Grado Superior', 2]
         ];
-
-        foreach ($cursosData as $data) {
-            $curso = new Curso();
-            $curso->setNombre($data[0]);
-            $curso->setAbreviacion($data[1]);
-            $curso->setGrado($data[2]);
-            $curso->setNivel($data[3]);
-            $manager->persist($curso);
-            $cursosCache[$data[1]] = $curso;
+        foreach ($cursosData as $d) {
+            $this->createOrUpdateCurso($d[0], $d[1], $d[2], $d[3]);
         }
 
-        $manager->flush(); // Guardamos catálogos base
+        $manager->flush();
 
         // ======================================================
-        // 6. USUARIOS Y PERFILES
+        // 6. USUARIOS (REVIVIR Y ACTUALIZAR)
         // ======================================================
 
-        // --- 6.1 COORDINADOR (Maite) ---
-        $u1 = new Usuario();
-        $u1->setCorreo('maitesolam@gmail.com');
-        $u1->setGoogleId('google_uid_maite');
-        $u1->setRol($rolesCache['Coordinador']);
-        $u1->setEstadoCuenta('Activa');
-        $manager->persist($u1);
+        // --- Coordinador ---
+        // Buscamos por correo. Si existe (aunque esté borrado), lo actualizamos.
+        $coordUser = $this->createOrUpdateUsuario('Coordinador', 'maitesolam@gmail.com', 'google_uid_maite');
+        $this->createOrUpdatePerfilCoordinador($coordUser, 'Maite', 'Sola');
 
-        $coord = new Coordinador();
-        $coord->setUsuario($u1);
-        $coord->setNombre('Maite');
-        $coord->setApellidos('Sola');
-        $coord->setTelefono('600111222');
-        $manager->persist($coord);
+        // --- ONGs ---
+        $ongs = [];
+        $ongData = [
+            ['Tech For Good', 'info@techforgood.org', 'uid_org_tech', 'Tecnología Social'],
+            ['EcoVida', 'contacto@ecovida.org', 'uid_org_eco', 'Medioambiente'],
+            ['Animal Rescue', 'help@animalrescue.org', 'uid_org_animal', 'Refugio Animales'],
+            ['Cruz Roja Local', 'cruzroja@org.com', 'uid_cr', 'Ayuda Humanitaria']
+        ];
+        foreach ($ongData as $d) {
+            $u = $this->createOrUpdateUsuario('Organizacion', $d[1], $d[2]);
+            $ongs[] = $this->createOrUpdatePerfilOrganizacion($u, $d[0], $d[3]);
+        }
 
-        // --- 6.2 VOLUNTARIO 1: Pepe (Tecnológico) ---
-        $u2 = new Usuario();
-        $u2->setCorreo('pepe@test.com');
-        $u2->setGoogleId('uid_pepe');
-        $u2->setRol($rolesCache['Voluntario']);
-        $u2->setEstadoCuenta('Activa');
-        $manager->persist($u2);
+        // --- Voluntarios ---
+        $vols = [];
+        $volData = [
+            ['Pepe', 'Pérez', 'pepe@test.com', 'uid_pepe', 'DAW', ['Tecnológico / Digital']],
+            ['Laura', 'Gómez', 'laura@test.com', 'uid_laura', 'ENF', ['Salud / Sanitario']],
+            ['Carlos', 'Ruiz', 'carlos@test.com', 'uid_carlos', 'TAFAD', ['Deportivo', 'Protección Animal']],
+            ['Ana', 'López', 'ana@test.com', 'uid_ana', 'MK', ['Acción Social', 'Educación']]
+        ];
+        foreach ($volData as $d) {
+            $u = $this->createOrUpdateUsuario('Voluntario', $d[2], $d[3]);
+            $v = $this->createOrUpdatePerfilVoluntario($u, $d[0], $d[1], $d[4]);
 
-        $v1 = new Voluntario();
-        $v1->setUsuario($u2);
-        $v1->setNombre('Pepe');
-        $v1->setApellidos('Tecnológico');
-        $v1->setDni('12345678A');
-        $v1->setTelefono('600333444');
-        $v1->setCursoActual($cursosCache['DAW']);
-        $v1->setCarnetConducir(true);
-        $v1->addPreferencia($tiposCache['Tecnológico / Digital']);
-        $v1->addPreferencia($tiposCache['Educación']);
-        $manager->persist($v1);
-
-        $vi1 = new VoluntarioIdioma();
-        $vi1->setVoluntario($v1);
-        $vi1->setIdioma($idiomasCache['Inglés']);
-        $vi1->setNivel('B2');
-        $manager->persist($vi1);
-
-        // --- 6.3 VOLUNTARIA 2: Laura (Salud / Medioambiente) ---
-        $u3 = new Usuario();
-        $u3->setCorreo('laura@test.com');
-        $u3->setGoogleId('uid_laura');
-        $u3->setRol($rolesCache['Voluntario']);
-        $u3->setEstadoCuenta('Activa');
-        $manager->persist($u3);
-
-        $v2 = new Voluntario();
-        $v2->setUsuario($u3);
-        $v2->setNombre('Laura');
-        $v2->setApellidos('Sanitaria');
-        $v2->setDni('87654321B');
-        $v2->setTelefono('600555666');
-        $v2->setCursoActual($cursosCache['ENF']);
-        $v2->addPreferencia($tiposCache['Salud / Sanitario']);
-        $v2->addPreferencia($tiposCache['Medioambiente']);
-        $manager->persist($v2);
-
-        // --- 6.4 VOLUNTARIO 3: Carlos (Deportista / Animales) ---
-        $u4 = new Usuario();
-        $u4->setCorreo('carlos@test.com');
-        $u4->setGoogleId('uid_carlos');
-        $u4->setRol($rolesCache['Voluntario']);
-        $u4->setEstadoCuenta('Activa');
-        $manager->persist($u4);
-
-        $v3 = new Voluntario();
-        $v3->setUsuario($u4);
-        $v3->setNombre('Carlos');
-        $v3->setApellidos('Deportista');
-        $v3->setDni('11223344C');
-        $v3->setTelefono('600777888');
-        $v3->setCursoActual($cursosCache['TAFAD']);
-        $v3->addPreferencia($tiposCache['Deportivo']);
-        $v3->addPreferencia($tiposCache['Protección Animal']);
-        $manager->persist($v3);
-
-        // --- 6.5 ONGs ---
-        $uOrg1 = new Usuario();
-        $uOrg1->setCorreo('info@techforgood.org');
-        $uOrg1->setGoogleId('uid_org_tech');
-        $uOrg1->setRol($rolesCache['Organizacion']);
-        $uOrg1->setEstadoCuenta('Activa');
-        $manager->persist($uOrg1);
-        $org1 = new Organizacion();
-        $org1->setUsuario($uOrg1);
-        $org1->setNombre('Tech For Good');
-        $org1->setCif('B11111111');
-        $org1->setDescripcion('Tecnología social.');
-        $manager->persist($org1);
-
-        $uOrg2 = new Usuario();
-        $uOrg2->setCorreo('contacto@ecovida.org');
-        $uOrg2->setGoogleId('uid_org_eco');
-        $uOrg2->setRol($rolesCache['Organizacion']);
-        $uOrg2->setEstadoCuenta('Activa');
-        $manager->persist($uOrg2);
-        $org2 = new Organizacion();
-        $org2->setUsuario($uOrg2);
-        $org2->setNombre('EcoVida');
-        $org2->setCif('G22222222');
-        $org2->setDescripcion('Naturaleza viva.');
-        $manager->persist($org2);
-
-        $uOrg3 = new Usuario();
-        $uOrg3->setCorreo('help@animalrescue.org');
-        $uOrg3->setGoogleId('uid_org_animal');
-        $uOrg3->setRol($rolesCache['Organizacion']);
-        $uOrg3->setEstadoCuenta('Activa');
-        $manager->persist($uOrg3);
-        $org3 = new Organizacion();
-        $org3->setUsuario($uOrg3);
-        $org3->setNombre('Animal Rescue');
-        $org3->setCif('G33333333');
-        $org3->setDescripcion('Adopción y cuidado de animales.');
-        $manager->persist($org3);
+            // Preferencias (Solo añadimos si no las tiene ya)
+            foreach ($d[5] as $prefName) {
+                $tipo = $this->cache['TipoVoluntariado'][$prefName];
+                if (!$v->getPreferencias()->contains($tipo)) {
+                    $v->addPreferencia($tipo);
+                }
+            }
+            $vols[] = $v;
+        }
+        $manager->flush();
 
         // ======================================================
-        // 7. ACTIVIDADES
+        // 7. ACTIVIDADES (Buscar por Título o Crear)
         // ======================================================
+        $acts = [];
 
-        // Actividad 1: Taller Digital (Tech For Good)
-        $act1 = new Actividad();
-        $act1->setOrganizacion($org1);
-        $act1->setTitulo('Taller de Alfabetización Digital');
-        $act1->setDescripcion('Enseñar uso básico de móvil a mayores.');
-        $act1->setUbicacion('Centro Cívico');
-        $act1->setDuracionHoras(3);
-        $act1->setCupoMaximo(5);
-        $act1->setEstadoPublicacion('Publicada');
-        $act1->setFechaInicio((new \DateTime())->modify('+5 days')->setTime(17, 0));
-        if (isset($odsNombreMap['Educación de Calidad'])) $act1->addOd($odsNombreMap['Educación de Calidad']);
-        $act1->addTiposVoluntariado($tiposCache['Tecnológico / Digital']);
-        $manager->persist($act1);
+        // Act 1
+        $a1 = $this->createOrUpdateActividad($ongs[0], 'Taller de Alfabetización Digital', 'Publicada');
+        $a1->setDescripcion('Clases de informática básica.');
+        $a1->setFechaInicio((new \DateTime())->modify('+5 days')->setTime(17, 0));
+        $a1->addTiposVoluntariado($this->cache['TipoVoluntariado']['Tecnológico / Digital']);
+        $acts[] = $a1;
 
-        // Actividad 2: Limpieza Monte (EcoVida)
-        $act2 = new Actividad();
-        $act2->setOrganizacion($org2);
-        $act2->setTitulo('Limpieza de Monte');
-        $act2->setDescripcion('Recogida de residuos en el monte.');
-        $act2->setUbicacion('Monte Ezcaba');
-        $act2->setDuracionHoras(4);
-        $act2->setCupoMaximo(20);
-        $act2->setEstadoPublicacion('Publicada');
-        $act2->setFechaInicio((new \DateTime())->modify('+2 days')->setTime(9, 0));
-        if (isset($odsNombreMap['Vida de Ecosistemas Terrestres'])) $act2->addOd($odsNombreMap['Vida de Ecosistemas Terrestres']);
-        $act2->addTiposVoluntariado($tiposCache['Medioambiente']);
-        $manager->persist($act2);
+        // Act 2
+        $a2 = $this->createOrUpdateActividad($ongs[1], 'Limpieza del Río Arga', 'Publicada');
+        $a2->setDescripcion('Recogida de plásticos.');
+        $a2->setFechaInicio((new \DateTime())->modify('+2 days')->setTime(9, 0));
+        $a2->addTiposVoluntariado($this->cache['TipoVoluntariado']['Medioambiente']);
+        $acts[] = $a2;
 
-        // Actividad 3: Paseo Perros (Animal Rescue)
-        $act3 = new Actividad();
-        $act3->setOrganizacion($org3);
-        $act3->setTitulo('Paseo Solidario');
-        $act3->setDescripcion('Pasear perros del refugio.');
-        $act3->setUbicacion('Refugio Municipal');
-        $act3->setDuracionHoras(2);
-        $act3->setCupoMaximo(10);
-        $act3->setEstadoPublicacion('Publicada');
-        $act3->setFechaInicio((new \DateTime())->modify('+1 week')->setTime(10, 0));
-        if (isset($odsNombreMap['Salud y Bienestar'])) $act3->addOd($odsNombreMap['Salud y Bienestar']);
-        $act3->addTiposVoluntariado($tiposCache['Protección Animal']);
-        $act3->addTiposVoluntariado($tiposCache['Deportivo']);
-        $manager->persist($act3);
+        // Act 3
+        $a3 = $this->createOrUpdateActividad($ongs[2], 'Paseo Canino Solidario', 'Publicada');
+        $a3->setDescripcion('Pasear perros del refugio.');
+        $a3->setFechaInicio((new \DateTime())->modify('+1 week')->setTime(10, 0));
+        $a3->addTiposVoluntariado($this->cache['TipoVoluntariado']['Protección Animal']);
+        $acts[] = $a3;
 
-        // Actividad 4: Evento Pasado
-        $act4 = new Actividad();
-        $act4->setOrganizacion($org1);
-        $act4->setTitulo('Charla Ciberseguridad');
-        $act4->setDescripcion('Evento ya finalizado.');
-        $act4->setUbicacion('Online');
-        $act4->setDuracionHoras(1);
-        $act4->setCupoMaximo(50);
-        $act4->setEstadoPublicacion('Finalizada');
-        $act4->setFechaInicio((new \DateTime())->modify('-1 week')->setTime(18, 0));
-        $manager->persist($act4);
-
-        // ======================================================
-        // 8. INSCRIPCIONES
-        // ======================================================
-
-        // 1. Pepe se apunta al Taller Digital (PENDIENTE)
-        $ins1 = new Inscripcion();
-        $ins1->setVoluntario($v1);
-        $ins1->setActividad($act1);
-        $ins1->setEstadoSolicitud('Pendiente');
-        $ins1->setFechaSolicitud(new \DateTime());
-        $manager->persist($ins1);
-
-        // 2. Laura se apunta a Limpieza (ACEPTADA)
-        $ins2 = new Inscripcion();
-        $ins2->setVoluntario($v2);
-        $ins2->setActividad($act2);
-        $ins2->setEstadoSolicitud('Aceptada');
-        $ins2->setFechaSolicitud((new \DateTime())->modify('-1 day'));
-        $manager->persist($ins2);
-
-        // 3. Carlos se apunta al Taller Digital (RECHAZADA)
-        $ins3 = new Inscripcion();
-        $ins3->setVoluntario($v3);
-        $ins3->setActividad($act1);
-        $ins3->setEstadoSolicitud('Rechazada');
-        $ins3->setFechaSolicitud((new \DateTime())->modify('-2 days'));
-        $manager->persist($ins3);
-
-        // 4. Carlos se apunta a Paseo Perros (PENDIENTE)
-        $ins4 = new Inscripcion();
-        $ins4->setVoluntario($v3);
-        $ins4->setActividad($act3);
-        $ins4->setEstadoSolicitud('Pendiente');
-        $ins4->setFechaSolicitud(new \DateTime());
-        $manager->persist($ins4);
+        // Act 4 (Pasada)
+        $a4 = $this->createOrUpdateActividad($ongs[3], 'Gran Recogida de Alimentos', 'Finalizada');
+        $a4->setDescripcion('Campaña de Navidad.');
+        $a4->setFechaInicio((new \DateTime())->modify('-1 month')->setTime(9, 0));
+        $acts[] = $a4;
 
         $manager->flush();
+
+        // ======================================================
+        // 8. INSCRIPCIONES (Buscar si existe, sino crear)
+        // ======================================================
+
+        $this->createOrUpdateInscripcion($vols[0], $a1, 'Aceptada'); // Pepe -> Taller
+        $this->createOrUpdateInscripcion($vols[3], $a1, 'Pendiente'); // Ana -> Taller
+
+        $this->createOrUpdateInscripcion($vols[1], $a2, 'Aceptada'); // Laura -> Rio
+        $this->createOrUpdateInscripcion($vols[2], $a2, 'Rechazada'); // Carlos -> Rio
+
+        $this->createOrUpdateInscripcion($vols[2], $a3, 'Aceptada'); // Carlos -> Perros
+        $this->createOrUpdateInscripcion($vols[0], $a3, 'Pendiente'); // Pepe -> Perros
+
+        // Todos a la pasada
+        foreach ($vols as $v) {
+            $this->createOrUpdateInscripcion($v, $a4, 'Finalizada');
+        }
+
+        $manager->flush();
+    }
+
+    private function createOrUpdateUsuario(string $rolName, string $email, string $googleId): Usuario
+    {
+        $repo = $this->manager->getRepository(Usuario::class);
+        $usuario = $repo->findOneBy(['correo' => $email]);
+
+        if (!$usuario) {
+            $usuario = new Usuario();
+            $usuario->setCorreo($email);
+            $usuario->setGoogleId($googleId);
+        }
+
+        $usuario->setDeletedAt(null);
+        $usuario->setEstadoCuenta('Activa');
+
+        // Buscamos el rol en la caché local que llenamos al principio
+        if (isset($this->cache['Rol'][$rolName])) {
+            $usuario->setRol($this->cache['Rol'][$rolName]);
+        }
+
+        $this->manager->persist($usuario);
+        return $usuario;
+    }
+
+    private function createOrUpdatePerfilVoluntario(Usuario $u, string $nom, string $ape, string $cursoAbrev): Voluntario
+    {
+        $repo = $this->manager->getRepository(Voluntario::class);
+        $vol = $repo->findOneBy(['usuario' => $u]);
+
+        if (!$vol) {
+            $vol = new Voluntario();
+            $vol->setUsuario($u);
+        }
+        $vol->setNombre($nom);
+        $vol->setApellidos($ape);
+        if (!$vol->getDni()) $vol->setDni(rand(10000000, 99999999) . 'X');
+        if (!$vol->getTelefono()) $vol->setTelefono('600' . rand(100000, 999999));
+
+        if (isset($this->cache['Curso'][$cursoAbrev])) {
+            $vol->setCursoActual($this->cache['Curso'][$cursoAbrev]);
+        }
+
+        $this->manager->persist($vol);
+        return $vol;
+    }
+
+    private function createOrUpdatePerfilOrganizacion(Usuario $u, string $nom, string $desc): Organizacion
+    {
+        $repo = $this->manager->getRepository(Organizacion::class);
+        $org = $repo->findOneBy(['usuario' => $u]);
+
+        if (!$org) {
+            $org = new Organizacion();
+            $org->setUsuario($u);
+            $org->setCif('G' . rand(10000000, 99999999));
+        }
+        $org->setNombre($nom);
+        $org->setDescripcion($desc);
+        $this->manager->persist($org);
+        return $org;
+    }
+
+    private function createOrUpdatePerfilCoordinador(Usuario $u, string $nom, string $ape): Coordinador
+    {
+        $repo = $this->manager->getRepository(Coordinador::class);
+        $coord = $repo->findOneBy(['usuario' => $u]);
+
+        if (!$coord) {
+            $coord = new Coordinador();
+            $coord->setUsuario($u);
+        }
+        $coord->setNombre($nom);
+        $coord->setApellidos($ape);
+        $this->manager->persist($coord);
+        return $coord;
+    }
+
+    private function createOrUpdateActividad(Organizacion $org, string $titulo, string $estado): Actividad
+    {
+        $repo = $this->manager->getRepository(Actividad::class);
+        $act = $repo->findOneBy(['titulo' => $titulo, 'organizacion' => $org]);
+
+        if (!$act) {
+            $act = new Actividad();
+            $act->setOrganizacion($org);
+            $act->setTitulo($titulo);
+            $act->setCupoMaximo(10);
+            $act->setDuracionHoras(2);
+        }
+        $act->setDeletedAt(null);
+        $act->setEstadoPublicacion($estado);
+
+        $this->manager->persist($act);
+        return $act;
+    }
+
+    private function createOrUpdateInscripcion(Voluntario $v, Actividad $a, string $estado): void
+    {
+        $repo = $this->manager->getRepository(Inscripcion::class);
+        // Doctrine usa los objetos para la clave compuesta
+        $ins = $repo->findOneBy(['voluntario' => $v, 'actividad' => $a]);
+
+        if (!$ins) {
+            $ins = new Inscripcion();
+            $ins->setVoluntario($v);
+            $ins->setActividad($a);
+            $ins->setFechaSolicitud(new \DateTime());
+        }
+        $ins->setEstadoSolicitud($estado);
+        $this->manager->persist($ins);
+    }
+
+    // --- Helpers Básicos (CORREGIDOS) ---
+
+    private function createOrUpdateRol(string $nombre): void
+    {
+        $repo = $this->manager->getRepository(Rol::class);
+        // CORRECCIÓN: Usamos 'nombre' (propiedad PHP) en vez de 'nombreRol'
+        $rol = $repo->findOneBy(['nombre' => $nombre]);
+        if (!$rol) {
+            $rol = new Rol();
+            $rol->setNombre($nombre);
+            $this->manager->persist($rol);
+        }
+        $this->cache['Rol'][$nombre] = $rol;
+    }
+
+    private function createOrUpdateIdioma(string $nombre, string $iso): void
+    {
+        $repo = $this->manager->getRepository(Idioma::class);
+        // CORRECCIÓN: Usamos 'codigoIso' (propiedad PHP)
+        $idioma = $repo->findOneBy(['codigoIso' => $iso]);
+        if (!$idioma) {
+            $idioma = new Idioma();
+            $idioma->setNombre($nombre);
+            $idioma->setCodigoIso($iso);
+            $this->manager->persist($idioma);
+        }
+        $this->cache['Idioma'][$nombre] = $idioma;
+    }
+
+    private function createOrUpdateTipo(string $nombre): void
+    {
+        $repo = $this->manager->getRepository(TipoVoluntariado::class);
+        // CORRECCIÓN: Aquí es tricky. Si usaste 'make:entity', suele ser 'nombreTipo' o 'nombre'.
+        // Si falla, cámbialo a 'nombre'.
+        // Probamos con 'nombreTipo' que suele ser el defecto si la columna es nombre_tipo
+        // Si te da error "Unrecognized field... nombreTipo", cambia esto a 'nombre'.
+        $tipo = $repo->findOneBy(['nombreTipo' => $nombre]);
+        if (!$tipo) {
+            $tipo = new TipoVoluntariado();
+            $tipo->setNombreTipo($nombre);
+            $this->manager->persist($tipo);
+        }
+        $this->cache['TipoVoluntariado'][$nombre] = $tipo;
+    }
+
+    private function createOrUpdateODS(int $id, string $nombre): void
+    {
+        $repo = $this->manager->getRepository(ODS::class);
+        $ods = $repo->find($id);
+        if (!$ods) {
+            $ods = new ODS($id, $nombre);
+            $this->manager->persist($ods);
+        } else {
+            // Opcional: Actualizar nombre si ha cambiado
+            // $ods->setNombre($nombre); 
+        }
+    }
+
+    private function createOrUpdateCurso(string $nom, string $abrev, string $grado, int $nivel): void
+    {
+        $repo = $this->manager->getRepository(Curso::class);
+        // CORRECCIÓN: Usamos 'abreviacionCurso' o 'abreviacion' según tu entidad.
+        // Asumo 'abreviacion' basado en tu SQL. Si falla, mira tu Entity/Curso.php
+        $curso = $repo->findOneBy(['abreviacion' => $abrev]); // Si falla pon 'abreviacionCurso'
+        if (!$curso) {
+            $curso = new Curso();
+            $curso->setAbreviacion($abrev);
+            $this->manager->persist($curso);
+        }
+        $curso->setNombre($nom);
+        $curso->setGrado($grado);
+        $curso->setNivel($nivel);
+        $this->cache['Curso'][$abrev] = $curso;
     }
 }

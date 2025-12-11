@@ -5,22 +5,25 @@ namespace App\Controller;
 use App\Entity\Usuario;
 use App\Entity\Voluntario;
 use App\Entity\VoluntarioIdioma;
+use App\Entity\Actividad;
+use App\Entity\Inscripcion;
 use App\Repository\RolRepository;
 use App\Repository\CursoRepository;
 use App\Repository\IdiomaRepository;
 use App\Repository\UsuarioRepository;
 use App\Repository\TipoVoluntariadoRepository;
-use Doctrine\DBAL\Exception\UniqueConstraintViolationException; // Para duplicados
+use App\Repository\ActividadRepository;
+use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\HttpFoundation\Response; // Códigos HTTP
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
-use OpenApi\Attributes as OA; // Swagger
+use OpenApi\Attributes as OA;
 
 #[Route('/api', name: 'api_')]
-#[OA\Tag(name: 'Voluntarios', description: 'Gestión de perfiles de voluntarios, recomendaciones y registro')]
+#[OA\Tag(name: 'Voluntarios', description: 'Gestión de perfiles de voluntarios, inscripciones y estadísticas')]
 final class VoluntarioController extends AbstractController
 {
     // ========================================================================
@@ -61,7 +64,6 @@ final class VoluntarioController extends AbstractController
     public function recomendaciones(int $id, EntityManagerInterface $em): JsonResponse
     {
         $conn = $em->getConnection();
-        // Usamos el SP que cruza preferencias con ODS de actividades
         $sql = 'EXEC SP_Get_Recomendaciones_Voluntario @id_voluntario = :id';
         
         try {
@@ -77,7 +79,7 @@ final class VoluntarioController extends AbstractController
     }
 
     // ========================================================================
-    // 3. REGISTRAR VOLUNTARIO (Transaccional)
+    // 3. REGISTRAR VOLUNTARIO (Transaccional) -> ¡ESTE ES EL QUE TE FALTABA!
     // ========================================================================
     #[Route('/voluntarios', name: 'registro_voluntario', methods: ['POST'])]
     #[OA\RequestBody(
@@ -104,7 +106,6 @@ final class VoluntarioController extends AbstractController
     )]
     #[OA\Response(response: 201, description: 'Voluntario registrado correctamente')]
     #[OA\Response(response: 409, description: 'Usuario duplicado')]
-    #[OA\Response(response: 500, description: 'Error en la transacción')]
     public function registrar(
         Request $request,
         EntityManagerInterface $entityManager,
@@ -120,7 +121,6 @@ final class VoluntarioController extends AbstractController
             return $this->json(['error' => 'Faltan datos obligatorios'], Response::HTTP_BAD_REQUEST);
         }
 
-        // INICIO TRANSACCIÓN: O se guarda todo, o no se guarda nada
         $entityManager->beginTransaction();
 
         try {
@@ -130,17 +130,16 @@ final class VoluntarioController extends AbstractController
             $usuario->setGoogleId($data['google_id']);
             $usuario->setEstadoCuenta('Activa'); 
             
-            $rolVoluntario = $rolRepository->findOneBy(['nombre' => 'Voluntario']); 
-            // Ojo: Asegúrate de que el rol en BBDD es 'Voluntario' (tu script SQL insertó 'Voluntario')
+            $rolVoluntario = $rolRepository->findOneBy(['nombreRol' => 'Voluntario']); 
             if (!$rolVoluntario) throw new \Exception("Error interno: Rol 'Voluntario' no configurado en BBDD");
             $usuario->setRol($rolVoluntario);
 
             $entityManager->persist($usuario);
-            $entityManager->flush(); // Necesario para obtener el ID del usuario
+            $entityManager->flush(); 
 
             // B. PERFIL VOLUNTARIO
             $voluntario = new Voluntario();
-            $voluntario->setUsuario($usuario); // Relación 1 a 1
+            $voluntario->setUsuario($usuario); 
             $voluntario->setNombre($data['nombre']);
             $voluntario->setApellidos($data['apellidos']);
             $voluntario->setTelefono($data['telefono'] ?? null);
@@ -157,7 +156,7 @@ final class VoluntarioController extends AbstractController
                 if ($curso) $voluntario->setCursoActual($curso);
             }
 
-            // C. IDIOMAS (Tabla Intermedia con atributos)
+            // C. IDIOMAS
             if (!empty($data['idiomas']) && is_array($data['idiomas'])) {
                 foreach ($data['idiomas'] as $idiomaData) {
                     $idiomaEntity = $idiomaRepository->find($idiomaData['id_idioma']);
@@ -171,7 +170,7 @@ final class VoluntarioController extends AbstractController
                 }
             }
 
-            // D. PREFERENCIAS (Tabla Intermedia simple)
+            // D. PREFERENCIAS
             if (!empty($data['preferencias_ids']) && is_array($data['preferencias_ids'])) {
                 foreach ($data['preferencias_ids'] as $idTipo) {
                     $tipo = $tipoRepo->find($idTipo);
@@ -181,17 +180,15 @@ final class VoluntarioController extends AbstractController
 
             $entityManager->persist($voluntario);
             $entityManager->flush();
-            
-            // Si todo ha ido bien, confirmamos cambios
             $entityManager->commit();
 
             return $this->json($voluntario, Response::HTTP_CREATED, [], ['groups' => 'usuario:read']);
 
         } catch (UniqueConstraintViolationException $e) {
-            $entityManager->rollback(); // Deshacemos cambios
+            $entityManager->rollback();
             return $this->json(['error' => 'El correo o DNI ya existen'], Response::HTTP_CONFLICT);
         } catch (\Exception $e) {
-            $entityManager->rollback(); // Deshacemos cambios
+            $entityManager->rollback();
             return $this->json(['error' => 'Error al registrar: ' . $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
@@ -201,11 +198,9 @@ final class VoluntarioController extends AbstractController
     // ========================================================================
     #[Route('/voluntarios/{id}', name: 'get_voluntario', methods: ['GET'])]
     #[OA\Response(response: 200, description: 'Detalle del voluntario')]
-    #[OA\Response(response: 404, description: 'No encontrado')]
     public function getOne(int $id, UsuarioRepository $userRepo): JsonResponse 
     {
         $usuario = $userRepo->find($id);
-        // Si no existe o tiene deleted_at, devolvemos 404
         if (!$usuario || $usuario->getDeletedAt()) {
             return $this->json(['error' => 'Voluntario no encontrado'], Response::HTTP_NOT_FOUND);
         }
@@ -216,7 +211,6 @@ final class VoluntarioController extends AbstractController
     // 5. ACTUALIZAR (PUT)
     // ========================================================================
     #[Route('/voluntarios/{id}', name: 'actualizar_voluntario', methods: ['PUT'])]
-    #[OA\RequestBody(description: 'Datos a actualizar (parcial)', content: new OA\JsonContent(type: 'object'))]
     #[OA\Response(response: 200, description: 'Perfil actualizado')]
     public function actualizar(
         int $id,
@@ -233,18 +227,14 @@ final class VoluntarioController extends AbstractController
 
         $data = json_decode($request->getContent(), true);
 
-        // Campos básicos
         if (isset($data['nombre'])) $voluntario->setNombre($data['nombre']);
         if (isset($data['apellidos'])) $voluntario->setApellidos($data['apellidos']);
         if (isset($data['telefono'])) $voluntario->setTelefono($data['telefono']);
         
-        // Actualización de Preferencias (Borrar y re-crear es una estrategia válida simple)
         if (isset($data['preferencias_ids']) && is_array($data['preferencias_ids'])) {
-            // Limpiamos anteriores
             foreach ($voluntario->getPreferencias() as $pref) {
                 $voluntario->removePreferencia($pref);
             }
-            // Añadimos nuevas
             foreach ($data['preferencias_ids'] as $idTipo) {
                 $tipo = $tipoRepo->find($idTipo);
                 if ($tipo) $voluntario->addPreferencia($tipo);
@@ -265,8 +255,6 @@ final class VoluntarioController extends AbstractController
         $usuario = $usuarioRepo->find($id);
         if (!$usuario) return $this->json(['error' => 'Usuario no encontrado'], Response::HTTP_NOT_FOUND);
 
-        // USAMOS EL SP, igual que en UsuarioController, para que la lógica de BBDD mande.
-        // El SP se encarga de setDeletedAt(NOW) y setEstadoCuenta('Bloqueada')
         $sql = 'EXEC SP_SoftDelete_Usuario @id_usuario = :id';
         
         try {
@@ -291,5 +279,131 @@ final class VoluntarioController extends AbstractController
         } catch (\Exception $e) {
             return $this->json(['error' => 'Error al restaurar'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
+    }
+
+    // ========================================================================
+    // 8. INSCRIBIRSE A UNA ACTIVIDAD (POST)
+    // ========================================================================
+    #[Route('/voluntarios/{id}/actividades/{idActividad}', name: 'inscribirse_actividad', methods: ['POST'])]
+    #[OA\Response(response: 201, description: 'Inscripción realizada (Pendiente)')]
+    #[OA\Response(response: 409, description: 'Error de negocio (Cupo, Fechas, Ya inscrito)')]
+    public function inscribirse(
+        int $id, 
+        int $idActividad, 
+        UsuarioRepository $userRepo,
+        ActividadRepository $actRepo,
+        EntityManagerInterface $em
+    ): JsonResponse {
+        // 1. Validar Voluntario
+        $usuario = $userRepo->find($id);
+        if (!$usuario || !$usuario->getVoluntario()) { 
+             $voluntario = $em->getRepository(Voluntario::class)->findOneBy(['usuario' => $usuario]);
+        } else {
+             $voluntario = $usuario->getVoluntario();
+        }
+
+        if (!$voluntario) return $this->json(['error' => 'Voluntario no encontrado'], Response::HTTP_NOT_FOUND);
+
+        // 2. Validar Actividad
+        $actividad = $actRepo->find($idActividad);
+        if (!$actividad) return $this->json(['error' => 'Actividad no encontrada'], Response::HTTP_NOT_FOUND);
+
+        // 3. Crear Inscripción
+        $inscripcion = new Inscripcion();
+        $inscripcion->setVoluntario($voluntario);
+        $inscripcion->setActividad($actividad);
+        $inscripcion->setEstadoSolicitud('Pendiente');
+        $inscripcion->setFechaSolicitud(new \DateTime()); 
+
+        try {
+            $em->persist($inscripcion);
+            $em->flush();
+            return $this->json(['mensaje' => 'Inscripción solicitada correctamente'], Response::HTTP_CREATED);
+
+        } catch (\Exception $e) {
+            return $this->json([
+                'error' => 'No se pudo realizar la inscripción. Verifique cupos, fechas o si ya está inscrito.',
+                'detalle' => $e->getMessage() 
+            ], Response::HTTP_CONFLICT);
+        }
+    }
+
+    // ========================================================================
+    // 9. DESAPUNTARSE (DELETE)
+    // ========================================================================
+    #[Route('/voluntarios/{id}/actividades/{idActividad}', name: 'desapuntarse_actividad', methods: ['DELETE'])]
+    #[OA\Response(response: 200, description: 'Inscripción cancelada')]
+    public function desapuntarse(
+        int $id, 
+        int $idActividad, 
+        EntityManagerInterface $em
+    ): JsonResponse {
+        $inscripcion = $em->getRepository(Inscripcion::class)->findOneBy([
+            'voluntario' => $id, 
+            'actividad' => $idActividad
+        ]);
+
+        if (!$inscripcion) {
+            return $this->json(['error' => 'No estás inscrito en esta actividad'], Response::HTTP_NOT_FOUND);
+        }
+
+        $em->remove($inscripcion);
+        $em->flush();
+
+        return $this->json(['mensaje' => 'Te has desapuntado correctamente'], Response::HTTP_OK);
+    }
+
+    // ========================================================================
+    // 10. ESTADÍSTICAS E HISTORIAL (GET)
+    // ========================================================================
+    #[Route('/voluntarios/{id}/historial', name: 'historial_voluntario', methods: ['GET'])]
+    #[OA\Response(
+        response: 200, 
+        description: 'Estadísticas y lista de actividades',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'resumen', type: 'object'),
+                new OA\Property(property: 'actividades', type: 'array', items: new OA\Items(type: 'object'))
+            ]
+        )
+    )]
+    public function historial(int $id, UsuarioRepository $userRepo, EntityManagerInterface $em): JsonResponse
+    {
+        $usuario = $userRepo->find($id);
+        $voluntario = $em->getRepository(Voluntario::class)->findOneBy(['usuario' => $usuario]);
+
+        if (!$voluntario) return $this->json(['error' => 'Voluntario no encontrado'], Response::HTTP_NOT_FOUND);
+
+        $inscripciones = $em->getRepository(Inscripcion::class)->findBy(['voluntario' => $voluntario]);
+
+        $historial = [];
+        $horasTotales = 0;
+        $participacionesConfirmadas = 0;
+
+        foreach ($inscripciones as $insc) {
+            $act = $insc->getActividad();
+            
+            if (in_array($insc->getEstadoSolicitud(), ['Aceptada', 'Finalizada'])) {
+                $participacionesConfirmadas++;
+                $horasTotales += $act->getDuracionHoras();
+            }
+
+            $historial[] = [
+                'id_actividad' => $act->getId(),
+                'titulo' => $act->getTitulo(),
+                'fecha_inicio' => $act->getFechaInicio()->format('Y-m-d H:i:s'),
+                'estado_solicitud' => $insc->getEstadoSolicitud(), 
+                'horas' => $act->getDuracionHoras()
+            ];
+        }
+
+        return $this->json([
+            'resumen' => [
+                'total_participaciones' => $participacionesConfirmadas,
+                'horas_acumuladas' => $horasTotales,
+                'nivel_experiencia' => $horasTotales > 50 ? 'Experto' : ($horasTotales > 20 ? 'Intermedio' : 'Principiante')
+            ],
+            'actividades' => $historial
+        ], Response::HTTP_OK);
     }
 }

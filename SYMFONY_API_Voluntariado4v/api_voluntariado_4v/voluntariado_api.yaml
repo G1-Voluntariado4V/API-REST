@@ -35,8 +35,8 @@ tags:
     description: Flujo de solicitudes (Voluntario) y aprobaciones (Organización)
   - name: Catálogos
     description: Maestros (ODS, Idiomas, Cursos, Tipos)
-  - name: Administración
-    description: Dashboard y métricas globales (SQL Computed)
+  - name: Coordinadores # ROL central de gestión (Incluye Dashboard y Moderación)
+    description: Perfil, Dashboard y Moderación de Usuarios/Contenido.
 
 paths:
   # ============================================================
@@ -108,6 +108,8 @@ paths:
       responses:
         '201':
           description: Voluntario creado exitosamente.
+        '409':
+          description: El correo o DNI ya existen (Violación de unicidad).
 
   /voluntarios/{id}:
     parameters:
@@ -123,6 +125,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/VoluntarioPerfil'
+        '404':
+          description: Voluntario no encontrado.
     put:
       tags: [Voluntarios]
       summary: Actualizar datos
@@ -329,6 +333,8 @@ paths:
     post:
       tags: [Actividades]
       summary: Crear actividad (Solo Organizaciones)
+      security: # Añadido requisito de autenticación (Corregido)
+        - firebaseAuth: []
       requestBody:
         description: Datos de la nueva actividad
         content:
@@ -338,6 +344,8 @@ paths:
       responses:
         '201':
           description: Actividad creada (Estado inicial 'En revision').
+        '400':
+          description: Error de validación (ej. formato de fecha).
 
   /actividades/{id}:
     parameters:
@@ -455,7 +463,7 @@ paths:
         schema: { type: integer }
     patch:
       tags: [Inscripciones]
-      summary: Cambiar estado solicitud
+      summary: Cambiar estado solicitud (Aprobar/Rechazar)
       description: >
         **Trigger:** `TR_Check_Cupo_Update`.
         Controla cambios a 'Aceptada', 'Rechazada' o 'Cancelada'.
@@ -493,12 +501,14 @@ paths:
                   $ref: '#/components/schemas/InscripcionVolView'
 
   # ============================================================
-  # ADMINISTRACIÓN & CATÁLOGOS
+  # COORDINADORES (Perfil, Dashboard y Moderación)
   # ============================================================
+  
+  # --- DASHBOARD & MÉTRICAS ---
   /admin/stats:
     get:
-      tags: [Administración]
-      summary: Dashboard Stats
+      tags: [Coordinadores]
+      summary: Dashboard Stats (Solo Coordinadores)
       description: >
         **SQL Logic:** Ejecuta `SP_Dashboard_Stats`.
         Devuelve contadores en tiempo real cruzando múltiples tablas.
@@ -509,7 +519,105 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/DashboardStats'
+  
+  # --- CRUD PERFIL DE COORDINADOR ---
+  /coordinadores:
+    post:
+      tags: [Coordinadores]
+      summary: Registrar nuevo Coordinador (Acceso Admin)
+      description: Crea un usuario y perfil de Coordinador (Rol 4).
+      requestBody:
+        description: Datos mínimos para el perfil de Coordinador
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CoordinadorInput'
+      responses:
+        '201': 
+          description: 'Coordinador registrado correctamente'
 
+  /coordinadores/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+    get:
+      tags: [Coordinadores]
+      summary: Obtener perfil de Coordinador
+      responses:
+        '200': 
+          description: 'Perfil de Coordinador recuperado.'
+        '404': 
+          description: 'No encontrado'
+    put:
+      tags: [Coordinadores]
+      summary: Actualizar datos de Coordinador
+      requestBody:
+        description: Datos a actualizar (nombre, apellidos, telefono)
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CoordinadorInput'
+      responses:
+        '200': 
+          description: 'Perfil actualizado'
+    delete:
+      tags: [Coordinadores]
+      summary: Eliminar cuenta (Soft Delete)
+      description: Utiliza el SP `SP_SoftDelete_Usuario`.
+      responses:
+        '204': 
+          description: 'Cuenta Coordinador marcada como borrada.'
+
+  # --- MODERACIÓN DE USUARIOS (Voluntarios/Organizaciones) ---
+  /admin/{rol}/{id}/estado:
+    parameters:
+      - name: rol
+        in: path
+        required: true
+        description: "Tipo de usuario (voluntarios o organizaciones)"
+        schema: { type: string, enum: [voluntarios, organizaciones] }
+      - $ref: '#/components/parameters/IdParam'
+    patch:
+      tags: [Coordinadores]
+      summary: Moderar estado de Voluntarios/Organizaciones
+      description: Actualiza el estado de la cuenta (Activa, Rechazada, Bloqueada).
+      requestBody:
+        description: Nuevo estado para la cuenta
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                estado:
+                  type: string
+                  enum: [Activa, Rechazada, Bloqueada]
+      responses:
+        '200': { description: 'Estado de la cuenta actualizado.' }
+        '400': { description: 'Estado o Rol inválido.' }
+        '404': { description: 'Usuario no encontrado.' }
+
+  # --- MODERACIÓN DE CONTENIDO (Actividades) ---
+  /admin/actividades/{id}/estado:
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+    patch:
+      tags: [Coordinadores]
+      summary: Aprobar/Rechazar publicación de Actividad
+      description: Cambia el estado de publicación (Publicada, En revision, Cancelada).
+      requestBody:
+        description: Nuevo estado de publicación
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                estado:
+                  type: string
+                  enum: [Publicada, En revision, Cancelada]
+      responses:
+        '200': { description: 'Estado de publicación actualizado.' }
+        '404': { description: 'Actividad no encontrada.' }
+  
+  # --- CATÁLOGOS ---
   /catalogos/ods:
     get:
       tags: [Catálogos]
@@ -586,6 +694,17 @@ components:
         correo: { type: string, description: "Email registrado" }
         rol: { type: string, example: "Voluntario", description: "Rol del usuario en el sistema" }
         estado: { type: string, description: "Estado de la cuenta" }
+    
+    # --- COORDINADORES ---
+    CoordinadorInput:
+      type: object
+      required: [google_id, correo, nombre]
+      properties:
+        google_id: { type: string, description: "UID de Firebase" }
+        correo: { type: string, description: "Email de contacto" }
+        nombre: { type: string, description: "Nombre de pila" }
+        apellidos: { type: string, description: "Apellidos" }
+        telefono: { type: string, description: "Teléfono de contacto" }
 
     # --- VOLUNTARIOS ---
     VoluntarioInput:
@@ -760,6 +879,7 @@ components:
       properties:
         id_ods: { type: integer, description: "ID" }
         nombre: { type: string, description: "Nombre del objetivo" }
+        descripcion: { type: string, description: "Descripción completa del ODS" }
     
     TipoVoluntariado:
       type: object

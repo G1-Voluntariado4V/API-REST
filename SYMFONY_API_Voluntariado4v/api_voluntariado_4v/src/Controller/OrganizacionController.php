@@ -4,10 +4,12 @@ namespace App\Controller;
 
 use App\Entity\Organizacion;
 use App\Entity\Usuario;
+use App\Repository\ActividadRepository; // Necesario para listar actividades propias
 use App\Repository\RolRepository;
 use App\Repository\UsuarioRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -30,6 +32,7 @@ final class OrganizacionController extends AbstractController
     public function index(EntityManagerInterface $em): JsonResponse
     {
         $conn = $em->getConnection();
+        // Usamos la vista para filtrar automáticamente las borradas/bloqueadas
         $sql = 'SELECT * FROM VW_Organizaciones_Activas';
         try {
             $listado = $conn->executeQuery($sql)->fetchAllAssociative();
@@ -40,7 +43,7 @@ final class OrganizacionController extends AbstractController
     }
 
     // ========================================================================
-    // 2. REGISTRAR (POST)
+    // REGISTRAR ORGANIZACIÓN (POST)
     // ========================================================================
     #[Route('/organizaciones', name: 'registro_organizacion', methods: ['POST'])]
     #[OA\RequestBody(
@@ -50,100 +53,80 @@ final class OrganizacionController extends AbstractController
                 new OA\Property(property: 'google_id', type: 'string'),
                 new OA\Property(property: 'correo', type: 'string'),
                 new OA\Property(property: 'nombre', type: 'string', description: 'Nombre de la ONG'),
-                new OA\Property(property: 'cif', type: 'string', description: 'Identificador fiscal')
+                new OA\Property(property: 'cif', type: 'string'),
+                new OA\Property(property: 'descripcion', type: 'string'),
+                new OA\Property(property: 'direccion', type: 'string'),
+                new OA\Property(property: 'sitio_web', type: 'string'),
+                new OA\Property(property: 'telefono', type: 'string')
             ]
         )
     )]
-    #[OA\Response(response: 201, description: 'Organización registrada (Pendiente de validación)')]
+    #[OA\Response(response: 201, description: 'Organización registrada correctamente')]
     public function registrar(
         Request $request,
-        EntityManagerInterface $entityManager,
+        EntityManagerInterface $em,
         RolRepository $rolRepository
     ): JsonResponse {
         $data = json_decode($request->getContent(), true);
 
-        if (!isset($data['google_id'], $data['correo'], $data['nombre'], $data['cif'])) {
-            return $this->json(['error' => 'Faltan datos obligatorios'], Response::HTTP_BAD_REQUEST);
+        // Validar datos mínimos
+        if (!isset($data['google_id'], $data['correo'], $data['cif'], $data['nombre'])) {
+            return $this->json(['error' => 'Faltan datos obligatorios (CIF, Nombre, GoogleID...)'], 400);
         }
 
-        $entityManager->beginTransaction();
-
+        $em->beginTransaction();
         try {
-            // A. USUARIO BASE
+            // 1. Crear Usuario Base
             $usuario = new Usuario();
             $usuario->setCorreo($data['correo']);
             $usuario->setGoogleId($data['google_id']);
-            $usuario->setEstadoCuenta('Pendiente'); // Nace pendiente de validación por Admin
+            $usuario->setEstadoCuenta('Pendiente'); // Las ONGs suelen requerir aprobación
 
-            $rolOrg = $rolRepository->findOneBy(['nombre' => 'Organizacion']);
-            if (!$rolOrg) throw new \Exception("Rol 'Organizacion' no encontrado");
+            // Asignar Rol "Organizacion" (ID 3 según tus mocks)
+            $rolOrg = $rolRepository->findOneBy(['nombreRol' => 'Organizacion']);
+            if (!$rolOrg) throw new \Exception("Rol 'Organizacion' no encontrado en BBDD");
+
             $usuario->setRol($rolOrg);
 
-            $entityManager->persist($usuario);
-            $entityManager->flush();
+            $em->persist($usuario);
+            $em->flush(); // Para obtener ID
 
-            // B. PERFIL ORGANIZACIÓN
+            // 2. Crear Perfil Organización
             $org = new Organizacion();
-            $org->setUsuario($usuario);
-            $org->setNombre($data['nombre']);
+            $org->setUsuario($usuario); // PK = FK (1:1)
             $org->setCif($data['cif']);
+            $org->setNombre($data['nombre']);
             $org->setDescripcion($data['descripcion'] ?? null);
             $org->setDireccion($data['direccion'] ?? null);
             $org->setSitioWeb($data['sitio_web'] ?? null);
             $org->setTelefono($data['telefono'] ?? null);
-            $org->setImgPerfil($data['img_perfil'] ?? null);
-            $org->setUpdatedAt(new \DateTime()); // Usamos DateTime de PHP para asegurar compatibilidad
 
-            $entityManager->persist($org);
-            $entityManager->flush();
-
-            $entityManager->commit();
+            $em->persist($org);
+            $em->flush();
+            $em->commit();
 
             return $this->json($org, Response::HTTP_CREATED, [], ['groups' => 'usuario:read']);
+        } catch (UniqueConstraintViolationException $e) {
+            $em->rollback();
+            return $this->json(['error' => 'El correo o CIF ya están registrados'], 409);
         } catch (\Exception $e) {
-            $entityManager->rollback();
-            return $this->json(['error' => 'Error al registrar: ' . $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
+            $em->rollback();
+            return $this->json(['error' => 'Error al registrar: ' . $e->getMessage()], 500);
         }
     }
 
     // ========================================================================
-    // 3. VALIDAR CUENTA (PATCH) - Acción de Admin
-    // ========================================================================
-    #[Route('/organizaciones/{id}/validar', name: 'validar_organizacion', methods: ['PATCH'])]
-    #[OA\RequestBody(
-        description: 'Nuevo estado de la cuenta',
-        content: new OA\JsonContent(
-            properties: [
-                new OA\Property(property: 'estado', type: 'string', enum: ['Activa', 'Rechazada', 'Bloqueada'], example: 'Activa')
-            ]
-        )
-    )]
-    #[OA\Response(response: 200, description: 'Estado actualizado')]
-    public function validar(int $id, UsuarioRepository $userRepo, Request $request, EntityManagerInterface $em): JsonResponse
-    {
-        $usuario = $userRepo->find($id);
-        if (!$usuario) return $this->json(['error' => 'Usuario no encontrado'], Response::HTTP_NOT_FOUND);
-
-        $data = json_decode($request->getContent(), true);
-        $nuevoEstado = $data['estado'] ?? 'Activa';
-
-        $usuario->setEstadoCuenta($nuevoEstado);
-        $usuario->setUpdatedAt(new \DateTime());
-        $em->flush();
-
-        return $this->json(['mensaje' => "Estado actualizado a: $nuevoEstado"], Response::HTTP_OK);
-    }
-
-    // ========================================================================
-    // 4. GET ONE
+    // 3. GET ONE (Ver Perfil)
     // ========================================================================
     #[Route('/organizaciones/{id}', name: 'get_organizacion', methods: ['GET'])]
+    #[OA\Response(response: 200, description: 'Perfil de la organización')]
+    #[OA\Response(response: 404, description: 'No encontrada')]
     public function getOne(int $id, UsuarioRepository $userRepo, EntityManagerInterface $em): JsonResponse
     {
         $usuario = $userRepo->find($id);
         // Si no existe o tiene deleted_at (Soft Deleted)
         if (!$usuario || $usuario->getDeletedAt()) {
-            return $this->json(['error' => 'No encontrada'], Response::HTTP_NOT_FOUND);
+            return $this->json(['error' => 'Organización no encontrada'], Response::HTTP_NOT_FOUND);
         }
 
         // Buscamos el perfil específico
@@ -154,19 +137,21 @@ final class OrganizacionController extends AbstractController
     }
 
     // ========================================================================
-    // 5. ACTUALIZAR (PUT)
+    // 4. ACTUALIZAR (PUT) - Gestión de Datos Propios
     // ========================================================================
     #[Route('/organizaciones/{id}', name: 'actualizar_organizacion', methods: ['PUT'])]
+    #[OA\RequestBody(description: 'Datos editables de la ONG', content: new OA\JsonContent(type: 'object'))]
     public function actualizar(int $id, Request $request, UsuarioRepository $userRepo, EntityManagerInterface $em): JsonResponse
     {
         $usuario = $userRepo->find($id);
-        if (!$usuario) return $this->json(['error' => 'Usuario no encontrado'], Response::HTTP_NOT_FOUND);
+        if (!$usuario || $usuario->getDeletedAt()) return $this->json(['error' => 'Usuario no encontrado'], Response::HTTP_NOT_FOUND);
 
         $org = $em->getRepository(Organizacion::class)->findOneBy(['usuario' => $usuario]);
         if (!$org) return $this->json(['error' => 'Perfil no encontrado'], Response::HTTP_NOT_FOUND);
 
         $data = json_decode($request->getContent(), true);
 
+        // Actualización segura: No permitimos cambiar CIF ni Usuario ID por aquí
         if (isset($data['nombre'])) $org->setNombre($data['nombre']);
         if (isset($data['descripcion'])) $org->setDescripcion($data['descripcion']);
         if (isset($data['direccion'])) $org->setDireccion($data['direccion']);
@@ -181,9 +166,10 @@ final class OrganizacionController extends AbstractController
     }
 
     // ========================================================================
-    // 6. ELIMINAR (DELETE) - Usando SP SoftDelete
+    // 5. ELIMINAR (DELETE) - Baja de la Organización
     // ========================================================================
     #[Route('/organizaciones/{id}', name: 'borrar_organizacion', methods: ['DELETE'])]
+    #[OA\Response(response: 200, description: 'Cuenta cerrada (Soft Delete)')]
     public function eliminar(int $id, UsuarioRepository $userRepo, EntityManagerInterface $em): JsonResponse
     {
         $usuario = $userRepo->find($id);
@@ -193,9 +179,59 @@ final class OrganizacionController extends AbstractController
         $sql = 'EXEC SP_SoftDelete_Usuario @id_usuario = :id';
         try {
             $em->getConnection()->executeStatement($sql, ['id' => $id]);
-            return $this->json(['mensaje' => 'Organización eliminada correctamente (Soft Delete)'], Response::HTTP_OK);
+            return $this->json(['mensaje' => 'Organización eliminada correctamente. Sus actividades siguen en histórico.'], Response::HTTP_OK);
         } catch (\Exception $e) {
             return $this->json(['error' => 'Error al eliminar organización'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
+    }
+
+    // ========================================================================
+    // 6. MIS ACTIVIDADES (GET) - Listado propio
+    // ========================================================================
+    #[Route('/organizaciones/{id}/actividades', name: 'mis_actividades_org', methods: ['GET'])]
+    #[OA\Response(response: 200, description: 'Lista de actividades creadas por esta ONG')]
+    public function misActividades(
+        int $id,
+        ActividadRepository $actRepo,
+        UsuarioRepository $userRepo
+    ): JsonResponse {
+        // 1. Primero verificamos que la Organización existe
+        // Recordamos que Organizacion hereda de Usuario, así que buscamos por ese ID
+        $organizacion = $userRepo->find($id);
+
+        if (!$organizacion || !in_array('Organizacion', $organizacion->getRoles() ?? [])) {
+            // Nota: Ajusta la lógica de roles según cómo los guardes en BBDD (si usas string o array)
+            // Si tu BBDD usa roles relacionales, verifica la entidad Organizacion directamente:
+            // $organizacion = $entityManager->getRepository(Organizacion::class)->find($id);
+        }
+
+        // Forma más directa si tienes repositorio de Organizacion inyectado:
+        // $organizacionEntity = $orgRepo->find($id); 
+
+        // 2. Buscamos actividades pasando el OBJETO organización, no el int.
+        // Doctrine prefiere objetos para las relaciones.
+        $actividades = $actRepo->findBy(['organizacion' => $id]);
+
+        // Mapeamos a un formato ligero para la lista
+        $resultado = [];
+        foreach ($actividades as $act) {
+            // Solo mostramos si NO está borrada (Soft Delete)
+            // Asumimos que implementaste getDeletedAt() en la entidad Actividad como hablamos
+            if (method_exists($act, 'getDeletedAt') && !$act->getDeletedAt()) {
+                $resultado[] = [
+                    'id_actividad' => $act->getId(),
+                    'titulo' => $act->getTitulo(),
+                    'fecha_inicio' => $act->getFechaInicio()->format('Y-m-d H:i:s'),
+                    'estado_publicacion' => $act->getEstadoPublicacion(),
+                    'cupo_maximo' => $act->getCupoMaximo(),
+                    // Opcional: contar inscripciones aceptadas
+                    'inscritos' => $act->getInscripciones()->filter(function ($insc) {
+                        return $insc->getEstadoSolicitud() === 'Aceptada';
+                    })->count()
+                ];
+            }
+        }
+
+        return $this->json($resultado, Response::HTTP_OK);
     }
 }

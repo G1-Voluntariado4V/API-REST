@@ -2,8 +2,10 @@
 
 namespace App\Controller;
 
+use App\Entity\Actividad;
 use App\Entity\Coordinador;
 use App\Entity\Usuario;
+use App\Repository\ActividadRepository;
 use App\Repository\RolRepository;
 use App\Repository\UsuarioRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -15,13 +17,13 @@ use Symfony\Component\Routing\Attribute\Route;
 use OpenApi\Attributes as OA;
 
 #[Route('/api', name: 'api_')]
-#[OA\Tag(name: 'Coordinadores', description: 'Gestión interna y Dashboard')]
+#[OA\Tag(name: 'Coordinadores', description: 'Gestión interna, Dashboard y Moderación Global')]
 final class CoordinadorController extends AbstractController
 {
     // ========================================================================
     // 1. DASHBOARD GLOBAL (Estadísticas vía SP)
     // ========================================================================
-    #[Route('/admin/stats', name: 'admin_stats', methods: ['GET'])]
+    #[Route('/coord/stats', name: 'coord_stats', methods: ['GET'])]
     #[OA\Response(
         response: 200,
         description: 'Métricas globales del sistema (Usando SP SQL)',
@@ -145,6 +147,7 @@ final class CoordinadorController extends AbstractController
     // 4. ACTUALIZAR PERFIL
     // ========================================================================
     #[Route('/coordinadores/{id}', name: 'actualizar_coordinador', methods: ['PUT'])]
+    #[OA\RequestBody(description: 'Datos a actualizar', content: new OA\JsonContent(type: 'object'))]
     public function actualizar(
         int $id,
         Request $request,
@@ -189,5 +192,118 @@ final class CoordinadorController extends AbstractController
         } catch (\Exception $e) {
             return $this->json(['error' => 'Error al cerrar cuenta'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
+    }
+    
+    // ========================================================================
+    // 6. MODERACIÓN: GESTIÓN DE ESTADO DE USUARIOS (Voluntarios/Organizaciones)
+    // ========================================================================
+    #[Route('/coord/{rol}/{id}/estado', name: 'coord_cambiar_estado_usuario', methods: ['PATCH'])]
+    #[OA\Response(response: 200, description: 'Estado de usuario actualizado.')]
+    #[OA\Response(response: 400, description: 'Estado o Rol inválido.')]
+    #[OA\Parameter(name: 'rol', description: 'Tipo de usuario (voluntarios o organizaciones)', in: 'path', schema: new OA\Schema(type: 'string', enum: ['voluntarios', 'organizaciones']))]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'estado', type: 'string', description: 'Nuevo estado', enum: ['Activa', 'Rechazada', 'Bloqueada'])
+            ]
+        )
+    )]
+    public function cambiarEstadoUsuario(
+        int $id,
+        string $rol,
+        Request $request,
+        UsuarioRepository $userRepo,
+        EntityManagerInterface $em
+    ): JsonResponse {
+        $data = json_decode($request->getContent(), true);
+        $nuevoEstado = $data['estado'] ?? null;
+        $estadosValidos = ['Activa', 'Rechazada', 'Bloqueada'];
+    
+        // 1. Validar Rol y Estado
+        if (!in_array($rol, ['voluntarios', 'organizaciones'])) {
+            return $this->json(['error' => 'Rol de usuario inválido para esta acción.'], Response::HTTP_BAD_REQUEST);
+        }
+        if (!in_array($nuevoEstado, $estadosValidos)) {
+            return $this->json(['error' => 'Estado de cuenta inválido. Use: ' . implode(', ', $estadosValidos)], Response::HTTP_BAD_REQUEST);
+        }
+    
+        // 2. Buscar y Actualizar
+        $usuario = $userRepo->find($id);
+        if (!$usuario) {
+            return $this->json(['error' => 'Usuario no encontrado'], Response::HTTP_NOT_FOUND);
+        }
+    
+        $usuario->setEstadoCuenta($nuevoEstado);
+        $usuario->setUpdatedAt(new \DateTime());
+        $em->flush();
+    
+        return $this->json(['mensaje' => 'Estado de la cuenta actualizado a ' . $nuevoEstado], Response::HTTP_OK);
+    }
+    
+    // ========================================================================
+    // 7. GESTIÓN TOTAL DE ACTIVIDADES (COORDINACIÓN)
+    // ========================================================================
+    
+    // 7.1 MODERAR ESTADO (Publicar/Rechazar)
+    #[Route('/coord/actividades/{id}/estado', name: 'coord_cambiar_estado_actividad', methods: ['PATCH'])]
+    #[OA\Response(response: 200, description: 'Estado de publicación actualizado.')]
+    #[OA\RequestBody(required: true, content: new OA\JsonContent(properties: [new OA\Property(property: 'estado', type: 'string', enum: ['Publicada', 'En revision', 'Cancelada'])]))]
+    public function cambiarEstadoActividad(int $id, Request $request, EntityManagerInterface $em): JsonResponse 
+    {
+        $data = json_decode($request->getContent(), true);
+        $nuevoEstado = $data['estado'] ?? null;
+        $estadosValidos = ['Publicada', 'En revision', 'Cancelada'];
+        
+        if (!in_array($nuevoEstado, $estadosValidos)) {
+            return $this->json(['error' => 'Estado de publicación inválido. Use: ' . implode(', ', $estadosValidos)], Response::HTTP_BAD_REQUEST);
+        }
+    
+        $actividad = $em->getRepository(Actividad::class)->find($id);
+        if (!$actividad) return $this->json(['error' => 'Actividad no encontrada'], Response::HTTP_NOT_FOUND);
+    
+        $actividad->setEstadoPublicacion($nuevoEstado);
+        $actividad->setUpdatedAt(new \DateTime());
+        $em->flush();
+    
+        return $this->json(['mensaje' => 'Estado de publicación actualizado a ' . $nuevoEstado], Response::HTTP_OK);
+    }
+
+    // 7.2 BORRAR ACTIVIDAD (COORD DELETE) - Borrado forzoso
+    #[Route('/coord/actividades/{id}', name: 'coord_borrar_actividad', methods: ['DELETE'])]
+    #[OA\Response(response: 200, description: 'Actividad eliminada por coordinación (Soft Delete)')]
+    public function borrarActividadCoord(int $id, EntityManagerInterface $em): JsonResponse
+    {
+        // Reutilizamos el SP de Soft Delete para consistencia
+        $sql = 'EXEC SP_SoftDelete_Actividad @id_actividad = :id';
+        try {
+            $em->getConnection()->executeStatement($sql, ['id' => $id]);
+            return $this->json(['mensaje' => 'Actividad eliminada por Coordinador'], Response::HTTP_OK);
+        } catch (\Exception $e) {
+            return $this->json(['error' => 'Error al eliminar actividad'], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    // 7.3 MODIFICAR ACTIVIDAD (COORD UPDATE) - Edición de contenido
+    #[Route('/coord/actividades/{id}', name: 'coord_editar_actividad', methods: ['PUT'])]
+    #[OA\RequestBody(description: 'Datos a forzar actualización', content: new OA\JsonContent(type: 'object'))]
+    public function editarActividadCoord(int $id, Request $request, ActividadRepository $repo, EntityManagerInterface $em): JsonResponse
+    {
+        // Esta función permite al coordinador corregir textos o datos de cualquier actividad
+        $actividad = $repo->find($id);
+        if (!$actividad) return $this->json(['error' => 'Actividad no encontrada'], Response::HTTP_NOT_FOUND);
+
+        $data = json_decode($request->getContent(), true);
+        
+        // Actualización simple de campos escalares (Título, Descripción, etc.)
+        if (isset($data['titulo'])) $actividad->setTitulo($data['titulo']);
+        if (isset($data['descripcion'])) $actividad->setDescripcion($data['descripcion']);
+        if (isset($data['cupo_maximo'])) $actividad->setCupoMaximo($data['cupo_maximo']);
+        // ... (añadir resto de campos si necesario, ej. ubicación, fechas)
+
+        $actividad->setUpdatedAt(new \DateTime());
+        $em->flush();
+
+        return $this->json(['mensaje' => 'Actividad editada por Coordinación', 'actividad' => $actividad->getTitulo()], Response::HTTP_OK);
     }
 }
