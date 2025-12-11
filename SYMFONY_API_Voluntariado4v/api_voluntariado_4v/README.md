@@ -12,11 +12,11 @@ Antes de empezar, asegúrate de tener instalado en tu máquina:
 4.  **Microsoft SQL Server** (Express o Developer Edition).
 5.  **SQL Server Management Studio (SSMS)**.
 6.  **Drivers PHP para SQL Server**:
-    - Debes descargar las DLLs (`php_sqlsrv` y `php_pdo_sqlsrv`) correspondientes a tu versión de PHP. Puedes descargar desde: https://learn.microsoft.com/en-us/sql/connect/php/download-drivers-php-sql-server?view=sql-server-ver17
-    - Pegarlas en la carpeta `ext` de tu PHP.
-    - Activarlas en el `php.ini`:
-      `extension=php_sqlsrv_82_ts_x64.dll`
-      `extension=php_pdo_sqlsrv_82_ts_x64.dll`
+    -   Debes descargar las DLLs (`php_sqlsrv` y `php_pdo_sqlsrv`) correspondientes a tu versión de PHP. Puedes descargar desde: https://learn.microsoft.com/en-us/sql/connect/php/download-drivers-php-sql-server?view=sql-server-ver17
+    -   Pegarlas en la carpeta `ext` de tu PHP.
+    -   Activarlas en el `php.ini`:
+        `extension=php_sqlsrv_82_ts_x64.dll`
+        `extension=php_pdo_sqlsrv_82_ts_x64.dll`
 
 ---
 
@@ -69,6 +69,9 @@ GO
 
 ---
 
+
+
+
 ## ⚙️ 2. Instalación del Proyecto Symfony
 
 1. Clonar el repositorio:
@@ -89,10 +92,9 @@ DATABASE_URL="sqlsrv://symfony_app:Symfony2025!@127.0.0.1/VoluntariadoDB?instanc
 
 ```yaml
 doctrine:
-  dbal:
-    url: "%env(resolve:DATABASE_URL)%"
-    driver: "sqlsrv" # Esto es lo único fijo importante
-    # ... resto de opciones ...
+    dbal:
+        url: "%env(resolve:DATABASE_URL)%"
+        driver: "sqlsrv" # Esto es lo único fijo importante
 ```
 
 5. Verificar conexión: Ejecuta este comando. Si ves la versión de SQL Server, todo está correcto.
@@ -170,3 +172,18 @@ Error SSL Provider... certificate chain...:
 Falta confiar en el certificado.
 
 Solución: Asegúrate de que la URL en el .env termina con &trustServerCertificate=true.
+
+# 7.1. Error de autenticación de usuario en SQLServer
+
+Error 18456: Login failed for user 'root'
+
+Solución: Asegúrate de que en el .env. tienes la URL correcta con el usuario y contraseña.
+
+Solución 2: Asegurate de que en SQL server en tu usuario
+    Carpeta Security
+        Logins
+            symfony_app (clic derecho)
+                properties
+                    General: Enforce password policy: No
+                    User Mapping: Esté la base de datos seleccionada y que esté marcado como db_owner
+                    status: Enabled
