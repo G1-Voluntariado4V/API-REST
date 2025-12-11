@@ -10,38 +10,46 @@ use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use OpenApi\Attributes as OA;
 
 #[Route('/api', name: 'api_')]
+#[OA\Tag(name: 'Coordinadores', description: 'Gestión interna y Dashboard')]
 final class CoordinadorController extends AbstractController
 {
     // ========================================================================
-    // 1. DASHBOARD GLOBAL (Estadísticas)
+    // 1. DASHBOARD GLOBAL (Estadísticas vía SP)
     // ========================================================================
-
     #[Route('/admin/stats', name: 'admin_stats', methods: ['GET'])]
+    #[OA\Response(
+        response: 200,
+        description: 'Métricas globales del sistema (Usando SP SQL)',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'titulo', type: 'string'),
+                new OA\Property(property: 'metricas', type: 'object', example: ['voluntarios_activos' => 10, 'actividades_pendientes' => 2])
+            ]
+        )
+    )]
     public function dashboard(EntityManagerInterface $em): JsonResponse
     {
-
-        // 1. Seguridad: Aquí deberías comprobar si el usuario es ROLE_COORDINADOR
-        // $this->denyAccessUnlessGranted('ROLE_COORDINADOR'); (Lo activaremos luego)
-
         $conn = $em->getConnection();
-
-        // 2. Llamamos al Procedimiento Almacenado de tu compañero
+        // Llamada al Procedimiento Almacenado optimizado
         $sql = 'EXEC SP_Dashboard_Stats';
 
         try {
-            // fetchAssociative devuelve: { "voluntarios_activos": 10, "organizaciones_activas": 5 ... }
             $stats = $conn->executeQuery($sql)->fetchAssociative();
-
             return $this->json([
                 'titulo' => 'Panel de Control General',
                 'fecha_generacion' => date('Y-m-d H:i:s'),
                 'metricas' => $stats
-            ]);
+            ], Response::HTTP_OK);
         } catch (\Exception $e) {
-            return $this->json(['error' => 'Error calculando estadísticas: ' . $e->getMessage()], 500);
+            return $this->json(
+                ['error' => 'Error calculando estadísticas: ' . $e->getMessage()], 
+                Response::HTTP_INTERNAL_SERVER_ERROR
+            );
         }
     }
 
@@ -49,6 +57,16 @@ final class CoordinadorController extends AbstractController
     // 2. REGISTRAR COORDINADOR (POST)
     // ========================================================================
     #[Route('/coordinadores', name: 'registro_coordinador', methods: ['POST'])]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'nombre', type: 'string'),
+                new OA\Property(property: 'correo', type: 'string'),
+                new OA\Property(property: 'google_id', type: 'string')
+            ]
+        )
+    )]
     public function registrar(
         Request $request,
         EntityManagerInterface $entityManager,
@@ -57,29 +75,25 @@ final class CoordinadorController extends AbstractController
         $data = json_decode($request->getContent(), true);
 
         if (!isset($data['google_id'], $data['correo'], $data['nombre'])) {
-            return $this->json(['error' => 'Faltan datos obligatorios'], 400);
+            return $this->json(['error' => 'Faltan datos obligatorios'], Response::HTTP_BAD_REQUEST);
         }
 
         $entityManager->beginTransaction();
         try {
-            // A. USUARIO
+            // A. USUARIO BASE
             $usuario = new Usuario();
             $usuario->setCorreo($data['correo']);
             $usuario->setGoogleId($data['google_id']);
+            $usuario->setEstadoCuenta('Activa'); // Los jefes nacen activos
 
-            // Los Coordinadores nacen ACTIVOS (son los jefes)
-            $usuario->setEstadoCuenta('Activa');
-
-            // Buscar Rol (ID 4 o por Nombre)
             $rolCoord = $rolRepository->findOneBy(['nombre' => 'Coordinador']);
-            if (!$rolCoord) throw new \Exception("El rol 'Coordinador' no existe en la BBDD.");
-
+            if (!$rolCoord) throw new \Exception("Error config: Rol 'Coordinador' no existe.");
             $usuario->setRol($rolCoord);
 
             $entityManager->persist($usuario);
             $entityManager->flush();
 
-            // B. PERFIL
+            // B. PERFIL COORDINADOR
             $coord = new Coordinador();
             $coord->setUsuario($usuario);
             $coord->setNombre($data['nombre']);
@@ -89,7 +103,7 @@ final class CoordinadorController extends AbstractController
 
             $entityManager->persist($coord);
             $entityManager->flush();
-
+            
             $entityManager->commit();
 
             return $this->json([
@@ -99,15 +113,16 @@ final class CoordinadorController extends AbstractController
                     'nombre' => $coord->getNombre(),
                     'rol' => 'Coordinador'
                 ]
-            ], 201);
+            ], Response::HTTP_CREATED);
+
         } catch (\Exception $e) {
             $entityManager->rollback();
-            return $this->json(['error' => 'Error al registrar: ' . $e->getMessage()], 500);
+            return $this->json(['error' => 'Error al registrar: ' . $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
     // ========================================================================
-    // 3. VER MI PERFIL (GET ONE)
+    // 3. VER MI PERFIL
     // ========================================================================
     #[Route('/coordinadores/{id}', name: 'get_coordinador', methods: ['GET'])]
     public function getOne(int $id, UsuarioRepository $userRepo, EntityManagerInterface $em): JsonResponse
@@ -115,22 +130,19 @@ final class CoordinadorController extends AbstractController
         $usuario = $userRepo->find($id);
 
         if (!$usuario || $usuario->getDeletedAt()) {
-            return $this->json(['error' => 'Coordinador no encontrado'], 404);
+            return $this->json(['error' => 'Coordinador no encontrado'], Response::HTTP_NOT_FOUND);
         }
 
-        // Buscamos el perfil específico
         $coord = $em->getRepository(Coordinador::class)->findOneBy(['usuario' => $usuario]);
-
         if (!$coord) {
-            return $this->json(['error' => 'Perfil de datos incompleto'], 404);
+            return $this->json(['error' => 'Perfil de datos incompleto'], Response::HTTP_NOT_FOUND);
         }
 
-        // Devolvemos el perfil completo
-        return $this->json($coord, 200, [], ['groups' => 'usuario:read']);
+        return $this->json($coord, Response::HTTP_OK, [], ['groups' => 'usuario:read']);
     }
 
     // ========================================================================
-    // 4. ACTUALIZAR PERFIL (PUT)
+    // 4. ACTUALIZAR PERFIL
     // ========================================================================
     #[Route('/coordinadores/{id}', name: 'actualizar_coordinador', methods: ['PUT'])]
     public function actualizar(
@@ -140,26 +152,25 @@ final class CoordinadorController extends AbstractController
         EntityManagerInterface $em
     ): JsonResponse {
         $usuario = $userRepo->find($id);
-        if (!$usuario) return $this->json(['error' => 'Usuario no encontrado'], 404);
+        if (!$usuario) return $this->json(['error' => 'Usuario no encontrado'], Response::HTTP_NOT_FOUND);
 
         $coord = $em->getRepository(Coordinador::class)->findOneBy(['usuario' => $usuario]);
-        if (!$coord) return $this->json(['error' => 'Perfil no encontrado'], 404);
+        if (!$coord) return $this->json(['error' => 'Perfil no encontrado'], Response::HTTP_NOT_FOUND);
 
         $data = json_decode($request->getContent(), true);
 
         if (isset($data['nombre'])) $coord->setNombre($data['nombre']);
         if (isset($data['apellidos'])) $coord->setApellidos($data['apellidos']);
         if (isset($data['telefono'])) $coord->setTelefono($data['telefono']);
-
+        
         $coord->setUpdatedAt(new \DateTime());
-
         $em->flush();
 
-        return $this->json($coord, 200, [], ['groups' => 'usuario:read']);
+        return $this->json($coord, Response::HTTP_OK, [], ['groups' => 'usuario:read']);
     }
 
     // ========================================================================
-    // 5. ELIMINAR CUENTA PROPIA (DELETE)
+    // 5. ELIMINAR CUENTA (USANDO SP)
     // ========================================================================
     #[Route('/coordinadores/{id}', name: 'borrar_coordinador', methods: ['DELETE'])]
     public function eliminar(
@@ -168,14 +179,15 @@ final class CoordinadorController extends AbstractController
         EntityManagerInterface $em
     ): JsonResponse {
         $usuario = $userRepo->find($id);
-        if (!$usuario) return $this->json(['error' => 'Usuario no encontrado'], 404);
+        if (!$usuario) return $this->json(['error' => 'Usuario no encontrado'], Response::HTTP_NOT_FOUND);
 
-        // Soft Delete manual
-        $usuario->setDeletedAt(new \DateTimeImmutable());
-        $usuario->setEstadoCuenta('Bloqueada');
-
-        $em->flush();
-
-        return $this->json(['mensaje' => 'Cuenta de coordinador cerrada correctamente'], 200);
+        // Usamos SP para consistencia
+        $sql = 'EXEC SP_SoftDelete_Usuario @id_usuario = :id';
+        try {
+            $em->getConnection()->executeStatement($sql, ['id' => $id]);
+            return $this->json(['mensaje' => 'Cuenta cerrada correctamente'], Response::HTTP_OK);
+        } catch (\Exception $e) {
+            return $this->json(['error' => 'Error al cerrar cuenta'], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
     }
 }

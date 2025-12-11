@@ -18,3 +18,13 @@ services:
 
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones
+
+    # --- ARREGLO PARA SWAGGER / OPENAPI ---
+    # Definimos el controlador manualmente pasando los 2 argumentos que pide el constructor
+    # para evitar el error "Too few arguments" o "Cannot autowire service".
+    Nelmio\ApiDocBundle\Controller\SwaggerUiController:
+        public: true
+        tags: ['controller.service_arguments']
+        arguments:
+            $renderOpenApi: '@nelmio_api_doc.render_docs'
+            $uiRenderer: 'swagger_ui'

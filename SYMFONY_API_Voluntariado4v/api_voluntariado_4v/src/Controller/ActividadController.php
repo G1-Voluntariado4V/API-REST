@@ -3,41 +3,95 @@
 namespace App\Controller;
 
 use App\Entity\Actividad;
+use App\Entity\Organizacion;
 use App\Repository\ActividadRepository;
-use App\Repository\OrganizacionRepository;
 use App\Repository\ODSRepository;
 use App\Repository\TipoVoluntariadoRepository;
+use App\Repository\UsuarioRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response; // Códigos HTTP
 use Symfony\Component\Routing\Attribute\Route;
+use OpenApi\Attributes as OA; // Swagger
 
 #[Route('/api', name: 'api_')]
+#[OA\Tag(name: 'Actividades', description: 'Gestión de ofertas de voluntariado')]
 final class ActividadController extends AbstractController
 {
     // ========================================================================
-    // 1. LISTAR ACTIVIDADES (GET)
+    // 1. LISTAR ACTIVIDADES (GET) - FILTROS SQL + VISTA
     // ========================================================================
     #[Route('/actividades', name: 'listar_actividades', methods: ['GET'])]
-    public function index(ActividadRepository $actividadRepository): JsonResponse
+    #[OA\Parameter(name: 'ods_id', description: 'Filtrar por ID de ODS', in: 'query', schema: new OA\Schema(type: 'integer'))]
+    #[OA\Parameter(name: 'tipo_id', description: 'Filtrar por ID de Tipo Voluntariado', in: 'query', schema: new OA\Schema(type: 'integer'))]
+    #[OA\Response(
+        response: 200,
+        description: 'Catálogo de actividades publicadas (Vista SQL)',
+        content: new OA\JsonContent(type: 'array', items: new OA\Items(type: 'object'))
+    )]
+    public function index(Request $request, EntityManagerInterface $em): JsonResponse
     {
-        // Filtramos para no mostrar las borradas (Soft Delete)
-        // Podríamos filtrar también por 'estadoPublicacion' => 'Publicada' si es para el home
-        $actividades = $actividadRepository->findBy(['deletedAt' => null]);
+        // Recogemos filtros de la URL (?ods_id=1&tipo_id=2)
+        $odsId = $request->query->get('ods_id');
+        $tipoId = $request->query->get('tipo_id');
 
-        // Usamos el grupo 'actividad:read' que pusimos en la Entidad
-        return $this->json($actividades, 200, [], ['groups' => 'actividad:read']);
+        $conn = $em->getConnection();
+        $qb = $conn->createQueryBuilder();
+
+        // Usamos la VISTA SQL para máxima velocidad (ya filtra deleted_at y estado='Publicada')
+        $qb->select('*')->from('VW_Actividades_Publicadas');
+
+        // Filtro Dinámico 1: Por ODS
+        if ($odsId) {
+            $qb->andWhere('id_actividad IN (SELECT id_actividad FROM ACTIVIDAD_ODS WHERE id_ods = :ods)')
+                ->setParameter('ods', $odsId);
+        }
+
+        // Filtro Dinámico 2: Por Tipo de Voluntariado
+        if ($tipoId) {
+            $qb->andWhere('id_actividad IN (SELECT id_actividad FROM ACTIVIDAD_TIPO WHERE id_tipo = :tipo)')
+                ->setParameter('tipo', $tipoId);
+        }
+
+        try {
+            $actividades = $qb->executeQuery()->fetchAllAssociative();
+            return $this->json($actividades, Response::HTTP_OK);
+        } catch (\Exception $e) {
+            return $this->json(
+                ['error' => 'Error al cargar catálogo: ' . $e->getMessage()],
+                Response::HTTP_INTERNAL_SERVER_ERROR
+            );
+        }
     }
 
     // ========================================================================
     // 2. CREAR ACTIVIDAD (POST)
     // ========================================================================
     #[Route('/actividades', name: 'crear_actividad', methods: ['POST'])]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'id_organizacion', type: 'integer', description: 'ID del Usuario Organización'),
+                new OA\Property(property: 'titulo', type: 'string'),
+                new OA\Property(property: 'descripcion', type: 'string'),
+                new OA\Property(property: 'ubicacion', type: 'string'),
+                new OA\Property(property: 'duracion_horas', type: 'integer'),
+                new OA\Property(property: 'cupo_maximo', type: 'integer'),
+                new OA\Property(property: 'fecha_inicio', type: 'string', format: 'date-time'),
+                new OA\Property(property: 'ods_ids', type: 'array', items: new OA\Items(type: 'integer')),
+                new OA\Property(property: 'tipo_ids', type: 'array', items: new OA\Items(type: 'integer'))
+            ]
+        )
+    )]
+    #[OA\Response(response: 201, description: 'Actividad creada (En revisión)')]
+    #[OA\Response(response: 404, description: 'Organización no encontrada')]
     public function crear(
         Request $request,
         EntityManagerInterface $entityManager,
-        OrganizacionRepository $orgRepo,
+        UsuarioRepository $userRepo,
         ODSRepository $odsRepo,
         TipoVoluntariadoRepository $tipoRepo
     ): JsonResponse {
@@ -45,13 +99,16 @@ final class ActividadController extends AbstractController
 
         // A. Validaciones básicas
         if (!isset($data['id_organizacion'], $data['titulo'], $data['fecha_inicio'], $data['duracion_horas'], $data['cupo_maximo'])) {
-            return $this->json(['error' => 'Faltan datos obligatorios'], 400);
+            return $this->json(['error' => 'Faltan datos obligatorios'], Response::HTTP_BAD_REQUEST);
         }
 
-        // B. Buscar la Organización dueña
-        $organizacion = $orgRepo->find($data['id_organizacion']);
+        // B. Buscar la Organización dueña (Usuario -> Organizacion)
+        $usuarioOrg = $userRepo->find($data['id_organizacion']);
+        if (!$usuarioOrg) return $this->json(['error' => 'Usuario organización no encontrado'], Response::HTTP_NOT_FOUND);
+
+        $organizacion = $entityManager->getRepository(Organizacion::class)->findOneBy(['usuario' => $usuarioOrg]);
         if (!$organizacion) {
-            return $this->json(['error' => 'Organización no encontrada'], 404);
+            return $this->json(['error' => 'Perfil de organización no encontrado'], Response::HTTP_NOT_FOUND);
         }
 
         // C. Crear el objeto Actividad
@@ -62,26 +119,23 @@ final class ActividadController extends AbstractController
         $actividad->setUbicacion($data['ubicacion'] ?? null);
         $actividad->setDuracionHoras($data['duracion_horas']);
         $actividad->setCupoMaximo($data['cupo_maximo']);
-        $actividad->setEstadoPublicacion('En revision'); // Default seguro
+        $actividad->setEstadoPublicacion('En revision'); // Por defecto
 
-        // D. Convertir fecha (String -> DateTime)
         try {
             $actividad->setFechaInicio(new \DateTime($data['fecha_inicio']));
         } catch (\Exception $e) {
-            return $this->json(['error' => 'Formato de fecha inválido (Use YYYY-MM-DD HH:MM:SS)'], 400);
+            return $this->json(['error' => 'Formato de fecha inválido'], Response::HTTP_BAD_REQUEST);
         }
 
-        // E. Asignar ODS (Muchos a Muchos)
-        // Esperamos: "ods_ids": [1, 13]
+        // E. Asignar ODS (ManyToMany)
         if (!empty($data['ods_ids']) && is_array($data['ods_ids'])) {
             foreach ($data['ods_ids'] as $idOds) {
                 $ods = $odsRepo->find($idOds);
-                if ($ods) $actividad->addOd($ods); // Nota: revisa si tu método es addOd o addOds en la Entidad
+                if ($ods) $actividad->addOd($ods);
             }
         }
 
-        // F. Asignar Tipos de Voluntariado
-        // Esperamos: "tipo_ids": [2]
+        // F. Asignar Tipos (ManyToMany)
         if (!empty($data['tipo_ids']) && is_array($data['tipo_ids'])) {
             foreach ($data['tipo_ids'] as $idTipo) {
                 $tipo = $tipoRepo->find($idTipo);
@@ -89,18 +143,21 @@ final class ActividadController extends AbstractController
             }
         }
 
-        // G. Guardar
-        $entityManager->persist($actividad);
-        $entityManager->flush();
-
-        return $this->json($actividad, 201, [], ['groups' => 'actividad:read']);
+        try {
+            $entityManager->persist($actividad);
+            $entityManager->flush();
+            return $this->json($actividad, Response::HTTP_CREATED, [], ['groups' => 'actividad:read']);
+        } catch (\Exception $e) {
+            return $this->json(['error' => 'Error al crear actividad: ' . $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
     }
-
 
     // ========================================================================
     // 3. ACTUALIZAR ACTIVIDAD (PUT)
     // ========================================================================
     #[Route('/actividades/{id}', name: 'actualizar_actividad', methods: ['PUT'])]
+    #[OA\RequestBody(description: 'Datos a actualizar', content: new OA\JsonContent(type: 'object'))]
+    #[OA\Response(response: 200, description: 'Actividad actualizada')]
     public function actualizar(
         int $id,
         Request $request,
@@ -111,64 +168,62 @@ final class ActividadController extends AbstractController
     ): JsonResponse {
         $actividad = $actividadRepository->find($id);
         if (!$actividad) {
-            return $this->json(['error' => 'Actividad no encontrada'], 404);
+            return $this->json(['error' => 'Actividad no encontrada'], Response::HTTP_NOT_FOUND);
         }
 
         $data = json_decode($request->getContent(), true);
 
-        // Actualizamos campos simples si vienen en el JSON
         if (isset($data['titulo'])) $actividad->setTitulo($data['titulo']);
         if (isset($data['descripcion'])) $actividad->setDescripcion($data['descripcion']);
         if (isset($data['ubicacion'])) $actividad->setUbicacion($data['ubicacion']);
         if (isset($data['duracion_horas'])) $actividad->setDuracionHoras($data['duracion_horas']);
         if (isset($data['cupo_maximo'])) $actividad->setCupoMaximo($data['cupo_maximo']);
 
-        // Actualizar Fecha
         if (isset($data['fecha_inicio'])) {
             try {
                 $actividad->setFechaInicio(new \DateTime($data['fecha_inicio']));
             } catch (\Exception $e) {
-                return $this->json(['error' => 'Formato de fecha inválido'], 400);
+                return $this->json(['error' => 'Formato de fecha inválido'], Response::HTTP_BAD_REQUEST);
             }
         }
 
-        // Actualizar ODS (Lógica de sincronización)
-        // Si nos envían una lista nueva, borramos los viejos y ponemos los nuevos
+        // Sincronizar ODS (Borrar antiguos, poner nuevos)
         if (isset($data['ods_ids']) && is_array($data['ods_ids'])) {
-            // 1. Limpiar actuales
             foreach ($actividad->getOds() as $odExisting) {
                 $actividad->removeOd($odExisting);
             }
-            // 2. Añadir nuevos
             foreach ($data['ods_ids'] as $idOds) {
                 $ods = $odsRepo->find($idOds);
                 if ($ods) $actividad->addOd($ods);
             }
         }
 
-        // Actualizar Tipos de Voluntariado
+        // Sincronizar Tipos
         if (isset($data['tipo_ids']) && is_array($data['tipo_ids'])) {
-            // 1. Limpiar actuales
             foreach ($actividad->getTiposVoluntariado() as $tipoExisting) {
                 $actividad->removeTiposVoluntariado($tipoExisting);
             }
-            // 2. Añadir nuevos
             foreach ($data['tipo_ids'] as $idTipo) {
                 $tipo = $tipoRepo->find($idTipo);
                 if ($tipo) $actividad->addTiposVoluntariado($tipo);
             }
         }
 
+        // El updated_at se actualiza solo gracias al Trigger de BBDD, 
+        // pero Doctrine también puede hacerlo si tienes la extensión Timestampable.
+        // Por seguridad, dejemos que Doctrine lo sepa:
         $actividad->setUpdatedAt(new \DateTime());
+
         $entityManager->flush();
 
-        return $this->json($actividad, 200, [], ['groups' => 'actividad:read']);
+        return $this->json($actividad, Response::HTTP_OK, [], ['groups' => 'actividad:read']);
     }
 
     // ========================================================================
-    // 4. ELIMINAR ACTIVIDAD (DELETE / SOFT DELETE)
+    // 4. ELIMINAR ACTIVIDAD (DELETE) - USANDO SP
     // ========================================================================
     #[Route('/actividades/{id}', name: 'eliminar_actividad', methods: ['DELETE'])]
+    #[OA\Response(response: 200, description: 'Actividad cancelada (Soft Delete)')]
     public function eliminar(
         int $id,
         ActividadRepository $actividadRepository,
@@ -176,15 +231,89 @@ final class ActividadController extends AbstractController
     ): JsonResponse {
         $actividad = $actividadRepository->find($id);
         if (!$actividad) {
-            return $this->json(['error' => 'Actividad no encontrada'], 404);
+            return $this->json(['error' => 'Actividad no encontrada'], Response::HTTP_NOT_FOUND);
         }
 
-        // Soft Delete: Marcamos fecha y cambiamos estado
-        $actividad->setDeletedAt(new \DateTimeImmutable());
-        $actividad->setEstadoPublicacion('Cancelada');
+        // Usamos el SP para asegurar que se marca como 'Cancelada' y se pone deleted_at
+        // manteniendo la integridad que definiste en SQL
+        $conn = $entityManager->getConnection();
+        try {
+            $conn->executeStatement('EXEC SP_SoftDelete_Actividad @id_actividad = :id', ['id' => $id]);
+            return $this->json(['mensaje' => 'Actividad cancelada y eliminada correctamente'], Response::HTTP_OK);
+        } catch (\Exception $e) {
+            return $this->json(
+                ['error' => 'Error al eliminar actividad: ' . $e->getMessage()],
+                Response::HTTP_INTERNAL_SERVER_ERROR
+            );
+        }
+    }
 
-        $entityManager->flush();
+    // ========================================================================
+    // 5. DETALLE (GET ONE)
+    // ========================================================================
+    #[Route('/actividades/{id}', name: 'detalle_actividad', methods: ['GET'])]
+    #[OA\Response(response: 200, description: 'Detalle de la actividad')]
+    public function detalle(Actividad $actividad = null): JsonResponse
+    {
+        if (!$actividad) {
+            return $this->json(['error' => 'Actividad no encontrada'], Response::HTTP_NOT_FOUND);
+        }
+        return $this->json($actividad, Response::HTTP_OK, [], ['groups' => 'actividad:read']);
+    }
 
-        return $this->json(['mensaje' => 'Actividad cancelada y eliminada correctamente'], 200);
+    // ========================================================================
+    // 6. AÑADIR IMAGEN A LA GALERÍA (POST)
+    // ========================================================================
+    #[Route('/actividades/{id}/imagenes', name: 'add_imagen_actividad', methods: ['POST'])]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'url_imagen', type: 'string', description: 'URL pública de la imagen (Firebase/S3)'),
+                new OA\Property(property: 'descripcion', type: 'string', description: 'Pie de foto')
+            ]
+        )
+    )]
+    #[OA\Response(response: 201, description: 'Imagen añadida a la galería')]
+    #[OA\Response(response: 404, description: 'Actividad no encontrada')]
+    public function addImagen(
+        int $id,
+        Request $request,
+        ActividadRepository $actividadRepo,
+        EntityManagerInterface $em
+    ): JsonResponse {
+        $actividad = $actividadRepo->find($id);
+        if (!$actividad) {
+            return $this->json(['error' => 'Actividad no encontrada'], Response::HTTP_NOT_FOUND);
+        }
+
+        $data = json_decode($request->getContent(), true);
+
+        if (empty($data['url_imagen'])) {
+            return $this->json(['error' => 'Falta la URL de la imagen'], Response::HTTP_BAD_REQUEST);
+        }
+
+        // Creamos la entidad ImagenActividad
+        // Asegúrate de tener: use App\Entity\ImagenActividad; al principio del archivo
+        $imagen = new \App\Entity\ImagenActividad();
+        $imagen->setActividad($actividad);
+        $imagen->setUrlImagen($data['url_imagen']);
+        $imagen->setDescripcionPieFoto($data['descripcion'] ?? null);
+
+        try {
+            $em->persist($imagen);
+            $em->flush();
+
+            return $this->json([
+                'mensaje' => 'Imagen añadida correctamente',
+                'id_imagen' => $imagen->getId(),
+                'url' => $imagen->getUrlImagen()
+            ], Response::HTTP_CREATED);
+        } catch (\Exception $e) {
+            return $this->json(
+                ['error' => 'Error al guardar la imagen: ' . $e->getMessage()],
+                Response::HTTP_INTERNAL_SERVER_ERROR
+            );
+        }
     }
 }
