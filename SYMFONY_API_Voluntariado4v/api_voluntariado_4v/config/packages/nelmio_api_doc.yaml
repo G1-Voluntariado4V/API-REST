@@ -1,10 +1,24 @@
 nelmio_api_doc:
     documentation:
         info:
-            title: API Voluntariado
-            description: Documentación de la API
+            title: API Voluntariado 4V
+            description: API REST para la gestión de voluntariado escolar (Alumnos, Coordinadores y ONGs).
             version: 1.0.0
-    areas:
-        default: 
-            path_patterns:
-                - ^/api(?!/doc$)
+        
+        # Esto define cómo se verá la autenticación (candadito) en la web
+        components:
+            securitySchemes:
+                Bearer:
+                    type: http
+                    scheme: bearer
+                    bearerFormat: JWT  # O el formato de token que uses (ej: API Key)
+        
+        # Aplica seguridad globalmente (opcional, si toda la API es privada)
+        # security:
+        #     - Bearer: []
+
+    # Áreas de documentación
+    areas: 
+        default:
+            path_patterns: 
+                - ^/api(?!/doc$) # Documenta todas las rutas que empiecen por /api excepto /api/doc

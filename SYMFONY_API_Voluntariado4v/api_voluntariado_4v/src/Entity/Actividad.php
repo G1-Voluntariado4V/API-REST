@@ -245,6 +245,20 @@ class Actividad
         return $this;
     }
     // Fechas
+
+    // ... tus setters anteriores ...
+
+    public function getUpdatedAt(): ?\DateTimeInterface
+    {
+        return $this->updatedAt;
+    }
+
+    // IMPORTANTE: Este es el que usa tu controlador para filtrar borrados
+    public function getDeletedAt(): ?\DateTimeImmutable
+    {
+        return $this->deletedAt;
+    }
+
     public function setUpdatedAt(?\DateTimeInterface $updatedAt): static
     {
         $this->updatedAt = $updatedAt;

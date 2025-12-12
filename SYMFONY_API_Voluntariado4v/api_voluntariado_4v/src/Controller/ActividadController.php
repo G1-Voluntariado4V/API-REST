@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Entity\Actividad;
+use App\Entity\ImagenActividad; // <--- Importante añadir esto
 use App\Entity\Organizacion;
 use App\Repository\ActividadRepository;
 use App\Repository\ODSRepository;
@@ -12,9 +13,9 @@ use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\HttpFoundation\Response; // Códigos HTTP
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
-use OpenApi\Attributes as OA; // Swagger
+use OpenApi\Attributes as OA;
 
 #[Route('/api', name: 'api_')]
 #[OA\Tag(name: 'Actividades', description: 'Gestión de ofertas de voluntariado')]
@@ -33,14 +34,14 @@ final class ActividadController extends AbstractController
     )]
     public function index(Request $request, EntityManagerInterface $em): JsonResponse
     {
-        // Recogemos filtros de la URL (?ods_id=1&tipo_id=2)
         $odsId = $request->query->get('ods_id');
         $tipoId = $request->query->get('tipo_id');
 
         $conn = $em->getConnection();
         $qb = $conn->createQueryBuilder();
 
-        // Usamos la VISTA SQL para máxima velocidad (ya filtra deleted_at y estado='Publicada')
+        // Usamos la VISTA SQL (VW_Actividades_Publicadas)
+        // Ventaja: Ya filtra deleted_at IS NULL y estado = 'Publicada'
         $qb->select('*')->from('VW_Actividades_Publicadas');
 
         // Filtro Dinámico 1: Por ODS
@@ -56,6 +57,7 @@ final class ActividadController extends AbstractController
         }
 
         try {
+            // fetchAllAssociative devuelve un array de arrays asociativos (snake_case tal cual viene de la BBDD)
             $actividades = $qb->executeQuery()->fetchAllAssociative();
             return $this->json($actividades, Response::HTTP_OK);
         } catch (\Exception $e) {
@@ -87,7 +89,6 @@ final class ActividadController extends AbstractController
         )
     )]
     #[OA\Response(response: 201, description: 'Actividad creada (En revisión)')]
-    #[OA\Response(response: 404, description: 'Organización no encontrada')]
     public function crear(
         Request $request,
         EntityManagerInterface $entityManager,
@@ -102,11 +103,16 @@ final class ActividadController extends AbstractController
             return $this->json(['error' => 'Faltan datos obligatorios'], Response::HTTP_BAD_REQUEST);
         }
 
-        // B. Buscar la Organización dueña (Usuario -> Organizacion)
+        // B. Buscar la Organización dueña
         $usuarioOrg = $userRepo->find($data['id_organizacion']);
-        if (!$usuarioOrg) return $this->json(['error' => 'Usuario organización no encontrado'], Response::HTTP_NOT_FOUND);
+        if (!$usuarioOrg) return $this->json(['error' => 'Usuario no encontrado'], Response::HTTP_NOT_FOUND);
 
+        // OJO: Asumimos que la entidad Organizacion tiene relación OneToOne con Usuario o comparte ID
         $organizacion = $entityManager->getRepository(Organizacion::class)->findOneBy(['usuario' => $usuarioOrg]);
+
+        // Si no usas relación OneToOne y usan el mismo ID (herencia), usa esto:
+        // $organizacion = $entityManager->getRepository(Organizacion::class)->find($data['id_organizacion']);
+
         if (!$organizacion) {
             return $this->json(['error' => 'Perfil de organización no encontrado'], Response::HTTP_NOT_FOUND);
         }
@@ -119,7 +125,7 @@ final class ActividadController extends AbstractController
         $actividad->setUbicacion($data['ubicacion'] ?? null);
         $actividad->setDuracionHoras($data['duracion_horas']);
         $actividad->setCupoMaximo($data['cupo_maximo']);
-        $actividad->setEstadoPublicacion('En revision'); // Por defecto
+        $actividad->setEstadoPublicacion('En revision');
 
         try {
             $actividad->setFechaInicio(new \DateTime($data['fecha_inicio']));
@@ -127,7 +133,7 @@ final class ActividadController extends AbstractController
             return $this->json(['error' => 'Formato de fecha inválido'], Response::HTTP_BAD_REQUEST);
         }
 
-        // E. Asignar ODS (ManyToMany)
+        // E. Asignar ODS
         if (!empty($data['ods_ids']) && is_array($data['ods_ids'])) {
             foreach ($data['ods_ids'] as $idOds) {
                 $ods = $odsRepo->find($idOds);
@@ -135,7 +141,7 @@ final class ActividadController extends AbstractController
             }
         }
 
-        // F. Asignar Tipos (ManyToMany)
+        // F. Asignar Tipos
         if (!empty($data['tipo_ids']) && is_array($data['tipo_ids'])) {
             foreach ($data['tipo_ids'] as $idTipo) {
                 $tipo = $tipoRepo->find($idTipo);
@@ -146,6 +152,7 @@ final class ActividadController extends AbstractController
         try {
             $entityManager->persist($actividad);
             $entityManager->flush();
+            // Usamos groups para serializar solo lo necesario
             return $this->json($actividad, Response::HTTP_CREATED, [], ['groups' => 'actividad:read']);
         } catch (\Exception $e) {
             return $this->json(['error' => 'Error al crear actividad: ' . $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
@@ -156,8 +163,6 @@ final class ActividadController extends AbstractController
     // 3. ACTUALIZAR ACTIVIDAD (PUT)
     // ========================================================================
     #[Route('/actividades/{id}', name: 'actualizar_actividad', methods: ['PUT'])]
-    #[OA\RequestBody(description: 'Datos a actualizar', content: new OA\JsonContent(type: 'object'))]
-    #[OA\Response(response: 200, description: 'Actividad actualizada')]
     public function actualizar(
         int $id,
         Request $request,
@@ -187,11 +192,13 @@ final class ActividadController extends AbstractController
             }
         }
 
-        // Sincronizar ODS (Borrar antiguos, poner nuevos)
+        // Sincronizar ODS
         if (isset($data['ods_ids']) && is_array($data['ods_ids'])) {
+            // Borrar existentes
             foreach ($actividad->getOds() as $odExisting) {
                 $actividad->removeOd($odExisting);
             }
+            // Añadir nuevos
             foreach ($data['ods_ids'] as $idOds) {
                 $ods = $odsRepo->find($idOds);
                 if ($ods) $actividad->addOd($ods);
@@ -209,12 +216,7 @@ final class ActividadController extends AbstractController
             }
         }
 
-        // El updated_at se actualiza solo gracias al Trigger de BBDD, 
-        // pero Doctrine también puede hacerlo si tienes la extensión Timestampable.
-        // Por seguridad, dejemos que Doctrine lo sepa:
-        $actividad->setUpdatedAt(new \DateTime());
-
-        $entityManager->flush();
+        $entityManager->flush(); // El trigger actualizará updated_at en BBDD
 
         return $this->json($actividad, Response::HTTP_OK, [], ['groups' => 'actividad:read']);
     }
@@ -223,7 +225,6 @@ final class ActividadController extends AbstractController
     // 4. ELIMINAR ACTIVIDAD (DELETE) - USANDO SP
     // ========================================================================
     #[Route('/actividades/{id}', name: 'eliminar_actividad', methods: ['DELETE'])]
-    #[OA\Response(response: 200, description: 'Actividad cancelada (Soft Delete)')]
     public function eliminar(
         int $id,
         ActividadRepository $actividadRepository,
@@ -233,9 +234,11 @@ final class ActividadController extends AbstractController
         if (!$actividad) {
             return $this->json(['error' => 'Actividad no encontrada'], Response::HTTP_NOT_FOUND);
         }
+        if ($actividad->getDeletedAt() !== null) {
+            return $this->json(['mensaje' => 'La actividad ya estaba eliminada previamente'], Response::HTTP_OK);
+        }
 
-        // Usamos el SP para asegurar que se marca como 'Cancelada' y se pone deleted_at
-        // manteniendo la integridad que definiste en SQL
+        // Llamada al Stored Procedure para Soft Delete seguro
         $conn = $entityManager->getConnection();
         try {
             $conn->executeStatement('EXEC SP_SoftDelete_Actividad @id_actividad = :id', ['id' => $id]);
@@ -252,12 +255,12 @@ final class ActividadController extends AbstractController
     // 5. DETALLE (GET ONE)
     // ========================================================================
     #[Route('/actividades/{id}', name: 'detalle_actividad', methods: ['GET'])]
-    #[OA\Response(response: 200, description: 'Detalle de la actividad')]
-    public function detalle(Actividad $actividad = null): JsonResponse
+    public function detalle(?Actividad $actividad = null): JsonResponse
     {
         if (!$actividad) {
             return $this->json(['error' => 'Actividad no encontrada'], Response::HTTP_NOT_FOUND);
         }
+        // Doctrine ParamConverter inyecta $actividad automáticamente si el ID coincide
         return $this->json($actividad, Response::HTTP_OK, [], ['groups' => 'actividad:read']);
     }
 
@@ -265,17 +268,6 @@ final class ActividadController extends AbstractController
     // 6. AÑADIR IMAGEN A LA GALERÍA (POST)
     // ========================================================================
     #[Route('/actividades/{id}/imagenes', name: 'add_imagen_actividad', methods: ['POST'])]
-    #[OA\RequestBody(
-        required: true,
-        content: new OA\JsonContent(
-            properties: [
-                new OA\Property(property: 'url_imagen', type: 'string', description: 'URL pública de la imagen (Firebase/S3)'),
-                new OA\Property(property: 'descripcion', type: 'string', description: 'Pie de foto')
-            ]
-        )
-    )]
-    #[OA\Response(response: 201, description: 'Imagen añadida a la galería')]
-    #[OA\Response(response: 404, description: 'Actividad no encontrada')]
     public function addImagen(
         int $id,
         Request $request,
@@ -293,9 +285,7 @@ final class ActividadController extends AbstractController
             return $this->json(['error' => 'Falta la URL de la imagen'], Response::HTTP_BAD_REQUEST);
         }
 
-        // Creamos la entidad ImagenActividad
-        // Asegúrate de tener: use App\Entity\ImagenActividad; al principio del archivo
-        $imagen = new \App\Entity\ImagenActividad();
+        $imagen = new ImagenActividad(); // Usando el 'use' de arriba
         $imagen->setActividad($actividad);
         $imagen->setUrlImagen($data['url_imagen']);
         $imagen->setDescripcionPieFoto($data['descripcion'] ?? null);
