@@ -16,14 +16,17 @@ class Voluntario
 {
     // --- PK COMPARTIDA CON USUARIO (1:1) ---
     #[ORM\Id]
+    #[ORM\Column(name: 'id_usuario', type: 'integer')]
+    #[ORM\GeneratedValue(strategy: 'NONE')]
+    private ?int $id = null;
+
     #[ORM\OneToOne(targetEntity: Usuario::class, cascade: ['persist', 'remove'])]
     #[ORM\JoinColumn(
-        name: 'id_usuario',
-        referencedColumnName: 'id_usuario',
-        nullable: false,
-        onDelete: 'CASCADE' // <--- ¡ESTO ES LA CLAVE!
+        name: 'id_usuario', 
+        referencedColumnName: 'id_usuario', 
+        nullable: false, 
+        onDelete: 'CASCADE'
     )]
-    #[Groups(['usuario:read'])]
     private ?Usuario $usuario = null;
 
     #[ORM\Column(length: 9, unique: true, nullable: true)]
@@ -93,7 +96,7 @@ class Voluntario
 
     public function getId(): ?int
     {
-        return $this->usuario?->getId();
+        return $this->id;
     }
 
     public function getUsuario(): ?Usuario
@@ -103,6 +106,10 @@ class Voluntario
     public function setUsuario(Usuario $usuario): static
     {
         $this->usuario = $usuario;
+        // Si el usuario ya tiene ID, lo asignamos. Si no, habrá que asignarlo antes de flush.
+        if ($usuario->getId()) {
+            $this->id = $usuario->getId();
+        }
         return $this;
     }
 

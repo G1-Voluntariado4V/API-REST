@@ -11,6 +11,10 @@ use Symfony\Component\Serializer\Annotation\Groups;
 class Organizacion
 {
     #[ORM\Id]
+    #[ORM\Column(name: 'id_usuario', type: 'integer')]
+    #[ORM\GeneratedValue(strategy: 'NONE')]
+    private ?int $id = null;
+
     #[ORM\OneToOne(targetEntity: Usuario::class, cascade: ['persist', 'remove'])]
     #[ORM\JoinColumn(
         name: 'id_usuario',
@@ -18,7 +22,7 @@ class Organizacion
         nullable: false,
         onDelete: 'CASCADE'
     )]
-    #[Groups(['usuario:read'])] // El ID de usuario quizás no hace falta en la actividad, pero mal no hace
+    #[Groups(['usuario:read'])] 
     private ?Usuario $usuario = null;
 
     // --- DATOS DE LA EMPRESA / ONG ---
@@ -60,7 +64,7 @@ class Organizacion
 
     public function getId(): ?int
     {
-        return $this->usuario?->getId();
+        return $this->id;
     }
 
     public function getUsuario(): ?Usuario
@@ -71,6 +75,9 @@ class Organizacion
     public function setUsuario(Usuario $usuario): static
     {
         $this->usuario = $usuario;
+        if ($usuario->getId()) {
+            $this->id = $usuario->getId();
+        }
         return $this;
     }
 
