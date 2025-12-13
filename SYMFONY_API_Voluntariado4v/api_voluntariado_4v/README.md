@@ -141,10 +141,16 @@ Para probar Voluntario/ONG: Usad el formulario de registro del frontend o editad
 
 ## ▶️ 5. Ejecutar el Servidor
 
-Para iniciar el servidor de desarrollo de Symfony:
+Para iniciar el servidor de desarrollo, usa una de estas opciones:
 
+**Opción 1: Usar Symfony CLI (Recomendado)**
 ```bash
-php bin/console server:start
+symfony server:start
+```
+
+**Opción 2: Usar servidor PHP built-in**
+```bash
+php -S localhost:8000 -t public
 ```
 
 La API estará disponible en http://127.0.0.1:8000.
