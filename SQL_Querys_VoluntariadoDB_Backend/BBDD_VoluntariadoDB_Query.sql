@@ -1,7 +1,7 @@
 /* =========================================================================
-   PROYECTO: GESTIÓN DE VOLUNTARIADO
+   PROYECTO: GESTIï¿½N DE VOLUNTARIADO
    MOTOR: MICROSOFT SQL SERVER
-   VERSIÓN: FINAL (CORREGIDA Y DOCUMENTADA)
+   VERSIï¿½N: FINAL (CORREGIDA Y DOCUMENTADA)
    =========================================================================
 */
 
@@ -34,7 +34,7 @@ CREATE TABLE CURSO (
     nombre_curso NVARCHAR(100) NOT NULL,
     abreviacion_curso NVARCHAR(10) NOT NULL,
     grado NVARCHAR(50) NOT NULL,
-    CONSTRAINT CK_Grado_Curso CHECK (grado IN ('Grado Superior', 'Grado Medio', 'Grado Básico')),
+    CONSTRAINT CK_Grado_Curso CHECK (grado IN ('Grado Superior', 'Grado Medio', 'Grado Basico')),
     nivel INT NOT NULL,
     CONSTRAINT CK_Nivel_Curso CHECK (nivel IN (1, 2))
 );
@@ -91,11 +91,11 @@ CREATE TABLE VOLUNTARIO (
     -- Restricciones de Formato
     CONSTRAINT CK_Tlf_Voluntario CHECK (telefono NOT LIKE '%[^0-9+ ]%'),
     
-    /* RESTRICCIÓN DE NEGOCIO (QA): Evitar viajes en el tiempo.
+    /* RESTRICCIï¿½N DE NEGOCIO (QA): Evitar viajes en el tiempo.
        Un voluntario no puede haber nacido en el futuro. */
     CONSTRAINT CK_FechaNac_Valida CHECK (fecha_nac < GETDATE()),
     
-    -- Claves Foráneas
+    -- Claves Forï¿½neas
     CONSTRAINT FK_Vol_Usuario FOREIGN KEY (id_usuario) REFERENCES USUARIO(id_usuario) ON DELETE CASCADE,
     CONSTRAINT FK_Vol_Curso FOREIGN KEY (id_curso_actual) REFERENCES CURSO(id_curso)
 );
@@ -137,8 +137,8 @@ CREATE TABLE VOLUNTARIO_IDIOMA (
     
     PRIMARY KEY (id_voluntario, id_idioma),
     
-    /* RESTRICCIÓN DE NEGOCIO (QA): Estandarización.
-       Asegurar que los niveles de idioma sigan el Marco Común Europeo. */
+    /* RESTRICCIï¿½N DE NEGOCIO (QA): Estandarizaciï¿½n.
+       Asegurar que los niveles de idioma sigan el Marco Comï¿½n Europeo. */
     CONSTRAINT CK_Nivel_Idioma CHECK (nivel IN ('A1', 'A2', 'B1', 'B2', 'C1', 'C2', 'Nativo')),
     
     CONSTRAINT FK_VI_Vol FOREIGN KEY (id_voluntario) REFERENCES VOLUNTARIO(id_usuario) ON DELETE CASCADE,
@@ -156,7 +156,7 @@ CREATE TABLE PREFERENCIA_VOLUNTARIO (
 );
 
 -- =========================================================================
--- GESTIÓN DE ACTIVIDADES E INSCRIPCIONES
+-- GESTIï¿½N DE ACTIVIDADES E INSCRIPCIONES
 -- =========================================================================
 
 CREATE TABLE ACTIVIDAD (
@@ -181,7 +181,7 @@ CREATE TABLE ACTIVIDAD (
     CONSTRAINT CK_Duracion_Positiva CHECK (duracion_horas > 0),
     CONSTRAINT CK_Cupo_Positivo CHECK (cupo_maximo > 0),
     
-    -- Claves Foráneas
+    -- Claves Forï¿½neas
     CONSTRAINT FK_Act_Org FOREIGN KEY (id_organizacion) REFERENCES ORGANIZACION(id_usuario) ON DELETE CASCADE
 );
 
@@ -227,12 +227,12 @@ CREATE TABLE INSCRIPCION (
 GO
 
 -- =========================================================================
--- ÍNDICES
+-- ï¿½NDICES
 -- =========================================================================
 
 /*
-ÍNDICES DE RENDIMIENTO
-OBJETIVO: Acelerar las búsquedas y los JOINS más comunes.
+ï¿½NDICES DE RENDIMIENTO
+OBJETIVO: Acelerar las bï¿½squedas y los JOINS mï¿½s comunes.
 */
 CREATE INDEX IX_Actividad_Organizacion ON ACTIVIDAD(id_organizacion);
 CREATE INDEX IX_Inscripcion_Voluntario ON INSCRIPCION(id_voluntario);
@@ -243,9 +243,9 @@ CREATE INDEX IX_Usuario_DeletedAt ON USUARIO(deleted_at);
 CREATE INDEX IX_Actividad_DeletedAt ON ACTIVIDAD(deleted_at);
 
 /*
-ÍNDICES FILTRADOS
-OBJETIVO: Índices más pequeños y rápidos que solo contienen datos "Activos".
-VENTAJA: Ahorran espacio y hacen las consultas de usuarios activos instantáneas.
+ï¿½NDICES FILTRADOS
+OBJETIVO: ï¿½ndices mï¿½s pequeï¿½os y rï¿½pidos que solo contienen datos "Activos".
+VENTAJA: Ahorran espacio y hacen las consultas de usuarios activos instantï¿½neas.
 */
 CREATE INDEX IX_Usuario_Estado ON USUARIO(estado_cuenta) WHERE deleted_at IS NULL;
 
@@ -255,8 +255,8 @@ GO
 
 /*
 RESTRICCIONES DE UNICIDAD CONDICIONAL (Business Logic)
-OBJETIVO: Garantizar datos únicos siendo compatible con soft delete.
-LÓGICA: Permite duplicados en la 'papelera' (usuarios borrados) pero no entre los usuarios activos.
+OBJETIVO: Garantizar datos ï¿½nicos siendo compatible con soft delete.
+Lï¿½GICA: Permite duplicados en la 'papelera' (usuarios borrados) pero no entre los usuarios activos.
 */
 CREATE UNIQUE INDEX UX_Usuario_Correo_Activo ON USUARIO(correo) WHERE deleted_at IS NULL;
 CREATE UNIQUE INDEX UX_Usuario_GoogleId_Activo ON USUARIO(google_id) WHERE deleted_at IS NULL;
@@ -267,8 +267,8 @@ GO
 -- =========================================================================
 
 /*
-GRUPO DE TRIGGERS: AUTOMATIZACIÓN DE FECHAS (Updated_At)
-PROPÓSITO: Mantener el rastro de cuándo se modificó un dato por última vez.
+GRUPO DE TRIGGERS: AUTOMATIZACIï¿½N DE FECHAS (Updated_At)
+PROPï¿½SITO: Mantener el rastro de cuï¿½ndo se modificï¿½ un dato por ï¿½ltima vez.
 */
 GO
 CREATE TRIGGER TR_Usuario_UpdatedAt 
@@ -322,8 +322,8 @@ GO
 /*
 TRIGGER DE SEGURIDAD: TR_Protect_Usuario_Delete
 TIPO: INSTEAD OF DELETE
-OBJETIVO: Protección contra borrados accidentales (Hard Delete).
-LÓGICA:
+OBJETIVO: Protecciï¿½n contra borrados accidentales (Hard Delete).
+Lï¿½GICA:
     1. Intercepta el comando DELETE.
     2. En su lugar, realiza un Soft Delete (actualiza deleted_at).
     3. Bloquea la cuenta para impedir accesos.
@@ -335,7 +335,7 @@ INSTEAD OF DELETE
 AS
 BEGIN
     SET NOCOUNT ON;
-    PRINT '>> ALERTA: Se ha interceptado un intento de borrado físico. Transformando en Soft Delete...';
+    PRINT '>> ALERTA: Se ha interceptado un intento de borrado fisico. Transformando en Soft Delete...';
     UPDATE USUARIO
     SET deleted_at = GETDATE(),
         estado_cuenta = 'Bloqueada'
@@ -346,11 +346,11 @@ GO
 /*
 TRIGGER MAESTRO: TR_Check_Cupo_Actividad
 TIPO: INSTEAD OF INSERT
-OBJETIVO: Validar reglas complejas antes de permitir una inscripción.
-LÓGICA:
-    1. VALIDACIÓN DE FECHA Y ESTADO: Impide inscribirse si la actividad no está publicada o ya pasó.
-    2. VALIDACIÓN DE AGENDA: Impide que un voluntario se apunte a dos actividades que ocurren a la misma hora (Solapamiento).
-    3. VALIDACIÓN DE CUPO: Impide Overbooking si el cupo está lleno.
+OBJETIVO: Validar reglas complejas antes de permitir una inscripciï¿½n.
+Lï¿½GICA:
+    1. VALIDACIï¿½N DE FECHA Y ESTADO: Impide inscribirse si la actividad no estï¿½ publicada o ya pasï¿½.
+    2. VALIDACIï¿½N DE AGENDA: Impide que un voluntario se apunte a dos actividades que ocurren a la misma hora (Solapamiento).
+    3. VALIDACIï¿½N DE CUPO: Impide Overbooking si el cupo estï¿½ lleno.
 */
 GO
 CREATE OR ALTER TRIGGER TR_Check_Cupo_Actividad
@@ -360,19 +360,19 @@ AS
 BEGIN
     SET NOCOUNT ON;
     
-    -- 1. VALIDACIÓN: La actividad debe estar publicada y vigente
+    -- 1. VALIDACIï¿½N: La actividad debe estar publicada y vigente
     IF EXISTS (
         SELECT 1 FROM inserted i
         JOIN ACTIVIDAD a ON i.id_actividad = a.id_actividad
         WHERE (a.estado_publicacion <> 'Publicada') OR (a.fecha_inicio < GETDATE())
     )
     BEGIN
-        RAISERROR ('ERROR: No se puede inscribir. La actividad no está publicada o ya ha finalizado.', 16, 1);
+        RAISERROR ('ERROR: No se puede inscribir. La actividad no estÃ¡ publicada o ya ha finalizado.', 16, 1);
         ROLLBACK TRANSACTION;
         RETURN;
     END
 
-    -- 2. VALIDACIÓN: Agenda (No permitir estar en dos sitios a la vez)
+    -- 2. VALIDACIï¿½N: Agenda (No permitir estar en dos sitios a la vez)
     IF EXISTS (
         SELECT 1
         FROM inserted i_new
@@ -381,7 +381,7 @@ BEGIN
         JOIN ACTIVIDAD a_old ON i_old.id_actividad = a_old.id_actividad
         WHERE i_old.estado_solicitud IN ('Aceptada', 'Pendiente')
           AND a_new.id_actividad <> a_old.id_actividad
-          -- Fórmula matemática del choque de horarios
+          -- Fï¿½rmula matemï¿½tica del choque de horarios
           AND a_new.fecha_inicio < DATEADD(HOUR, a_old.duracion_horas, a_old.fecha_inicio)
           AND DATEADD(HOUR, a_new.duracion_horas, a_new.fecha_inicio) > a_old.fecha_inicio
     )
@@ -391,7 +391,7 @@ BEGIN
         RETURN;
     END
 
-    -- 3. VALIDACIÓN: Cupo (Overbooking en Insert)
+    -- 3. VALIDACIï¿½N: Cupo (Overbooking en Insert)
     IF EXISTS (
         SELECT 1 FROM inserted i
         JOIN ACTIVIDAD a ON i.id_actividad = a.id_actividad
@@ -401,12 +401,12 @@ BEGIN
                AND ins.estado_solicitud = 'Aceptada') >= a.cupo_maximo
     )
     BEGIN
-        RAISERROR ('ERROR DE CUPO: La actividad ya está completa.', 16, 1);
+        RAISERROR ('ERROR DE CUPO: La actividad ya esta completa.', 16, 1);
         ROLLBACK TRANSACTION;
         RETURN;
     END
 
-    -- 4. ÉXITO
+    -- 4. ï¿½XITO
     INSERT INTO INSCRIPCION (id_voluntario, id_actividad, fecha_solicitud, estado_solicitud)
     SELECT id_voluntario, id_actividad, GETDATE(), estado_solicitud FROM inserted;
 END
@@ -416,9 +416,9 @@ GO
 TRIGGER DE CONSISTENCIA: TR_Check_Cupo_Update
 TIPO: AFTER UPDATE
 OBJETIVO: Evitar que se vulnere el cupo mediante actualizaciones administrativas.
-LÓGICA:
-    - Se dispara cuando alguien cambia el estado de una inscripción a 'Aceptada'.
-    - Verifica si ese cambio provoca que se supere el cupo máximo.
+Lï¿½GICA:
+    - Se dispara cuando alguien cambia el estado de una inscripciï¿½n a 'Aceptada'.
+    - Verifica si ese cambio provoca que se supere el cupo mï¿½ximo.
 */
 CREATE TRIGGER TR_Check_Cupo_Update
 ON INSCRIPCION
@@ -436,7 +436,7 @@ BEGIN
           AND a.cupo_maximo IS NOT NULL
     )
     BEGIN
-        -- Contamos ocupación total
+        -- Contamos ocupaciï¿½n total
         IF EXISTS (
             SELECT a.id_actividad
             FROM ACTIVIDAD a
@@ -451,7 +451,7 @@ BEGIN
             ) > a.cupo_maximo
         )
         BEGIN
-            RAISERROR ('ERROR DE NEGOCIO: No se puede aceptar la inscripción. El cupo de la actividad se ha excedido.', 16, 1);
+            RAISERROR ('ERROR DE NEGOCIO: No se puede aceptar la inscripcion. El cupo de la actividad se ha excedido.', 16, 1);
             ROLLBACK TRANSACTION;
             RETURN;
         END
@@ -465,8 +465,8 @@ GO
 
 /*
 VISTA: VW_Usuarios_Activos
-PROPÓSITO: Nivel base de seguridad y autenticación.
-FILTRO CRÍTICO: Excluye a cualquiera que tenga fecha en deleted_at.
+PROPï¿½SITO: Nivel base de seguridad y autenticaciï¿½n.
+FILTRO CRï¿½TICO: Excluye a cualquiera que tenga fecha en deleted_at.
 */
 CREATE VIEW VW_Usuarios_Activos AS
 SELECT u.*, r.nombre_rol FROM USUARIO u INNER JOIN ROL r ON u.id_rol = r.id_rol WHERE u.deleted_at IS NULL;
@@ -474,7 +474,7 @@ GO
 
 /*
 VISTA: VW_Voluntarios_Activos
-PROPÓSITO: Obtener el perfil completo de los voluntarios activos sin JOINS manuales.
+PROPï¿½SITO: Obtener el perfil completo de los voluntarios activos sin JOINS manuales.
 */
 CREATE VIEW VW_Voluntarios_Activos AS
 SELECT u.id_usuario, u.correo, u.estado_cuenta, u.fecha_registro, v.nombre, v.apellidos, v.telefono, v.fecha_nac, v.carnet_conducir, v.img_perfil, c.nombre_curso, c.abreviacion_curso, c.grado, c.nivel
@@ -483,7 +483,7 @@ GO
 
 /*
 VISTA: VW_Organizaciones_Activas
-PROPÓSITO: Obtener el perfil completo de las organizaciones activas.
+PROPï¿½SITO: Obtener el perfil completo de las organizaciones activas.
 */
 CREATE VIEW VW_Organizaciones_Activas AS
 SELECT u.id_usuario, u.correo, u.estado_cuenta, u.fecha_registro, o.cif, o.nombre, o.descripcion, o.direccion, o.sitio_web, o.telefono, o.img_perfil
@@ -492,7 +492,7 @@ GO
 
 /*
 VISTA: VW_Actividades_Activas
-PROPÓSITO: Gestión interna de actividades (Panel de Administración).
+PROPï¿½SITO: Gestiï¿½n interna de actividades (Panel de Administraciï¿½n).
 */
 CREATE VIEW VW_Actividades_Activas AS
 SELECT a.*, o.nombre AS nombre_organizacion, o.img_perfil AS img_organizacion,
@@ -502,8 +502,8 @@ GO
 
 /*
 VISTA: VW_Actividades_Publicadas
-PROPÓSITO: Escaparate público (lo que ven los voluntarios en la Aplicación Web).
-FILTROS: Actividad no borrada + Estado 'Publicada' + Organización activa.
+PROPï¿½SITO: Escaparate pï¿½blico (lo que ven los voluntarios en la Aplicaciï¿½n Web).
+FILTROS: Actividad no borrada + Estado 'Publicada' + Organizaciï¿½n activa.
 */
 CREATE VIEW VW_Actividades_Publicadas AS
 SELECT a.id_actividad, a.titulo, a.descripcion, a.fecha_inicio, a.duracion_horas, a.cupo_maximo, a.ubicacion, a.estado_publicacion, o.nombre AS nombre_organizacion, o.img_perfil AS img_organizacion,
@@ -519,7 +519,7 @@ GO
 
 /*
 PROCEDIMIENTO: SP_SoftDelete_Usuario
-OBJETIVO: Realizar un "Borrado Lógico" de un usuario sin utilizar DELETE.
+OBJETIVO: Realizar un "Borrado Lï¿½gico" de un usuario sin utilizar DELETE.
 */
 CREATE PROCEDURE SP_SoftDelete_Usuario @id_usuario INT AS
 BEGIN
@@ -555,7 +555,7 @@ GO
 
 /*
 PROCEDIMIENTO: SP_Dashboard_Stats
-OBJETIVO: Obtener métricas globales para el Panel de Administración.
+OBJETIVO: Obtener mï¿½tricas globales para el Panel de Administraciï¿½n.
 */
 CREATE PROCEDURE SP_Dashboard_Stats AS
 BEGIN
@@ -573,7 +573,7 @@ GO
 /*
 PROCEDIMIENTO: SP_Get_Recomendaciones_Voluntario
 OBJETIVO: Encontrar actividades que coincidan con los ODS que le interesan al voluntario.
-LÓGICA:
+Lï¿½GICA:
     1. Cruza actividades con sus ODS y con los intereses del voluntario.
     2. Filtra solo actividades publicadas y con cupo disponible.
 */
@@ -583,7 +583,7 @@ AS
 BEGIN
     SET NOCOUNT ON;
     IF NOT EXISTS (SELECT 1 FROM VOLUNTARIO WHERE id_usuario = @id_voluntario) BEGIN
-        PRINT 'El usuario no es un voluntario válido.';
+        PRINT 'El usuario no es un voluntario valido.';
         RETURN;
     END
 

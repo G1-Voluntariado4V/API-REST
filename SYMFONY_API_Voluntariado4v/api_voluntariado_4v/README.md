@@ -141,10 +141,16 @@ Para probar Voluntario/ONG: Usad el formulario de registro del frontend o editad
 
 ## ▶️ 5. Ejecutar el Servidor
 
-Para iniciar el servidor de desarrollo de Symfony:
+Para iniciar el servidor de desarrollo, usa una de estas opciones:
 
+**Opción 1: Usar Symfony CLI (Recomendado)**
 ```bash
-Symfony server:start
+symfony server:start
+```
+
+**Opción 2: Usar servidor PHP built-in**
+```bash
+php bin/console server:start
 ```
 
 La API estará disponible en http://127.0.0.1:8000.
@@ -187,3 +193,39 @@ Solución 2: Asegurate de que en SQL server en tu usuario
                     General: Enforce password policy: No
                     User Mapping: Esté la base de datos seleccionada y que esté marcado como db_owner
                     status: Enabled
+
+# 🧪 8. QA y Testing (Documentación Oficial)
+
+Este proyecto sigue una estrategia de testing piramidal, cubriendo Unitarios, Integración y Funcionales.
+
+## 8.1 Ejecutar Tests según Capa
+
+### **1. Tests Unitarios (Lógica de Negocio)**
+Verifican el comportamiento interno de las Entidades y Servicios sin tocar la Base de Datos.
+- **Ubicación**: `tests/Entity`
+- **Comando**:
+```bash
+php bin/phpunit --testdox tests/Entity
+```
+
+### **2. Tests de Integración (Capa de Datos)**
+Verifican que el repositorio y el driver conectan correctamente con SQL Server y las Vistas/SP.
+- **Ubicación**: `tests/Integration`
+- **Comando**:
+```bash
+php bin/phpunit --testdox tests/Integration
+```
+
+### **3. Tests Funcionales (Endpoints API)**
+Prueban la aplicación completa simulando peticiones HTTP reales. Validan rutas, seguridad y respuestas JSON.
+- **Ubicación**: `tests/Controller`
+- **Comando**:
+```bash
+php bin/phpunit --testdox tests/Controller
+```
+
+## 8.2 Ejecución Global
+Para lanzar toda la suite de QA:
+```bash
+php bin/phpunit --testdox
+```
