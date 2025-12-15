@@ -13,7 +13,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use OpenApi\Attributes as OA;
 
-#[Route('/api', name: 'api_voluntario_idiomas_')]
+#[Route('', name: 'api_voluntario_idiomas_')]
 #[OA\Tag(name: 'Idiomas Voluntario', description: 'Gestión de habilidades lingüísticas del voluntario')]
 final class VoluntarioIdiomaController extends AbstractController
 {

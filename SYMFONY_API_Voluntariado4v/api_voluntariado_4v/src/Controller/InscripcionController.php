@@ -12,7 +12,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use OpenApi\Attributes as OA;
 
-#[Route('/api', name: 'api_inscripciones_')]
+#[Route('', name: 'api_inscripciones_')]
 #[OA\Tag(name: 'Gestión Inscripciones', description: 'Endpoints para que Organizaciones y Coordinadores gestionen solicitudes')]
 final class InscripcionController extends AbstractController
 {
@@ -40,7 +40,7 @@ final class InscripcionController extends AbstractController
     {
         // Buscamos todas las inscripciones de esa actividad
         $inscripciones = $repo->findBy(['actividad' => $id]);
-        
+
         $resultado = [];
         foreach ($inscripciones as $ins) {
             $vol = $ins->getVoluntario();
@@ -80,20 +80,20 @@ final class InscripcionController extends AbstractController
         // Doctrine mapea 'actividad' y 'voluntario' automáticamente a los IDs si pasas enteros en findOneBy
         $inscripcion = $em->getRepository(Inscripcion::class)->findOneBy([
             'actividad' => $idActividad,
-            'voluntario' => $idVoluntario 
+            'voluntario' => $idVoluntario
         ]);
 
         if (!$inscripcion) return $this->json(['error' => 'Inscripción no encontrada'], Response::HTTP_NOT_FOUND);
 
         $data = json_decode($request->getContent(), true);
         $nuevoEstado = $data['estado'] ?? null;
-        
+
         if (!in_array($nuevoEstado, ['Aceptada', 'Rechazada', 'Cancelada', 'Pendiente'])) {
             return $this->json(['error' => 'Estado inválido. Valores permitidos: Aceptada, Rechazada, Cancelada, Pendiente'], Response::HTTP_BAD_REQUEST);
         }
 
         $inscripcion->setEstadoSolicitud($nuevoEstado);
-        
+
         // Asumiendo que añadiste el setter en tu Entidad Inscripcion como te indiqué antes
         if (method_exists($inscripcion, 'setUpdatedAt')) {
             $inscripcion->setUpdatedAt(new \DateTime());
@@ -101,17 +101,16 @@ final class InscripcionController extends AbstractController
 
         try {
             // 💥 AQUÍ salta el Trigger TR_Check_Cupo_Update si intentamos aceptar y ya está lleno
-            $em->flush(); 
+            $em->flush();
             return $this->json(['mensaje' => 'Estado actualizado a ' . $nuevoEstado], Response::HTTP_OK);
-
         } catch (\Exception $e) {
             $msg = $e->getMessage();
-            
+
             // Captura de errores específicos de SQL Server definidos en tus Triggers
             if (str_contains($msg, 'ERROR DE NEGOCIO') || str_contains($msg, 'ERROR DE CUPO')) {
                 return $this->json(['error' => 'No se puede aceptar: El cupo de la actividad se ha completado.'], Response::HTTP_CONFLICT);
             }
-            
+
             return $this->json(['error' => 'Error al actualizar estado: ' . $msg], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }

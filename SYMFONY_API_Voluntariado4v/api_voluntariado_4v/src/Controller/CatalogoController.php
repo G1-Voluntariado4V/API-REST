@@ -11,7 +11,7 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Routing\Attribute\Route;
 
 // Agrupamos todo bajo /api/catalogos para que el Frontend lo tenga ordenado
-#[Route('/api/catalogos', name: 'api_catalogos_')]
+#[Route('/catalogos', name: 'api_catalogos_')]
 final class CatalogoController extends AbstractController
 {
     // 1. CURSOS

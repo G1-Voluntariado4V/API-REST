@@ -21,4 +21,4 @@ nelmio_api_doc:
     areas: 
         default:
             path_patterns: 
-                - ^/api(?!/doc$) # Documenta todas las rutas que empiecen por /api excepto /api/doc
+                - ^/(?!api/doc$) # Documenta todas las rutas que empiecen por /api excepto /api/doc

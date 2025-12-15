@@ -12,7 +12,7 @@ use Symfony\Component\HttpFoundation\Response; // <--- Importante
 use Symfony\Component\Routing\Attribute\Route;
 use OpenApi\Attributes as OA; // <--- Importante para Swagger
 
-#[Route('/api/roles', name: 'api_roles_')]
+#[Route('/roles', name: 'api_roles_')]
 #[OA\Tag(name: 'Roles', description: 'Catálogo de roles del sistema')]
 final class RolController extends AbstractController
 {

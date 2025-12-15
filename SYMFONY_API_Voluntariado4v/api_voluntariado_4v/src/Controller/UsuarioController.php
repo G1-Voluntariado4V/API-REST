@@ -14,7 +14,7 @@ use Symfony\Component\HttpFoundation\Response; // Códigos HTTP (200, 201, 400..
 use Symfony\Component\Routing\Attribute\Route;
 use OpenApi\Attributes as OA; // Documentación
 
-#[Route('/api', name: 'api_')]
+#[Route('', name: 'api_')]
 #[OA\Tag(name: 'Usuarios', description: 'Gestión administrativa de usuarios')]
 final class UsuarioController extends AbstractController
 {
@@ -46,7 +46,7 @@ final class UsuarioController extends AbstractController
             return $this->json($usuarios, Response::HTTP_OK);
         } catch (\Exception $e) {
             return $this->json(
-                ['error' => 'Error al listar usuarios: ' . $e->getMessage()], 
+                ['error' => 'Error al listar usuarios: ' . $e->getMessage()],
                 Response::HTTP_INTERNAL_SERVER_ERROR
             );
         }
@@ -80,7 +80,7 @@ final class UsuarioController extends AbstractController
         // 1. Validaciones
         if (empty($data['correo']) || empty($data['google_id']) || empty($data['id_rol'])) {
             return $this->json(
-                ['error' => 'Faltan datos obligatorios (correo, google_id, id_rol)'], 
+                ['error' => 'Faltan datos obligatorios (correo, google_id, id_rol)'],
                 Response::HTTP_BAD_REQUEST
             );
         }
@@ -96,7 +96,7 @@ final class UsuarioController extends AbstractController
         $usuario->setCorreo($data['correo']);
         $usuario->setGoogleId($data['google_id']);
         $usuario->setRol($rol);
-        $usuario->setEstadoCuenta('Pendiente'); 
+        $usuario->setEstadoCuenta('Pendiente');
         // Si tu entidad tiene fechaRegistro, Doctrine suele ponerla en el constructor o PrePersist,
         // si no, podrías hacer $usuario->setFechaRegistro(new \DateTime());
 
@@ -106,12 +106,12 @@ final class UsuarioController extends AbstractController
         } catch (UniqueConstraintViolationException $e) {
             // Capturamos el error específico de SQL Server cuando el correo ya existe
             return $this->json(
-                ['error' => 'El correo o el Google ID ya están registrados en el sistema.'], 
+                ['error' => 'El correo o el Google ID ya están registrados en el sistema.'],
                 Response::HTTP_CONFLICT // 409 Conflict
             );
         } catch (\Exception $e) {
             return $this->json(
-                ['error' => 'Error interno al guardar: ' . $e->getMessage()], 
+                ['error' => 'Error interno al guardar: ' . $e->getMessage()],
                 Response::HTTP_INTERNAL_SERVER_ERROR
             );
         }
@@ -145,12 +145,12 @@ final class UsuarioController extends AbstractController
             $em->getConnection()->executeStatement($sql, ['id' => $id]);
 
             return $this->json(
-                ['mensaje' => 'Usuario eliminado correctamente (Soft Delete aplicado vía SP)'], 
+                ['mensaje' => 'Usuario eliminado correctamente (Soft Delete aplicado vía SP)'],
                 Response::HTTP_OK
             );
         } catch (\Exception $e) {
             return $this->json(
-                ['error' => 'Error al ejecutar el procedimiento de borrado: ' . $e->getMessage()], 
+                ['error' => 'Error al ejecutar el procedimiento de borrado: ' . $e->getMessage()],
                 Response::HTTP_INTERNAL_SERVER_ERROR
             );
         }

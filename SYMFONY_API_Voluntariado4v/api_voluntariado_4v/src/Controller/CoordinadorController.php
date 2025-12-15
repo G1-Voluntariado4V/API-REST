@@ -16,7 +16,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use OpenApi\Attributes as OA;
 
-#[Route('/api', name: 'api_')]
+#[Route('', name: 'api_')]
 #[OA\Tag(name: 'Coordinadores', description: 'Gestión interna, Dashboard y Moderación Global')]
 final class CoordinadorController extends AbstractController
 {

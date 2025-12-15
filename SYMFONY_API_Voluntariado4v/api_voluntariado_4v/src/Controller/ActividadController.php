@@ -17,7 +17,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use OpenApi\Attributes as OA;
 
-#[Route('/api', name: 'api_')]
+#[Route('', name: 'api_')]
 #[OA\Tag(name: 'Actividades', description: 'Gestión de ofertas de voluntariado')]
 final class ActividadController extends AbstractController
 {

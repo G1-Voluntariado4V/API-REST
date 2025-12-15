@@ -10,7 +10,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use OpenApi\Attributes as OA;
 
-#[Route('/api/auth', name: 'api_auth_')]
+#[Route('/auth', name: 'api_auth_')]
 #[OA\Tag(name: 'Autenticación', description: 'Login y gestión de acceso')]
 final class AuthController extends AbstractController
 {
@@ -43,7 +43,7 @@ final class AuthController extends AbstractController
         // 1. Recibir datos
         $data = json_decode($request->getContent(), true);
         $googleId = $data['google_id'] ?? null;
-        $email = $data['email'] ?? null; 
+        $email = $data['email'] ?? null;
 
         if (!$googleId) {
             return $this->json(['mensaje' => 'Falta el google_id'], Response::HTTP_BAD_REQUEST);
@@ -51,7 +51,7 @@ final class AuthController extends AbstractController
 
         // 2. Buscar Usuario (Prioridad ID > Email)
         $usuario = $usuarioRepository->findOneBy(['googleId' => $googleId]);
-        
+
         if (!$usuario && $email) {
             $usuario = $usuarioRepository->findOneBy(['correo' => $email]);
         }
@@ -84,7 +84,7 @@ final class AuthController extends AbstractController
             'id_usuario' => $usuario->getId(),
             'google_id'  => $usuario->getGoogleId(),
             'correo'     => $usuario->getCorreo(),
-            'rol'        => $usuario->getRol() ? $usuario->getRol()->getNombre() : 'User', 
+            'rol'        => $usuario->getRol() ? $usuario->getRol()->getNombre() : 'User',
             'estado'     => $usuario->getEstadoCuenta()
         ], Response::HTTP_OK);
     }
@@ -127,20 +127,20 @@ final class AuthController extends AbstractController
         $usuario->setGoogleId($googleId);
         $usuario->setCorreo($email);
         $usuario->setFechaRegistro(new \DateTime());
-        
+
         // Asignar Rol
         $rolRepository = $em->getRepository(\App\Entity\Rol::class);
         $rol = null;
 
         if ($rolType === 'volunteer') {
             $rol = $rolRepository->findOneBy(['nombre' => 'Voluntario']);
-            $usuario->setEstadoCuenta('Activa'); 
+            $usuario->setEstadoCuenta('Activa');
         } elseif ($rolType === 'organizer') {
-            $rol = $rolRepository->findOneBy(['nombre' => 'Organización']); 
+            $rol = $rolRepository->findOneBy(['nombre' => 'Organización']);
             if (!$rol) $rol = $rolRepository->findOneBy(['nombre' => 'Organizador']);
             $usuario->setEstadoCuenta('Pendiente');
         } else {
-             return $this->json(['mensaje' => 'Rol inválido'], Response::HTTP_BAD_REQUEST);
+            return $this->json(['mensaje' => 'Rol inválido'], Response::HTTP_BAD_REQUEST);
         }
 
         if (!$rol) {
@@ -149,9 +149,9 @@ final class AuthController extends AbstractController
 
         $usuario->setRol($rol);
         $em->persist($usuario);
-        
+
         // FLUSH 1: Guardar Usuario para obtener ID
-        $em->flush(); 
+        $em->flush();
 
         // 4. Crear Entidad Específica
         if ($rolType === 'volunteer') {
@@ -170,7 +170,6 @@ final class AuthController extends AbstractController
                 if ($curso) $voluntario->setCursoActual($curso); // Nota: setCursoActual (según la entidad)
             }
             $em->persist($voluntario);
-
         } elseif ($rolType === 'organizer') {
             $organizacion = new \App\Entity\Organizacion();
             $organizacion->setNombre($data['nombre'] ?? 'Sin Nombre');
