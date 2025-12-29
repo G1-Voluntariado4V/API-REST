@@ -136,15 +136,8 @@ final class AuthController extends AbstractController
             $rol = $rolRepository->findOneBy(['nombre' => 'Voluntario']);
             $usuario->setEstadoCuenta('Activa');
         } elseif ($rolType === 'organizer') {
-<<<<<<< HEAD
             $rol = $rolRepository->findOneBy(['nombre' => 'Organización']);
             if (!$rol) $rol = $rolRepository->findOneBy(['nombre' => 'Organizador']);
-=======
-            // Intentamos las variantes: con tilde, sin tilde, y sinónimos
-            $rol = $rolRepository->findOneBy(['nombre' => 'Organización']);
-            if (!$rol) { $rol = $rolRepository->findOneBy(['nombre' => 'Organizacion']); }
-            if (!$rol) { $rol = $rolRepository->findOneBy(['nombre' => 'Organizador']); }
->>>>>>> b3e2e4f2124365fc77079c6f9ae80df9cd5aa01e
             $usuario->setEstadoCuenta('Pendiente');
         } else {
             return $this->json(['mensaje' => 'Rol inválido'], Response::HTTP_BAD_REQUEST);

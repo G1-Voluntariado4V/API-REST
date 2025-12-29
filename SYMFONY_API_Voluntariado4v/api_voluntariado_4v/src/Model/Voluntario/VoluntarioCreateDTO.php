@@ -1,6 +1,6 @@
 <?php
 // DTO para la creación de un voluntario: Lo que te manda el frontend
-namespace App\Model;
+namespace App\Model\Voluntario;
 
 use Symfony\Component\Validator\Constraints as Assert;
 

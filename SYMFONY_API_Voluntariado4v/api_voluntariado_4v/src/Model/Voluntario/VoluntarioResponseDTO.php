@@ -1,7 +1,7 @@
 <?php
 // <!-- DTO para la respuesta de un voluntario: Lo que manda el backend -->
 
-namespace App\Model;
+namespace App\Model\Voluntario;
 
 use App\Entity\Voluntario;
 
