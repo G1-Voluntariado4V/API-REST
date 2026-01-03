@@ -1,5 +1,5 @@
 <?php
-//Lógica SQL Avanzada
+
 declare(strict_types=1);
 
 namespace DoctrineMigrations;
@@ -7,11 +7,14 @@ namespace DoctrineMigrations;
 use Doctrine\DBAL\Schema\Schema;
 use Doctrine\Migrations\AbstractMigration;
 
-final class Version2025_LogicaSQL_Avanzada extends AbstractMigration
+/**
+ * Auto-generated Migration: Please modify to your needs!
+ */
+final class Version20260103120130 extends AbstractMigration
 {
     public function getDescription(): string
     {
-        return 'Implementación de Triggers, Vistas y Procedimientos Almacenados';
+        return 'Añade triggers, vistas y procedimientos almacenable';
     }
 
     public function up(Schema $schema): void
@@ -159,38 +162,48 @@ final class Version2025_LogicaSQL_Avanzada extends AbstractMigration
         // =========================================================================
         // 4. VISTAS
         // =========================================================================
-        
+
         $this->addSql("
             CREATE OR ALTER VIEW VW_Usuarios_Activos AS
             SELECT u.*, r.nombre_rol FROM USUARIO u INNER JOIN ROL r ON u.id_rol = r.id_rol WHERE u.deleted_at IS NULL
         ");
 
-        // OJO: Ajustado para que LEFT JOIN use 'id_curso' si es la PK de CURSO
+        // CORREGIDO: 'v.img_perfil' cambiado a 'u.img_perfil' porque la columna ahora está en USUARIO
         $this->addSql("
             CREATE OR ALTER VIEW VW_Voluntarios_Activos AS
-            SELECT u.id_usuario, u.correo, u.estado_cuenta, u.fecha_registro, v.nombre, v.apellidos, v.telefono, v.fecha_nac, v.carnet_conducir, v.img_perfil, c.nombre_curso, c.abreviacion_curso, c.grado, c.nivel
+            SELECT u.id_usuario, u.correo, u.estado_cuenta, u.fecha_registro, v.nombre, v.apellidos, v.telefono, v.fecha_nac, v.carnet_conducir, 
+                   u.img_perfil, 
+                   c.nombre_curso, c.abreviacion_curso, c.grado, c.nivel
             FROM USUARIO u INNER JOIN VOLUNTARIO v ON u.id_usuario = v.id_usuario LEFT JOIN CURSO c ON v.id_curso_actual = c.id_curso WHERE u.deleted_at IS NULL
         ");
 
+        // CORREGIDO: 'o.img_perfil' cambiado a 'u.img_perfil'
         $this->addSql("
             CREATE OR ALTER VIEW VW_Organizaciones_Activas AS
-            SELECT u.id_usuario, u.correo, u.estado_cuenta, u.fecha_registro, o.cif, o.nombre, o.descripcion, o.direccion, o.sitio_web, o.telefono, o.img_perfil
+            SELECT u.id_usuario, u.correo, u.estado_cuenta, u.fecha_registro, o.cif, o.nombre, o.descripcion, o.direccion, o.sitio_web, o.telefono, 
+                   u.img_perfil
             FROM USUARIO u INNER JOIN ORGANIZACION o ON u.id_usuario = o.id_usuario WHERE u.deleted_at IS NULL
         ");
 
+        // CORREGIDO: 'o.img_perfil' cambiado a 'u.img_perfil' y añadido JOIN con USUARIO
         $this->addSql("
             CREATE OR ALTER VIEW VW_Actividades_Activas AS
-            SELECT a.*, o.nombre AS nombre_organizacion, o.img_perfil AS img_organizacion,
-                (SELECT COUNT(*) FROM INSCRIPCION i WHERE i.id_actividad = a.id_actividad AND i.estado_solicitud = 'Aceptada') AS inscritos_confirmados
-            FROM ACTIVIDAD a INNER JOIN ORGANIZACION o ON a.id_organizacion = o.id_usuario WHERE a.deleted_at IS NULL
+            SELECT a.*, o.nombre AS nombre_organizacion, 
+                   u.img_perfil AS img_organizacion,
+                   (SELECT COUNT(*) FROM INSCRIPCION i WHERE i.id_actividad = a.id_actividad AND i.estado_solicitud = 'Aceptada') AS inscritos_confirmados
+            FROM ACTIVIDAD a 
+            INNER JOIN ORGANIZACION o ON a.id_organizacion = o.id_usuario 
+            INNER JOIN USUARIO u ON o.id_usuario = u.id_usuario
+            WHERE a.deleted_at IS NULL
         ");
 
-        // NOTA: He comentado la línea de IMAGEN_ACTIVIDAD porque esa tabla NO existe aún en Symfony.
+        // CORREGIDO: 'o.img_perfil' cambiado a 'u.img_perfil' (el JOIN con USUARIO ya existía)
         $this->addSql("
             CREATE OR ALTER VIEW VW_Actividades_Publicadas AS
-            SELECT a.id_actividad, a.titulo, a.descripcion, a.fecha_inicio, a.duracion_horas, a.cupo_maximo, a.ubicacion, a.estado_publicacion, o.nombre AS nombre_organizacion, o.img_perfil AS img_organizacion,
-                (SELECT COUNT(*) FROM INSCRIPCION i WHERE i.id_actividad = a.id_actividad AND i.estado_solicitud = 'Aceptada') AS inscritos_confirmados
-                -- , (SELECT TOP 1 url_imagen FROM IMAGEN_ACTIVIDAD img WHERE img.id_actividad = a.id_actividad) AS imagen_principal
+            SELECT a.id_actividad, a.titulo, a.descripcion, a.fecha_inicio, a.duracion_horas, a.cupo_maximo, a.ubicacion, a.estado_publicacion, o.nombre AS nombre_organizacion, 
+                   u.img_perfil AS img_organizacion,
+                   (SELECT COUNT(*) FROM INSCRIPCION i WHERE i.id_actividad = a.id_actividad AND i.estado_solicitud = 'Aceptada') AS inscritos_confirmados
+                   -- , (SELECT TOP 1 url_imagen FROM IMAGEN_ACTIVIDAD img WHERE img.id_actividad = a.id_actividad) AS imagen_principal
             FROM ACTIVIDAD a 
             INNER JOIN ORGANIZACION o ON a.id_organizacion = o.id_usuario 
             INNER JOIN USUARIO u ON o.id_usuario = u.id_usuario
@@ -200,11 +213,11 @@ final class Version2025_LogicaSQL_Avanzada extends AbstractMigration
         // =========================================================================
         // 5. PROCEDIMIENTOS ALMACENADOS
         // =========================================================================
-        
+
         $this->addSql("CREATE OR ALTER PROCEDURE SP_SoftDelete_Usuario @id_usuario INT AS BEGIN SET NOCOUNT ON; UPDATE USUARIO SET deleted_at = GETDATE(), estado_cuenta = 'Bloqueada' WHERE id_usuario = @id_usuario; END");
-        
+
         $this->addSql("CREATE OR ALTER PROCEDURE SP_SoftDelete_Actividad @id_actividad INT AS BEGIN SET NOCOUNT ON; UPDATE ACTIVIDAD SET deleted_at = GETDATE(), estado_publicacion = 'Cancelada' WHERE id_actividad = @id_actividad; END");
-        
+
         $this->addSql("CREATE OR ALTER PROCEDURE SP_Restore_Usuario @id_usuario INT AS BEGIN SET NOCOUNT ON; UPDATE USUARIO SET deleted_at = NULL, estado_cuenta = 'Pendiente' WHERE id_usuario = @id_usuario; END");
 
         $this->addSql("
@@ -221,7 +234,6 @@ final class Version2025_LogicaSQL_Avanzada extends AbstractMigration
             END
         ");
 
-        // NOTA: Ajustado nombres de columnas (id_ods, id_tipo)
         $this->addSql("
             CREATE OR ALTER PROCEDURE SP_Get_Recomendaciones_Voluntario @id_voluntario INT AS
             BEGIN
@@ -231,11 +243,9 @@ final class Version2025_LogicaSQL_Avanzada extends AbstractMigration
                 SELECT DISTINCT a.titulo, o.nombre AS organizacion, a.fecha_inicio, ods.nombre AS causa_ods
                 FROM ACTIVIDAD a
                 INNER JOIN ACTIVIDAD_ODS ao ON a.id_actividad = ao.id_actividad 
-                INNER JOIN ODS ods ON ao.id_ods = ods.id_ods -- Ajustado a id_ods
+                INNER JOIN ODS ods ON ao.id_ods = ods.id_ods 
                 INNER JOIN ORGANIZACION o ON a.id_organizacion = o.id_usuario 
                 WHERE ao.id_ods IN (
-                    -- Aquí asumimos que el ID del ODS coincide con el ID del TipoVoluntariado 
-                    -- Si no es así, esta lógica hay que revisarla en el futuro.
                     SELECT id_tipo FROM PREFERENCIA_VOLUNTARIO WHERE id_voluntario = @id_voluntario
                 )
                 AND a.estado_publicacion = 'Publicada'
@@ -252,13 +262,13 @@ final class Version2025_LogicaSQL_Avanzada extends AbstractMigration
         $this->addSql("DROP VIEW IF EXISTS VW_Organizaciones_Activas");
         $this->addSql("DROP VIEW IF EXISTS VW_Actividades_Activas");
         $this->addSql("DROP VIEW IF EXISTS VW_Actividades_Publicadas");
-        
+
         $this->addSql("DROP PROCEDURE IF EXISTS SP_SoftDelete_Usuario");
         $this->addSql("DROP PROCEDURE IF EXISTS SP_SoftDelete_Actividad");
         $this->addSql("DROP PROCEDURE IF EXISTS SP_Restore_Usuario");
         $this->addSql("DROP PROCEDURE IF EXISTS SP_Dashboard_Stats");
         $this->addSql("DROP PROCEDURE IF EXISTS SP_Get_Recomendaciones_Voluntario");
-        
+
         $this->addSql("DROP TRIGGER IF EXISTS TR_Usuario_UpdatedAt");
         $this->addSql("DROP TRIGGER IF EXISTS TR_Voluntario_UpdatedAt");
         $this->addSql("DROP TRIGGER IF EXISTS TR_Organizacion_UpdatedAt");

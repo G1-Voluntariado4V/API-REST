@@ -11,8 +11,8 @@ use App\Entity\Curso;
 use App\Entity\TipoVoluntariado;
 use App\Entity\Idioma;
 // DTOs
-use App\Model\VoluntarioCreateDTO;
-use App\Model\VoluntarioResponseDTO;
+use App\Model\Voluntario\VoluntarioCreateDTO;
+use App\Model\Voluntario\VoluntarioResponseDTO;
 // Repositorios
 use App\Repository\RolRepository;
 use App\Repository\UsuarioRepository;
@@ -74,7 +74,7 @@ final class VoluntarioController extends AbstractController
         )
     )]
     #[OA\Response(
-        response: 201, 
+        response: 201,
         description: 'Voluntario registrado correctamente',
         content: new OA\JsonContent(
             // Aquí usamos la clase Model correctamente importada
@@ -177,7 +177,7 @@ final class VoluntarioController extends AbstractController
     // ========================================================================
     #[Route('/voluntarios/{id}', name: 'get_voluntario', methods: ['GET'])]
     #[OA\Response(
-        response: 200, 
+        response: 200,
         description: 'Detalle del voluntario (DTO)',
         content: new OA\JsonContent(
             // Aquí usamos la clase Model correctamente importada
@@ -227,7 +227,7 @@ final class VoluntarioController extends AbstractController
     // ========================================================================
     #[Route('/voluntarios/{id}', name: 'actualizar_voluntario', methods: ['PUT'])]
     #[OA\Response(
-        response: 200, 
+        response: 200,
         description: 'Voluntario actualizado',
         content: new OA\JsonContent(
             // Documentamos que devolvemos el DTO actualizado

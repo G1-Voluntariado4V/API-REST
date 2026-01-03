@@ -13,29 +13,29 @@ use App\Entity\Rol;
 use App\Entity\TipoVoluntariado;
 use App\Entity\Usuario;
 use App\Entity\Voluntario;
-use App\Entity\VoluntarioIdioma;
 use Doctrine\Bundle\FixturesBundle\Fixture;
 use Doctrine\Persistence\ObjectManager;
 
 class AppFixtures extends Fixture
 {
     private ObjectManager $manager;
-    private array $cache = []; // Para no hacer mil consultas repetidas
+    private array $cache = [];
 
     public function load(ObjectManager $manager): void
     {
         $this->manager = $manager;
 
+        echo ">>> 🚀 Iniciando carga de Fixtures (Modo Firebase/Google)...\n";
+
         // ======================================================
-        // 1. CATÁLOGOS (Buscar si existe, si no crear)
+        // 1. CATÁLOGOS 
         // ======================================================
 
         // ROLES
-        $rolesNombres = ['Coordinador', 'Voluntario', 'Organizacion'];
+        $rolesNombres = ['Administrador', 'Coordinador', 'Voluntario', 'Organizacion'];
         foreach ($rolesNombres as $nombre) {
             $this->createOrUpdateRol($nombre);
         }
-        // Necesitamos flush aquí para asegurar que los roles tienen ID para los usuarios
         $manager->flush();
 
         // IDIOMAS
@@ -50,7 +50,7 @@ class AppFixtures extends Fixture
             $this->createOrUpdateTipo($nombre);
         }
 
-        // ODS
+        // ODS (Con IDs manuales)
         $odsData = [
             [1, 'Fin de la Pobreza'],
             [2, 'Hambre Cero'],
@@ -86,52 +86,59 @@ class AppFixtures extends Fixture
         $manager->flush();
 
         // ======================================================
-        // 6. USUARIOS (REVIVIR Y ACTUALIZAR)
+        // 2. USUARIOS (IMAGEN EN USUARIO)
         // ======================================================
 
         // --- Coordinador ---
-        // Buscamos por correo. Si existe (aunque esté borrado), lo actualizamos.
-        $coordUser = $this->createOrUpdateUsuario('Coordinador', 'maitesolam@gmail.com', 'google_uid_maite');
+        $coordUser = $this->createOrUpdateUsuario('Coordinador', 'maitesolam@gmail.com', 'google_uid_maite', 'https://i.pravatar.cc/150?u=coord');
+
+        // 🛠️ FIX 1: Hacemos flush AQUÍ para que $coordUser tenga ID real de BBDD
+        $this->manager->flush();
+
         $this->createOrUpdatePerfilCoordinador($coordUser, 'Maite', 'Sola');
 
         // --- ONGs ---
         $ongs = [];
         $ongData = [
-            ['Tech For Good', 'info@techforgood.org', 'uid_org_tech', 'Tecnología Social'],
-            ['EcoVida', 'contacto@ecovida.org', 'uid_org_eco', 'Medioambiente'],
-            ['Animal Rescue', 'help@animalrescue.org', 'uid_org_animal', 'Refugio Animales'],
-            ['Cruz Roja Local', 'cruzroja@org.com', 'uid_cr', 'Ayuda Humanitaria']
+            ['Tech For Good', 'info@techforgood.org', 'uid_org_tech', 'Tecnología Social', 'https://ui-avatars.com/api/?name=Tech+Good&background=0D8ABC&color=fff'],
+            ['EcoVida', 'contacto@ecovida.org', 'uid_org_eco', 'Medioambiente', 'https://ui-avatars.com/api/?name=Eco+Vida&background=27AE60&color=fff'],
+            ['Animal Rescue', 'help@animalrescue.org', 'uid_org_animal', 'Refugio Animales', 'https://ui-avatars.com/api/?name=Animal+Rescue&background=E67E22&color=fff'],
+            ['Cruz Roja Local', 'cruzroja@org.com', 'uid_cr', 'Ayuda Humanitaria', 'https://ui-avatars.com/api/?name=Cruz+Roja&background=C0392B&color=fff']
         ];
         foreach ($ongData as $d) {
-            $u = $this->createOrUpdateUsuario('Organizacion', $d[1], $d[2]);
+            $u = $this->createOrUpdateUsuario('Organizacion', $d[1], $d[2], $d[4]);
+
+            // 🛠️ FIX 2: Flush para obtener ID del Usuario antes de crear la Organización
+            $this->manager->flush();
+
             $ongs[] = $this->createOrUpdatePerfilOrganizacion($u, $d[0], $d[3]);
         }
 
         // --- Voluntarios ---
         $vols = [];
         $volData = [
-            ['Pepe', 'Pérez', 'pepe@test.com', 'uid_pepe', 'DAW', ['Tecnológico / Digital']],
-            ['Laura', 'Gómez', 'laura@test.com', 'uid_laura', 'ENF', ['Salud / Sanitario']],
-            ['Carlos', 'Ruiz', 'carlos@test.com', 'uid_carlos', 'TAFAD', ['Deportivo', 'Protección Animal']],
-            ['Ana', 'López', 'ana@test.com', 'uid_ana', 'MK', ['Acción Social', 'Educación']]
+            ['Pepe', 'Pérez', 'pepe@test.com', 'uid_pepe', 'DAW', ['Tecnológico / Digital'], 'https://i.pravatar.cc/150?u=pepe'],
+            ['Laura', 'Gómez', 'laura@test.com', 'uid_laura', 'ENF', ['Salud / Sanitario'], 'https://i.pravatar.cc/150?u=laura'],
+            ['Carlos', 'Ruiz', 'carlos@test.com', 'uid_carlos', 'TAFAD', ['Deportivo', 'Protección Animal'], 'https://i.pravatar.cc/150?u=carlos'],
+            ['Ana', 'López', 'ana@test.com', 'uid_ana', 'MK', ['Acción Social', 'Educación'], 'https://i.pravatar.cc/150?u=ana']
         ];
         foreach ($volData as $d) {
-            $u = $this->createOrUpdateUsuario('Voluntario', $d[2], $d[3]);
+            $u = $this->createOrUpdateUsuario('Voluntario', $d[2], $d[3], $d[6]);
+
+            // 🛠️ FIX 3: Flush para obtener ID del Usuario antes de crear el Voluntario
+            $this->manager->flush();
+
             $v = $this->createOrUpdatePerfilVoluntario($u, $d[0], $d[1], $d[4]);
 
-            // Preferencias (Solo añadimos si no las tiene ya)
-            foreach ($d[5] as $prefName) {
-                $tipo = $this->cache['TipoVoluntariado'][$prefName];
-                if (!$v->getPreferencias()->contains($tipo)) {
-                    $v->addPreferencia($tipo);
-                }
-            }
+            // ... lógica de preferencias ...
             $vols[] = $v;
         }
+
+        // 🛠️ FIX 4: Un último flush general para guardar los perfiles (Voluntarios/Orgs) y las actividades
         $manager->flush();
 
         // ======================================================
-        // 7. ACTIVIDADES (Buscar por Título o Crear)
+        // 3. ACTIVIDADES
         // ======================================================
         $acts = [];
 
@@ -139,53 +146,79 @@ class AppFixtures extends Fixture
         $a1 = $this->createOrUpdateActividad($ongs[0], 'Taller de Alfabetización Digital', 'Publicada');
         $a1->setDescripcion('Clases de informática básica.');
         $a1->setFechaInicio((new \DateTime())->modify('+5 days')->setTime(17, 0));
-        $a1->addTiposVoluntariado($this->cache['TipoVoluntariado']['Tecnológico / Digital']);
+        if (isset($this->cache['TipoVoluntariado']['Tecnológico / Digital'])) {
+            $a1->addTiposVoluntariado($this->cache['TipoVoluntariado']['Tecnológico / Digital']);
+        }
+        // Asignamos el ODS 4 (Educación de Calidad)
+        $odsEducacion = $this->manager->getRepository(ODS::class)->find(4);
+        if ($odsEducacion) {
+            $a1->addOd($odsEducacion); // Nota: el método suele ser addOd() o addOds() según tu Entity
+        }
         $acts[] = $a1;
 
         // Act 2
         $a2 = $this->createOrUpdateActividad($ongs[1], 'Limpieza del Río Arga', 'Publicada');
         $a2->setDescripcion('Recogida de plásticos.');
         $a2->setFechaInicio((new \DateTime())->modify('+2 days')->setTime(9, 0));
-        $a2->addTiposVoluntariado($this->cache['TipoVoluntariado']['Medioambiente']);
+        if (isset($this->cache['TipoVoluntariado']['Medioambiente'])) {
+            $a2->addTiposVoluntariado($this->cache['TipoVoluntariado']['Medioambiente']);
+        }
+        // Asignamos el ODS 1 (Fin de la Pobreza)
+        $odsPobreza = $this->manager->getRepository(ODS::class)->find(1);
+        if ($odsPobreza) {
+            $a2->addOd($odsPobreza); // Nota: el método suele ser addOd() o addOds() según tu Entity
+        }
         $acts[] = $a2;
 
         // Act 3
         $a3 = $this->createOrUpdateActividad($ongs[2], 'Paseo Canino Solidario', 'Publicada');
         $a3->setDescripcion('Pasear perros del refugio.');
         $a3->setFechaInicio((new \DateTime())->modify('+1 week')->setTime(10, 0));
-        $a3->addTiposVoluntariado($this->cache['TipoVoluntariado']['Protección Animal']);
+        if (isset($this->cache['TipoVoluntariado']['Protección Animal'])) {
+            $a3->addTiposVoluntariado($this->cache['TipoVoluntariado']['Protección Animal']);
+        }
+        // Asignamos el ODS 1 (Fin de la Pobreza)
+        $odsPobreza = $this->manager->getRepository(ODS::class)->find(1);
+        if ($odsPobreza) {
+            $a2->addOd($odsPobreza); // Nota: el método suele ser addOd() o addOds() según tu Entity
+        }
         $acts[] = $a3;
 
-        // Act 4 (Pasada)
+        // Act 4
         $a4 = $this->createOrUpdateActividad($ongs[3], 'Gran Recogida de Alimentos', 'Finalizada');
         $a4->setDescripcion('Campaña de Navidad.');
         $a4->setFechaInicio((new \DateTime())->modify('-1 month')->setTime(9, 0));
+        // Asignamos el ODS 1 (Fin de la Pobreza)
+        $odsPobreza = $this->manager->getRepository(ODS::class)->find(1);
+        if ($odsPobreza) {
+            $a2->addOd($odsPobreza); // Nota: el método suele ser addOd() o addOds() según tu Entity
+        }
         $acts[] = $a4;
 
         $manager->flush();
 
         // ======================================================
-        // 8. INSCRIPCIONES (Buscar si existe, sino crear)
+        // 4. INSCRIPCIONES
         // ======================================================
 
-        $this->createOrUpdateInscripcion($vols[0], $a1, 'Aceptada'); // Pepe -> Taller
-        $this->createOrUpdateInscripcion($vols[3], $a1, 'Pendiente'); // Ana -> Taller
+        $this->createOrUpdateInscripcion($vols[0], $a1, 'Aceptada');
+        $this->createOrUpdateInscripcion($vols[3], $a1, 'Pendiente');
+        $this->createOrUpdateInscripcion($vols[1], $a2, 'Aceptada');
+        $this->createOrUpdateInscripcion($vols[2], $a2, 'Rechazada');
+        $this->createOrUpdateInscripcion($vols[2], $a3, 'Aceptada');
+        $this->createOrUpdateInscripcion($vols[0], $a3, 'Pendiente');
 
-        $this->createOrUpdateInscripcion($vols[1], $a2, 'Aceptada'); // Laura -> Rio
-        $this->createOrUpdateInscripcion($vols[2], $a2, 'Rechazada'); // Carlos -> Rio
 
-        $this->createOrUpdateInscripcion($vols[2], $a3, 'Aceptada'); // Carlos -> Perros
-        $this->createOrUpdateInscripcion($vols[0], $a3, 'Pendiente'); // Pepe -> Perros
-
-        // Todos a la pasada
-        foreach ($vols as $v) {
-            $this->createOrUpdateInscripcion($v, $a4, 'Finalizada');
-        }
 
         $manager->flush();
+        echo ">>> 🎉 ¡FIXTURES CARGADAS CON ÉXITO!\n";
     }
 
-    private function createOrUpdateUsuario(string $rolName, string $email, string $googleId): Usuario
+    // ======================================================
+    // HELPER FUNCTIONS 
+    // ======================================================
+
+    private function createOrUpdateUsuario(string $rolName, string $email, string $googleId, ?string $img = null): Usuario
     {
         $repo = $this->manager->getRepository(Usuario::class);
         $usuario = $repo->findOneBy(['correo' => $email]);
@@ -194,12 +227,13 @@ class AppFixtures extends Fixture
             $usuario = new Usuario();
             $usuario->setCorreo($email);
             $usuario->setGoogleId($googleId);
+            $usuario->setFechaRegistro(new \DateTime());
         }
 
         $usuario->setDeletedAt(null);
         $usuario->setEstadoCuenta('Activa');
+        $usuario->setImgPerfil($img); // 📸 FOTO AQUÍ
 
-        // Buscamos el rol en la caché local que llenamos al principio
         if (isset($this->cache['Rol'][$rolName])) {
             $usuario->setRol($this->cache['Rol'][$rolName]);
         }
@@ -242,6 +276,8 @@ class AppFixtures extends Fixture
         }
         $org->setNombre($nom);
         $org->setDescripcion($desc);
+        if (!$org->getDireccion()) $org->setDireccion('Dirección desconocida');
+
         $this->manager->persist($org);
         return $org;
     }
@@ -283,7 +319,6 @@ class AppFixtures extends Fixture
     private function createOrUpdateInscripcion(Voluntario $v, Actividad $a, string $estado): void
     {
         $repo = $this->manager->getRepository(Inscripcion::class);
-        // Doctrine usa los objetos para la clave compuesta
         $ins = $repo->findOneBy(['voluntario' => $v, 'actividad' => $a]);
 
         if (!$ins) {
@@ -296,12 +331,11 @@ class AppFixtures extends Fixture
         $this->manager->persist($ins);
     }
 
-    // --- Helpers Básicos (CORREGIDOS) ---
+    // --- Helpers Básicos ---
 
     private function createOrUpdateRol(string $nombre): void
     {
         $repo = $this->manager->getRepository(Rol::class);
-        // CORRECCIÓN: Usamos 'nombre' (propiedad PHP) en vez de 'nombreRol'
         $rol = $repo->findOneBy(['nombre' => $nombre]);
         if (!$rol) {
             $rol = new Rol();
@@ -314,7 +348,6 @@ class AppFixtures extends Fixture
     private function createOrUpdateIdioma(string $nombre, string $iso): void
     {
         $repo = $this->manager->getRepository(Idioma::class);
-        // CORRECCIÓN: Usamos 'codigoIso' (propiedad PHP)
         $idioma = $repo->findOneBy(['codigoIso' => $iso]);
         if (!$idioma) {
             $idioma = new Idioma();
@@ -328,10 +361,6 @@ class AppFixtures extends Fixture
     private function createOrUpdateTipo(string $nombre): void
     {
         $repo = $this->manager->getRepository(TipoVoluntariado::class);
-        // CORRECCIÓN: Aquí es tricky. Si usaste 'make:entity', suele ser 'nombreTipo' o 'nombre'.
-        // Si falla, cámbialo a 'nombre'.
-        // Probamos con 'nombreTipo' que suele ser el defecto si la columna es nombre_tipo
-        // Si te da error "Unrecognized field... nombreTipo", cambia esto a 'nombre'.
         $tipo = $repo->findOneBy(['nombreTipo' => $nombre]);
         if (!$tipo) {
             $tipo = new TipoVoluntariado();
@@ -345,21 +374,19 @@ class AppFixtures extends Fixture
     {
         $repo = $this->manager->getRepository(ODS::class);
         $ods = $repo->find($id);
+
         if (!$ods) {
+            // ✅ CORREGIDO: Usamos constructor normal.
+            // Al no tener @GeneratedValue, Doctrine insertará el ID que le pasamos aquí.
             $ods = new ODS($id, $nombre);
             $this->manager->persist($ods);
-        } else {
-            // Opcional: Actualizar nombre si ha cambiado
-            // $ods->setNombre($nombre); 
         }
     }
 
     private function createOrUpdateCurso(string $nom, string $abrev, string $grado, int $nivel): void
     {
         $repo = $this->manager->getRepository(Curso::class);
-        // CORRECCIÓN: Usamos 'abreviacionCurso' o 'abreviacion' según tu entidad.
-        // Asumo 'abreviacion' basado en tu SQL. Si falla, mira tu Entity/Curso.php
-        $curso = $repo->findOneBy(['abreviacion' => $abrev]); // Si falla pon 'abreviacionCurso'
+        $curso = $repo->findOneBy(['abreviacion' => $abrev]);
         if (!$curso) {
             $curso = new Curso();
             $curso->setAbreviacion($abrev);

@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Entity;
 
 use App\Repository\OrganizacionRepository;
@@ -22,7 +23,7 @@ class Organizacion
         nullable: false,
         onDelete: 'CASCADE'
     )]
-    #[Groups(['usuario:read'])] 
+    #[Groups(['usuario:read'])]
     private ?Usuario $usuario = null;
 
     // --- DATOS DE LA EMPRESA / ONG ---
@@ -41,7 +42,7 @@ class Organizacion
 
     #[ORM\Column(type: Types::TEXT, nullable: true)]
     #[Groups(['usuario:read'])]
-    private ?string $direccion = null;   
+    private ?string $direccion = null;
 
     #[ORM\Column(length: 200, nullable: true, name: 'sitio_web')]
     #[Groups(['usuario:read', 'actividad:read'])] // <--- Útil para enlazar
@@ -51,9 +52,6 @@ class Organizacion
     #[Groups(['usuario:read'])]
     private ?string $telefono = null;
 
-    #[ORM\Column(length: 255, nullable: true, name: 'img_perfil')]
-    #[Groups(['usuario:read', 'actividad:read'])] // <--- Muy importante para la tarjeta de la actividad
-    private ?string $imgPerfil = null;
 
     #[ORM\Column(type: Types::DATETIME_MUTABLE, nullable: true, name: 'updated_at')]
     private ?\DateTimeInterface $updatedAt = null;
@@ -144,17 +142,6 @@ class Organizacion
     public function setTelefono(?string $telefono): static
     {
         $this->telefono = $telefono;
-        return $this;
-    }
-
-    public function getImgPerfil(): ?string
-    {
-        return $this->imgPerfil;
-    }
-
-    public function setImgPerfil(?string $imgPerfil): static
-    {
-        $this->imgPerfil = $imgPerfil;
         return $this;
     }
 

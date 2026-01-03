@@ -54,9 +54,6 @@ class Voluntario
 
     // --- LOS NUEVOS CAMPOS ---
 
-    #[ORM\Column(length: 255, nullable: true, name: 'img_perfil')]
-    private ?string $imgPerfil = null;
-
     // Relación con CURSO (id_curso_actual)
     #[ORM\ManyToOne(targetEntity: Curso::class)]
     #[ORM\JoinColumn(name: 'id_curso_actual', referencedColumnName: 'id_curso', nullable: true)]
@@ -173,16 +170,7 @@ class Voluntario
         return $this;
     }
 
-    public function getImgPerfil(): ?string
-    {
-        return $this->imgPerfil;
-    }
-    public function setImgPerfil(?string $imgPerfil): static
-    {
-        $this->imgPerfil = $imgPerfil;
-        return $this;
-    }
-
+    
     public function getCursoActual(): ?Curso
     {
         return $this->cursoActual;
