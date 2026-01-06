@@ -3,33 +3,42 @@
 namespace App\Controller;
 
 use App\Entity\Actividad;
-use App\Entity\ImagenActividad; // <--- Importante añadir esto
+use App\Entity\ImagenActividad;
 use App\Entity\Organizacion;
+// Modelos / DTOs
+use App\Model\Actividad\ActividadCreateDTO;
+use App\Model\Actividad\ActividadUpdateDTO; // <--- El nuevo que acabamos de crear
+use App\Model\Actividad\ActividadResponseDTO;
+// Repositorios
 use App\Repository\ActividadRepository;
 use App\Repository\ODSRepository;
 use App\Repository\TipoVoluntariadoRepository;
 use App\Repository\UsuarioRepository;
+// Core Symfony & Doctrine
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
+// Documentación
 use OpenApi\Attributes as OA;
+use Nelmio\ApiDocBundle\Attribute\Model;
 
 #[Route('', name: 'api_')]
 #[OA\Tag(name: 'Actividades', description: 'Gestión de ofertas de voluntariado')]
 final class ActividadController extends AbstractController
 {
     // ========================================================================
-    // 1. LISTAR ACTIVIDADES (GET) - FILTROS SQL + VISTA
+    // 1. LISTAR ACTIVIDADES (GET) - VISTA SQL
     // ========================================================================
     #[Route('/actividades', name: 'listar_actividades', methods: ['GET'])]
     #[OA\Parameter(name: 'ods_id', description: 'Filtrar por ID de ODS', in: 'query', schema: new OA\Schema(type: 'integer'))]
     #[OA\Parameter(name: 'tipo_id', description: 'Filtrar por ID de Tipo Voluntariado', in: 'query', schema: new OA\Schema(type: 'integer'))]
     #[OA\Response(
         response: 200,
-        description: 'Catálogo de actividades publicadas (Vista SQL)',
+        description: 'Catálogo de actividades publicadas (Vista SQL optimizada)',
         content: new OA\JsonContent(type: 'array', items: new OA\Items(type: 'object'))
     )]
     public function index(Request $request, EntityManagerInterface $em): JsonResponse
@@ -40,24 +49,20 @@ final class ActividadController extends AbstractController
         $conn = $em->getConnection();
         $qb = $conn->createQueryBuilder();
 
-        // Usamos la VISTA SQL (VW_Actividades_Publicadas)
-        // Ventaja: Ya filtra deleted_at IS NULL y estado = 'Publicada'
+        // Usamos la VISTA SQL por rendimiento (devuelve array asociativo, no Entidades)
         $qb->select('*')->from('VW_Actividades_Publicadas');
 
-        // Filtro Dinámico 1: Por ODS
         if ($odsId) {
             $qb->andWhere('id_actividad IN (SELECT id_actividad FROM ACTIVIDAD_ODS WHERE id_ods = :ods)')
                 ->setParameter('ods', $odsId);
         }
 
-        // Filtro Dinámico 2: Por Tipo de Voluntariado
         if ($tipoId) {
             $qb->andWhere('id_actividad IN (SELECT id_actividad FROM ACTIVIDAD_TIPO WHERE id_tipo = :tipo)')
                 ->setParameter('tipo', $tipoId);
         }
 
         try {
-            // fetchAllAssociative devuelve un array de arrays asociativos (snake_case tal cual viene de la BBDD)
             $actividades = $qb->executeQuery()->fetchAllAssociative();
             return $this->json($actividades, Response::HTTP_OK);
         } catch (\Exception $e) {
@@ -69,162 +74,157 @@ final class ActividadController extends AbstractController
     }
 
     // ========================================================================
-    // 2. CREAR ACTIVIDAD (POST)
+    // 2. CREAR ACTIVIDAD (POST) - Usando ActividadCreateDTO
     // ========================================================================
     #[Route('/actividades', name: 'crear_actividad', methods: ['POST'])]
     #[OA\RequestBody(
         required: true,
         content: new OA\JsonContent(
-            properties: [
-                new OA\Property(property: 'id_organizacion', type: 'integer', description: 'ID del Usuario Organización'),
-                new OA\Property(property: 'titulo', type: 'string'),
-                new OA\Property(property: 'descripcion', type: 'string'),
-                new OA\Property(property: 'ubicacion', type: 'string'),
-                new OA\Property(property: 'duracion_horas', type: 'integer'),
-                new OA\Property(property: 'cupo_maximo', type: 'integer'),
-                new OA\Property(property: 'fecha_inicio', type: 'string', format: 'date-time'),
-                new OA\Property(property: 'ods_ids', type: 'array', items: new OA\Items(type: 'integer')),
-                new OA\Property(property: 'tipo_ids', type: 'array', items: new OA\Items(type: 'integer'))
-            ]
+            ref: new Model(type: ActividadCreateDTO::class)
         )
     )]
-    #[OA\Response(response: 201, description: 'Actividad creada (En revisión)')]
+    #[OA\Response(
+        response: 201,
+        description: 'Actividad creada correctamente',
+        content: new OA\JsonContent(
+            ref: new Model(type: ActividadResponseDTO::class)
+        )
+    )]
     public function crear(
-        Request $request,
+        #[MapRequestPayload] ActividadCreateDTO $dto, // <--- Validación automática
         EntityManagerInterface $entityManager,
         UsuarioRepository $userRepo,
         ODSRepository $odsRepo,
         TipoVoluntariadoRepository $tipoRepo
     ): JsonResponse {
-        $data = json_decode($request->getContent(), true);
 
-        // A. Validaciones básicas
-        if (!isset($data['id_organizacion'], $data['titulo'], $data['fecha_inicio'], $data['duracion_horas'], $data['cupo_maximo'])) {
-            return $this->json(['error' => 'Faltan datos obligatorios'], Response::HTTP_BAD_REQUEST);
+        // 1. Buscar la Organización dueña (Necesario porque viene en el DTO de creación)
+        // Buscamos el Usuario primero
+        $usuarioOrg = $userRepo->find($dto->id_organizacion);
+        if (!$usuarioOrg) {
+            return $this->json(['error' => 'Usuario Organización no encontrado'], Response::HTTP_NOT_FOUND);
         }
 
-        // B. Buscar la Organización dueña
-        $usuarioOrg = $userRepo->find($data['id_organizacion']);
-        if (!$usuarioOrg) return $this->json(['error' => 'Usuario no encontrado'], Response::HTTP_NOT_FOUND);
-
-        // OJO: Asumimos que la entidad Organizacion tiene relación OneToOne con Usuario o comparte ID
+        // Buscamos el perfil de Organización asociado
         $organizacion = $entityManager->getRepository(Organizacion::class)->findOneBy(['usuario' => $usuarioOrg]);
-
-        // Si no usas relación OneToOne y usan el mismo ID (herencia), usa esto:
-        // $organizacion = $entityManager->getRepository(Organizacion::class)->find($data['id_organizacion']);
-
         if (!$organizacion) {
             return $this->json(['error' => 'Perfil de organización no encontrado'], Response::HTTP_NOT_FOUND);
         }
 
-        // C. Crear el objeto Actividad
+        // 2. Crear la Entidad y setear datos básicos
         $actividad = new Actividad();
         $actividad->setOrganizacion($organizacion);
-        $actividad->setTitulo($data['titulo']);
-        $actividad->setDescripcion($data['descripcion'] ?? null);
-        $actividad->setUbicacion($data['ubicacion'] ?? null);
-        $actividad->setDuracionHoras($data['duracion_horas']);
-        $actividad->setCupoMaximo($data['cupo_maximo']);
+        $actividad->setTitulo($dto->titulo);
+        $actividad->setDescripcion($dto->descripcion);
+        $actividad->setUbicacion($dto->ubicacion);
+        $actividad->setDuracionHoras($dto->duracion_horas);
+        $actividad->setCupoMaximo($dto->cupo_maximo);
         $actividad->setEstadoPublicacion('En revision');
 
+        // El DTO garantiza formato fecha, pero DateTime puede fallar si la fecha es lógica pero rara (ej: mes 13)
         try {
-            $actividad->setFechaInicio(new \DateTime($data['fecha_inicio']));
+            $actividad->setFechaInicio(new \DateTime($dto->fecha_inicio));
         } catch (\Exception $e) {
-            return $this->json(['error' => 'Formato de fecha inválido'], Response::HTTP_BAD_REQUEST);
+            return $this->json(['error' => 'Fecha inválida'], Response::HTTP_BAD_REQUEST);
         }
 
-        // E. Asignar ODS
-        if (!empty($data['ods_ids']) && is_array($data['ods_ids'])) {
-            foreach ($data['ods_ids'] as $idOds) {
-                $ods = $odsRepo->find($idOds);
-                if ($ods) $actividad->addOd($ods);
-            }
+        // 3. Asignar Relaciones (ODS y Tipos)
+        foreach ($dto->odsIds as $idOds) {
+            $ods = $odsRepo->find($idOds);
+            if ($ods) $actividad->addOd($ods);
         }
 
-        // F. Asignar Tipos
-        if (!empty($data['tipo_ids']) && is_array($data['tipo_ids'])) {
-            foreach ($data['tipo_ids'] as $idTipo) {
-                $tipo = $tipoRepo->find($idTipo);
-                if ($tipo) $actividad->addTiposVoluntariado($tipo);
-            }
+        foreach ($dto->tiposIds as $idTipo) {
+            $tipo = $tipoRepo->find($idTipo);
+            if ($tipo) $actividad->addTiposVoluntariado($tipo);
         }
 
+        // 4. Guardar
         try {
             $entityManager->persist($actividad);
             $entityManager->flush();
-            // Usamos groups para serializar solo lo necesario
-            return $this->json($actividad, Response::HTTP_CREATED, [], ['groups' => 'actividad:read']);
+
+            // 5. Devolver DTO de Respuesta (No la entidad circular)
+            // Necesitas tener el método estático `fromEntity` en tu ActividadResponseDTO (como te enseñé antes)
+            // Si no lo tienes, créalo, o mapea manualmente aquí. Asumo que lo tienes.
+            // Si te da error aquí, avísame para pasarte el mapper.
+            return $this->json($this->mapToResponse($actividad), Response::HTTP_CREATED);
         } catch (\Exception $e) {
             return $this->json(['error' => 'Error al crear actividad: ' . $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
     // ========================================================================
-    // 3. ACTUALIZAR ACTIVIDAD (PUT)
+    // 3. ACTUALIZAR ACTIVIDAD (PUT) - Usando ActividadUpdateDTO
     // ========================================================================
     #[Route('/actividades/{id}', name: 'actualizar_actividad', methods: ['PUT'])]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(
+            ref: new Model(type: ActividadUpdateDTO::class) // <--- DTO Sin id_organizacion
+        )
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Actividad actualizada',
+        content: new OA\JsonContent(
+            ref: new Model(type: ActividadResponseDTO::class)
+        )
+    )]
     public function actualizar(
         int $id,
-        Request $request,
+        #[MapRequestPayload] ActividadUpdateDTO $dto,
         ActividadRepository $actividadRepository,
         ODSRepository $odsRepo,
         TipoVoluntariadoRepository $tipoRepo,
         EntityManagerInterface $entityManager
     ): JsonResponse {
+
         $actividad = $actividadRepository->find($id);
         if (!$actividad) {
             return $this->json(['error' => 'Actividad no encontrada'], Response::HTTP_NOT_FOUND);
         }
 
-        $data = json_decode($request->getContent(), true);
-
-        if (isset($data['titulo'])) $actividad->setTitulo($data['titulo']);
-        if (isset($data['descripcion'])) $actividad->setDescripcion($data['descripcion']);
-        if (isset($data['ubicacion'])) $actividad->setUbicacion($data['ubicacion']);
-        if (isset($data['duracion_horas'])) $actividad->setDuracionHoras($data['duracion_horas']);
-        if (isset($data['cupo_maximo'])) $actividad->setCupoMaximo($data['cupo_maximo']);
-
-        if (isset($data['fecha_inicio'])) {
-            try {
-                $actividad->setFechaInicio(new \DateTime($data['fecha_inicio']));
-            } catch (\Exception $e) {
-                return $this->json(['error' => 'Formato de fecha inválido'], Response::HTTP_BAD_REQUEST);
-            }
+        // 1. Actualizar campos (Seguro: No tocamos id_organizacion)
+        $actividad->setTitulo($dto->titulo);
+        $actividad->setDescripcion($dto->descripcion);
+        $actividad->setUbicacion($dto->ubicacion);
+        $actividad->setDuracionHoras($dto->duracion_horas);
+        $actividad->setCupoMaximo($dto->cupo_maximo);
+        try {
+            $actividad->setFechaInicio(new \DateTime($dto->fecha_inicio));
+        } catch (\Exception $e) {
+            return $this->json(['error' => 'Fecha inválida'], 400);
         }
 
-        // Sincronizar ODS
-        if (isset($data['ods_ids']) && is_array($data['ods_ids'])) {
-            // Borrar existentes
-            foreach ($actividad->getOds() as $odExisting) {
-                $actividad->removeOd($odExisting);
-            }
-            // Añadir nuevos
-            foreach ($data['ods_ids'] as $idOds) {
-                $ods = $odsRepo->find($idOds);
-                if ($ods) $actividad->addOd($ods);
-            }
+        // 2. Sincronizar ODS (Borrar antiguos y poner nuevos)
+        foreach ($actividad->getOds() as $odExisting) {
+            $actividad->removeOd($odExisting);
+        }
+        foreach ($dto->odsIds as $idOds) {
+            $ods = $odsRepo->find($idOds);
+            if ($ods) $actividad->addOd($ods);
         }
 
-        // Sincronizar Tipos
-        if (isset($data['tipo_ids']) && is_array($data['tipo_ids'])) {
-            foreach ($actividad->getTiposVoluntariado() as $tipoExisting) {
-                $actividad->removeTiposVoluntariado($tipoExisting);
-            }
-            foreach ($data['tipo_ids'] as $idTipo) {
-                $tipo = $tipoRepo->find($idTipo);
-                if ($tipo) $actividad->addTiposVoluntariado($tipo);
-            }
+        // 3. Sincronizar Tipos
+        foreach ($actividad->getTiposVoluntariado() as $tipoExisting) {
+            $actividad->removeTiposVoluntariado($tipoExisting);
+        }
+        foreach ($dto->tiposIds as $idTipo) {
+            $tipo = $tipoRepo->find($idTipo);
+            if ($tipo) $actividad->addTiposVoluntariado($tipo);
         }
 
-        $entityManager->flush(); // El trigger actualizará updated_at en BBDD
+        $entityManager->flush();
 
-        return $this->json($actividad, Response::HTTP_OK, [], ['groups' => 'actividad:read']);
+        return $this->json($this->mapToResponse($actividad), Response::HTTP_OK);
     }
 
     // ========================================================================
-    // 4. ELIMINAR ACTIVIDAD (DELETE) - USANDO SP
+    // 4. ELIMINAR ACTIVIDAD (DELETE) - USANDO SP (Soft Delete)
     // ========================================================================
     #[Route('/actividades/{id}', name: 'eliminar_actividad', methods: ['DELETE'])]
+    #[OA\Response(response: 200, description: 'Actividad marcada como cancelada/eliminada')]
     public function eliminar(
         int $id,
         ActividadRepository $actividadRepository,
@@ -234,20 +234,18 @@ final class ActividadController extends AbstractController
         if (!$actividad) {
             return $this->json(['error' => 'Actividad no encontrada'], Response::HTTP_NOT_FOUND);
         }
+
         if ($actividad->getDeletedAt() !== null) {
             return $this->json(['mensaje' => 'La actividad ya estaba eliminada previamente'], Response::HTTP_OK);
         }
 
-        // Llamada al Stored Procedure para Soft Delete seguro
+        // Llamada al Stored Procedure
         $conn = $entityManager->getConnection();
         try {
             $conn->executeStatement('EXEC SP_SoftDelete_Actividad @id_actividad = :id', ['id' => $id]);
             return $this->json(['mensaje' => 'Actividad cancelada y eliminada correctamente'], Response::HTTP_OK);
         } catch (\Exception $e) {
-            return $this->json(
-                ['error' => 'Error al eliminar actividad: ' . $e->getMessage()],
-                Response::HTTP_INTERNAL_SERVER_ERROR
-            );
+            return $this->json(['error' => 'Error al eliminar actividad: ' . $e->getMessage()], 500);
         }
     }
 
@@ -255,19 +253,35 @@ final class ActividadController extends AbstractController
     // 5. DETALLE (GET ONE)
     // ========================================================================
     #[Route('/actividades/{id}', name: 'detalle_actividad', methods: ['GET'])]
+    #[OA\Response(
+        response: 200,
+        description: 'Detalle completo de la actividad',
+        content: new OA\JsonContent(
+            ref: new Model(type: ActividadResponseDTO::class)
+        )
+    )]
     public function detalle(?Actividad $actividad = null): JsonResponse
     {
         if (!$actividad) {
             return $this->json(['error' => 'Actividad no encontrada'], Response::HTTP_NOT_FOUND);
         }
-        // Doctrine ParamConverter inyecta $actividad automáticamente si el ID coincide
-        return $this->json($actividad, Response::HTTP_OK, [], ['groups' => 'actividad:read']);
+
+        return $this->json($this->mapToResponse($actividad), Response::HTTP_OK);
     }
 
     // ========================================================================
-    // 6. AÑADIR IMAGEN A LA GALERÍA (POST)
+    // 6. AÑADIR IMAGEN (POST)
     // ========================================================================
     #[Route('/actividades/{id}/imagenes', name: 'add_imagen_actividad', methods: ['POST'])]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'url_imagen', type: 'string'),
+                new OA\Property(property: 'descripcion', type: 'string')
+            ]
+        )
+    )]
     public function addImagen(
         int $id,
         Request $request,
@@ -280,12 +294,11 @@ final class ActividadController extends AbstractController
         }
 
         $data = json_decode($request->getContent(), true);
-
         if (empty($data['url_imagen'])) {
             return $this->json(['error' => 'Falta la URL de la imagen'], Response::HTTP_BAD_REQUEST);
         }
 
-        $imagen = new ImagenActividad(); // Usando el 'use' de arriba
+        $imagen = new ImagenActividad();
         $imagen->setActividad($actividad);
         $imagen->setUrlImagen($data['url_imagen']);
         $imagen->setDescripcionPieFoto($data['descripcion'] ?? null);
@@ -293,17 +306,54 @@ final class ActividadController extends AbstractController
         try {
             $em->persist($imagen);
             $em->flush();
-
             return $this->json([
                 'mensaje' => 'Imagen añadida correctamente',
                 'id_imagen' => $imagen->getId(),
                 'url' => $imagen->getUrlImagen()
             ], Response::HTTP_CREATED);
         } catch (\Exception $e) {
-            return $this->json(
-                ['error' => 'Error al guardar la imagen: ' . $e->getMessage()],
-                Response::HTTP_INTERNAL_SERVER_ERROR
-            );
+            return $this->json(['error' => 'Error al guardar imagen'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
+    }
+
+    // ========================================================================
+    // HELPER: Mapper Manual (Si no tienes el fromEntity estático en el DTO)
+    // ========================================================================
+    private function mapToResponse(Actividad $act): ActividadResponseDTO
+    {
+        // Esto es un parche por si tu DTO ActividadResponseDTO no tiene el método estático fromEntity.
+        // Si ya lo tiene, usa ActividadResponseDTO::fromEntity($act) directamente en el return.
+
+        // Mapeo de ODS a array/DTOs (según tu definición de ResponseDTO)
+        $odsList = [];
+        foreach ($act->getOds() as $o) {
+            // Asumo que tienes un OdsDTO o usas arrays simples. Ajusta según tu ResponseDTO.
+            // Por simplicidad envío objetos anónimos o lo que espere tu DTO.
+            $odsList[] = ['id' => $o->getIdOds(), 'nombre' => $o->getNombre()];
+        }
+
+        // Mapeo de Tipos
+        $tiposList = [];
+        foreach ($act->getTiposVoluntariado() as $t) {
+            $tiposList[] = ['id' => $t->getIdTipo(), 'nombre' => $t->getNombreTipo()];
+        }
+
+        $org = $act->getOrganizacion();
+
+        return new ActividadResponseDTO(
+            id: $act->getId(),
+            titulo: $act->getTitulo(),
+            descripcion: $act->getDescripcion(),
+            fecha_inicio: $act->getFechaInicio()->format('Y-m-d H:i:s'),
+            duracion_horas: $act->getDuracionHoras(),
+            cupo_maximo: $act->getCupoMaximo(),
+            inscritos_confirmados: 0, // O calcular count($act->getInscripciones()...)
+            ubicacion: $act->getUbicacion() ?? 'No definida',
+            estado_publicacion: $act->getEstadoPublicacion(),
+            nombre_organizacion: $org ? $org->getNombre() : 'Desconocida',
+            img_organizacion: $org && $org->getUsuario() ? $org->getUsuario()->getImgPerfil() : null,
+            ods: $odsList,
+            tipos: $tiposList
+        );
     }
 }

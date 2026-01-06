@@ -3,7 +3,10 @@
 namespace App\Controller;
 
 use App\Entity\Inscripcion;
+use App\Entity\Actividad;
+use App\Entity\Usuario;
 use App\Repository\InscripcionRepository;
+use App\Repository\ActividadRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -12,106 +15,105 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use OpenApi\Attributes as OA;
 
-#[Route('', name: 'api_inscripciones_')]
-#[OA\Tag(name: 'Gestión Inscripciones', description: 'Endpoints para que Organizaciones y Coordinadores gestionen solicitudes')]
+#[Route('', name: 'api_')]
+#[OA\Tag(name: 'Inscripciones (Gestión)', description: 'Gestión de solicitudes por parte de las Organizaciones')]
 final class InscripcionController extends AbstractController
 {
     // ========================================================================
-    // 1. VER ASPIRANTES (GET) - Vista para la Organización
-    // URL: /api/actividades/{id}/inscripciones
+    // 1. VER SOLICITUDES DE UNA ACTIVIDAD (GET)
     // ========================================================================
-    #[Route('/actividades/{id}/inscripciones', name: 'listar_aspirantes', methods: ['GET'])]
+    #[Route('/actividades/{idActividad}/inscripciones', name: 'listar_inscripciones_actividad', methods: ['GET'])]
     #[OA\Response(
         response: 200,
-        description: 'Lista de voluntarios inscritos en una actividad',
-        content: new OA\JsonContent(
-            type: 'array',
-            items: new OA\Items(
-                properties: [
-                    new OA\Property(property: 'id_voluntario', type: 'integer'),
-                    new OA\Property(property: 'nombre_completo', type: 'string'),
-                    new OA\Property(property: 'fecha_solicitud', type: 'string', format: 'date-time'),
-                    new OA\Property(property: 'estado', type: 'string', example: 'Pendiente')
-                ]
-            )
-        )
+        description: 'Lista de voluntarios inscritos en la actividad',
+        content: new OA\JsonContent(type: 'array', items: new OA\Items(type: 'object'))
     )]
-    public function listarAspirantes(int $id, InscripcionRepository $repo): JsonResponse
-    {
-        // Buscamos todas las inscripciones de esa actividad
-        $inscripciones = $repo->findBy(['actividad' => $id]);
+    public function listarSolicitudes(
+        int $idActividad,
+        ActividadRepository $actRepo,
+        EntityManagerInterface $em
+    ): JsonResponse {
 
-        $resultado = [];
-        foreach ($inscripciones as $ins) {
-            $vol = $ins->getVoluntario();
-            $resultado[] = [
-                'id_voluntario'   => $vol->getUsuario()->getId(), // ID Usuario
-                'nombre_completo' => $vol->getNombre() . ' ' . $vol->getApellidos(),
-                'fecha_solicitud' => $ins->getFechaSolicitud()->format('Y-m-d H:i:s'),
-                'estado'          => $ins->getEstadoSolicitud()
-            ];
+        $actividad = $actRepo->find($idActividad);
+        if (!$actividad) {
+            return $this->json(['error' => 'Actividad no encontrada'], Response::HTTP_NOT_FOUND);
         }
 
-        return $this->json($resultado, Response::HTTP_OK);
+        // Usamos DQL para traer datos del voluntario optimizados
+        $dql = "SELECT i.estadoSolicitud, i.fechaSolicitud, 
+                       v.nombre, v.apellidos, v.imgPerfil, u.correo, u.idUsuario as id_voluntario
+                FROM App\Entity\Inscripcion i
+                JOIN i.voluntario v
+                JOIN v.usuario u
+                WHERE i.actividad = :actividad
+                ORDER BY i.fechaSolicitud DESC";
+
+        $query = $em->createQuery($dql)->setParameter('actividad', $actividad);
+        $resultados = $query->getResult();
+
+        return $this->json($resultados, Response::HTTP_OK);
     }
 
     // ========================================================================
-    // 2. CAMBIAR ESTADO (PATCH) - Aceptar/Rechazar/Cancelar
-    // URL: /api/actividades/{idActividad}/inscripciones/{idVoluntario}
+    // 2. GESTIONAR ESTADO (Aceptar/Rechazar) (PATCH)
     // ========================================================================
-    #[Route('/actividades/{idActividad}/inscripciones/{idVoluntario}', name: 'cambiar_estado', methods: ['PATCH'])]
+    #[Route('/actividades/{idActividad}/inscripciones/{idVoluntario}', name: 'gestionar_inscripcion', methods: ['PATCH'])]
     #[OA\RequestBody(
         required: true,
         content: new OA\JsonContent(
             properties: [
-                new OA\Property(property: 'estado', type: 'string', enum: ['Aceptada', 'Rechazada', 'Cancelada', 'Pendiente'], description: 'Nuevo estado')
+                new OA\Property(property: 'estado', type: 'string', enum: ['Aceptada', 'Rechazada'], description: 'Nuevo estado')
             ]
         )
     )]
     #[OA\Response(response: 200, description: 'Estado actualizado correctamente')]
-    #[OA\Response(response: 409, description: 'Error de negocio (Cupo lleno)')]
+    #[OA\Response(response: 409, description: 'Error de cupo (Overbooking) controlado por Trigger')]
     public function cambiarEstado(
         int $idActividad,
         int $idVoluntario,
         Request $request,
         EntityManagerInterface $em
     ): JsonResponse {
-        // Buscamos la inscripción exacta
-        // Doctrine mapea 'actividad' y 'voluntario' automáticamente a los IDs si pasas enteros en findOneBy
+
+        // 1. Obtener Inscripción (PK Compuesta)
         $inscripcion = $em->getRepository(Inscripcion::class)->findOneBy([
             'actividad' => $idActividad,
             'voluntario' => $idVoluntario
         ]);
 
-        if (!$inscripcion) return $this->json(['error' => 'Inscripción no encontrada'], Response::HTTP_NOT_FOUND);
+        if (!$inscripcion) {
+            return $this->json(['error' => 'Inscripción no encontrada'], Response::HTTP_NOT_FOUND);
+        }
 
+        // 2. Leer nuevo estado
         $data = json_decode($request->getContent(), true);
         $nuevoEstado = $data['estado'] ?? null;
 
-        if (!in_array($nuevoEstado, ['Aceptada', 'Rechazada', 'Cancelada', 'Pendiente'])) {
-            return $this->json(['error' => 'Estado inválido. Valores permitidos: Aceptada, Rechazada, Cancelada, Pendiente'], Response::HTTP_BAD_REQUEST);
+        if (!in_array($nuevoEstado, ['Aceptada', 'Rechazada', 'Pendiente'])) {
+            return $this->json(['error' => 'Estado no válido. Use: Aceptada, Rechazada'], Response::HTTP_BAD_REQUEST);
         }
 
+        // 3. Aplicar cambio
         $inscripcion->setEstadoSolicitud($nuevoEstado);
 
-        // Asumiendo que añadiste el setter en tu Entidad Inscripcion como te indiqué antes
-        if (method_exists($inscripcion, 'setUpdatedAt')) {
-            $inscripcion->setUpdatedAt(new \DateTime());
-        }
-
         try {
-            // 💥 AQUÍ salta el Trigger TR_Check_Cupo_Update si intentamos aceptar y ya está lleno
+            // El Trigger TR_Check_Cupo_Update saltará aquí si intentamos aceptar y no hay cupo
             $em->flush();
-            return $this->json(['mensaje' => 'Estado actualizado a ' . $nuevoEstado], Response::HTTP_OK);
-        } catch (\Exception $e) {
-            $msg = $e->getMessage();
 
-            // Captura de errores específicos de SQL Server definidos en tus Triggers
-            if (str_contains($msg, 'ERROR DE NEGOCIO') || str_contains($msg, 'ERROR DE CUPO')) {
-                return $this->json(['error' => 'No se puede aceptar: El cupo de la actividad se ha completado.'], Response::HTTP_CONFLICT);
+            return $this->json([
+                'mensaje' => "Inscripción actualizada a: $nuevoEstado",
+                'voluntario' => $idVoluntario,
+                'actividad' => $idActividad
+            ], Response::HTTP_OK);
+        } catch (\Exception $e) {
+            // Capturamos el error del Trigger de SQL Server
+            if (str_contains($e->getMessage(), 'ERROR DE NEGOCIO') || str_contains($e->getMessage(), 'cupo')) {
+                return $this->json([
+                    'error' => 'No se puede aceptar: El cupo de la actividad está lleno (Overbooking prevented).'
+                ], Response::HTTP_CONFLICT);
             }
 
-            return $this->json(['error' => 'Error al actualizar estado: ' . $msg], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return $this->json(['error' => 'Error al actualizar: ' . $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 }

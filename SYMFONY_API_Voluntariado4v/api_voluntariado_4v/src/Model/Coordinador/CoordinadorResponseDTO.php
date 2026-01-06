@@ -1,0 +1,27 @@
+<?php
+
+namespace App\Model\Coordinador;
+
+use App\Entity\Coordinador;
+
+class CoordinadorResponseDTO
+{
+    public function __construct(
+        public int $id, // ID del Usuario
+        public string $nombre,
+        public string $rol,
+        public string $correo,
+        public string $estado_cuenta
+    ) {}
+
+    public static function fromEntity(Coordinador $coord): self
+    {
+        return new self(
+            $coord->getUsuario()->getId(),
+            $coord->getNombre() . ' ' . $coord->getApellidos(),
+            $coord->getUsuario()->getRol()->getNombre(),
+            $coord->getUsuario()->getCorreo(),
+            $coord->getUsuario()->getEstadoCuenta()
+        );
+    }
+}
