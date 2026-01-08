@@ -32,7 +32,7 @@ class AppFixtures extends Fixture
         // ======================================================
 
         // ROLES
-        $rolesNombres = ['Administrador', 'Coordinador', 'Voluntario', 'Organizacion'];
+        $rolesNombres = ['Coordinador', 'Voluntario', 'Organizacion'];
         foreach ($rolesNombres as $nombre) {
             $this->createOrUpdateRol($nombre);
         }
@@ -50,35 +50,44 @@ class AppFixtures extends Fixture
             $this->createOrUpdateTipo($nombre);
         }
 
-        // ODS (Con IDs manuales)
+        // ODS (Con IDs manuales y DESCRIPCIONES)
         $odsData = [
-            [1, 'Fin de la Pobreza'],
-            [2, 'Hambre Cero'],
-            [3, 'Salud y Bienestar'],
-            [4, 'Educación de Calidad'],
-            [5, 'Igualdad de Género'],
-            [6, 'Agua Limpia y Saneamiento'],
-            [7, 'Energía Asequible y No Contaminante'],
-            [10, 'Reducción de las Desigualdades'],
-            [11, 'Ciudades y Comunidades Sostenibles'],
-            [12, 'Producción y Consumo Responsables'],
-            [13, 'Acción por el Clima'],
-            [14, 'Vida Submarina'],
-            [15, 'Vida de Ecosistemas Terrestres'],
-            [16, 'Paz, Justicia e Instituciones Sólidas']
+            [1, 'Fin de la Pobreza', 'Poner fin a la pobreza en todas sus formas en todo el mundo.'],
+            [2, 'Hambre Cero', 'Poner fin al hambre, lograr la seguridad alimentaria y la mejora de la nutrición.'],
+            [3, 'Salud y Bienestar', 'Garantizar una vida sana y promover el bienestar para todos en todas las edades.'],
+            [4, 'Educación de Calidad', 'Garantizar una educación inclusiva, equitativa y de calidad.'],
+            [5, 'Igualdad de Género', 'Lograr la igualdad entre los géneros y empoderar a todas las mujeres y niñas.'],
+            [6, 'Agua Limpia y Saneamiento', 'Garantizar la disponibilidad de agua y su gestión sostenible.'],
+            [7, 'Energía Asequible y No Contaminante', 'Garantizar el acceso a una energía asequible, segura, sostenible y moderna.'],
+            [10, 'Reducción de las Desigualdades', 'Reducir la desigualdad en y entre los países.'],
+            [11, 'Ciudades y Comunidades Sostenibles', 'Lograr que las ciudades sean más inclusivas, seguras, resilientes y sostenibles.'],
+            [12, 'Producción y Consumo Responsables', 'Garantizar modalidades de consumo y producción sostenibles.'],
+            [13, 'Acción por el Clima', 'Adoptar medidas urgentes para combatir el cambio climático y sus efectos.'],
+            [14, 'Vida Submarina', 'Conservar y utilizar sosteniblemente los océanos, los mares y los recursos marinos.'],
+            [15, 'Vida de Ecosistemas Terrestres', 'Gestionar sosteniblemente los bosques, luchar contra la desertificación y detener la pérdida de biodiversidad.'],
+            [16, 'Paz, Justicia e Instituciones Sólidas', 'Promover sociedades justas, pacíficas e inclusivas.']
         ];
         foreach ($odsData as $d) {
-            $this->createOrUpdateODS($d[0], $d[1]);
+            $this->createOrUpdateODS($d[0], $d[1], $d[2]);
         }
 
-        // CURSOS
+        // CURSOS (Basados en las imágenes proporcionadas)
+        // Nivel 2 = Grado Superior, Nivel 1 = Grado Medio
         $cursosData = [
-            ['Desarrollo de Aplicaciones Web', 'DAW', 'Grado Superior', 2],
-            ['Desarrollo de Apps Multiplataforma', 'DAM', 'Grado Superior', 2],
-            ['Enfermería', 'ENF', 'Grado Medio', 1],
-            ['Marketing', 'MK', 'Grado Superior', 2],
-            ['Actividades Físicas y Deportivas', 'TAFAD', 'Grado Superior', 2]
+            // GRADO SUPERIOR (Nivel 2)
+            ['Desarrollo de Aplicaciones Multiplataforma Dual', 'DAM', 'Grado Superior', 2],
+            ['Administración de Sistemas Informáticos en Red Dual', 'ASIR', 'Grado Superior', 2],
+            ['Transporte y Logística Dual', 'TL', 'Grado Superior', 2],
+            ['Gestión de Ventas y Espacios Comerciales Dual', 'GVEC', 'Grado Superior', 2],
+            ['Comercio Internacional Dual Bilingüe', 'CI', 'Grado Superior', 2],
+            ['Administración y Finanzas Dual', 'ADFIN', 'Grado Superior', 2],
+
+            // GRADO MEDIO (Nivel 1)
+            ['Sistemas Microinformáticos y Redes', 'SMR', 'Grado Medio', 1],
+            ['Actividades Comerciales Bilingüe', 'AC', 'Grado Medio', 1],
+            ['Gestión Administrativa Bilingüe', 'GA', 'Grado Medio', 1]
         ];
+
         foreach ($cursosData as $d) {
             $this->createOrUpdateCurso($d[0], $d[1], $d[2], $d[3]);
         }
@@ -86,11 +95,12 @@ class AppFixtures extends Fixture
         $manager->flush();
 
         // ======================================================
-        // 2. USUARIOS (IMAGEN EN USUARIO)
+        // 2. USUARIOS (SIN IMÁGENES)
         // ======================================================
 
         // --- Coordinador ---
-        $coordUser = $this->createOrUpdateUsuario('Coordinador', 'maitesolam@gmail.com', 'google_uid_maite', 'https://i.pravatar.cc/150?u=coord');
+        // Eliminado el argumento de imagen
+        $coordUser = $this->createOrUpdateUsuario('Coordinador', 'maitesolam@gmail.com', 'google_uid_maite');
 
         // 🛠️ FIX 1: Hacemos flush AQUÍ para que $coordUser tenga ID real de BBDD
         $this->manager->flush();
@@ -100,13 +110,14 @@ class AppFixtures extends Fixture
         // --- ONGs ---
         $ongs = [];
         $ongData = [
-            ['Tech For Good', 'info@techforgood.org', 'uid_org_tech', 'Tecnología Social', 'https://ui-avatars.com/api/?name=Tech+Good&background=0D8ABC&color=fff'],
-            ['EcoVida', 'contacto@ecovida.org', 'uid_org_eco', 'Medioambiente', 'https://ui-avatars.com/api/?name=Eco+Vida&background=27AE60&color=fff'],
-            ['Animal Rescue', 'help@animalrescue.org', 'uid_org_animal', 'Refugio Animales', 'https://ui-avatars.com/api/?name=Animal+Rescue&background=E67E22&color=fff'],
-            ['Cruz Roja Local', 'cruzroja@org.com', 'uid_cr', 'Ayuda Humanitaria', 'https://ui-avatars.com/api/?name=Cruz+Roja&background=C0392B&color=fff']
+            ['Tech For Good', 'info@techforgood.org', 'uid_org_tech', 'Tecnología Social'],
+            ['EcoVida', 'contacto@ecovida.org', 'uid_org_eco', 'Medioambiente'],
+            ['Animal Rescue', 'help@animalrescue.org', 'uid_org_animal', 'Refugio Animales'],
+            ['Cruz Roja Local', 'cruzroja@org.com', 'uid_cr', 'Ayuda Humanitaria']
         ];
         foreach ($ongData as $d) {
-            $u = $this->createOrUpdateUsuario('Organizacion', $d[1], $d[2], $d[4]);
+            // Eliminado el argumento de imagen (índice 4 en tu array original)
+            $u = $this->createOrUpdateUsuario('Organizacion', $d[1], $d[2]);
 
             // 🛠️ FIX 2: Flush para obtener ID del Usuario antes de crear la Organización
             $this->manager->flush();
@@ -116,14 +127,16 @@ class AppFixtures extends Fixture
 
         // --- Voluntarios ---
         $vols = [];
+        // Actualizado para usar las abreviaciones nuevas (DAM, SMR, etc.)
         $volData = [
-            ['Pepe', 'Pérez', 'pepe@test.com', 'uid_pepe', 'DAW', ['Tecnológico / Digital'], 'https://i.pravatar.cc/150?u=pepe'],
-            ['Laura', 'Gómez', 'laura@test.com', 'uid_laura', 'ENF', ['Salud / Sanitario'], 'https://i.pravatar.cc/150?u=laura'],
-            ['Carlos', 'Ruiz', 'carlos@test.com', 'uid_carlos', 'TAFAD', ['Deportivo', 'Protección Animal'], 'https://i.pravatar.cc/150?u=carlos'],
-            ['Ana', 'López', 'ana@test.com', 'uid_ana', 'MK', ['Acción Social', 'Educación'], 'https://i.pravatar.cc/150?u=ana']
+            ['Pepe', 'Pérez', 'pepe@test.com', 'uid_pepe', 'DAM', ['Tecnológico / Digital']],
+            ['Laura', 'Gómez', 'laura@test.com', 'uid_laura', 'SMR', ['Salud / Sanitario']], // Puesto SMR por variar
+            ['Carlos', 'Ruiz', 'carlos@test.com', 'uid_carlos', 'TL', ['Deportivo', 'Protección Animal']], // Puesto TL
+            ['Ana', 'López', 'ana@test.com', 'uid_ana', 'GVEC', ['Acción Social', 'Educación']] // Puesto GVEC
         ];
         foreach ($volData as $d) {
-            $u = $this->createOrUpdateUsuario('Voluntario', $d[2], $d[3], $d[6]);
+            // Eliminado el argumento de imagen (índice 6 en tu array original)
+            $u = $this->createOrUpdateUsuario('Voluntario', $d[2], $d[3]);
 
             // 🛠️ FIX 3: Flush para obtener ID del Usuario antes de crear el Voluntario
             $this->manager->flush();
@@ -131,10 +144,12 @@ class AppFixtures extends Fixture
             $v = $this->createOrUpdatePerfilVoluntario($u, $d[0], $d[1], $d[4]);
 
             // ... lógica de preferencias ...
+            // Aquí deberías añadir la lógica para las preferencias usando $d[5] si la tienes implementada
+
             $vols[] = $v;
         }
 
-        // 🛠️ FIX 4: Un último flush general para guardar los perfiles (Voluntarios/Orgs) y las actividades
+        // 🛠️ FIX 4: Un último flush general para guardar los perfiles (Voluntarios/Orgs)
         $manager->flush();
 
         // ======================================================
@@ -152,7 +167,7 @@ class AppFixtures extends Fixture
         // Asignamos el ODS 4 (Educación de Calidad)
         $odsEducacion = $this->manager->getRepository(ODS::class)->find(4);
         if ($odsEducacion) {
-            $a1->addOd($odsEducacion); // Nota: el método suele ser addOd() o addOds() según tu Entity
+            $a1->addOd($odsEducacion);
         }
         $acts[] = $a1;
 
@@ -163,10 +178,10 @@ class AppFixtures extends Fixture
         if (isset($this->cache['TipoVoluntariado']['Medioambiente'])) {
             $a2->addTiposVoluntariado($this->cache['TipoVoluntariado']['Medioambiente']);
         }
-        // Asignamos el ODS 1 (Fin de la Pobreza)
+        // Asignamos el ODS 1 (Fin de la Pobreza) - (Ojo, quizás ODS 13 o 15 encaje mejor, pero mantengo tu lógica)
         $odsPobreza = $this->manager->getRepository(ODS::class)->find(1);
         if ($odsPobreza) {
-            $a2->addOd($odsPobreza); // Nota: el método suele ser addOd() o addOds() según tu Entity
+            $a2->addOd($odsPobreza);
         }
         $acts[] = $a2;
 
@@ -177,10 +192,9 @@ class AppFixtures extends Fixture
         if (isset($this->cache['TipoVoluntariado']['Protección Animal'])) {
             $a3->addTiposVoluntariado($this->cache['TipoVoluntariado']['Protección Animal']);
         }
-        // Asignamos el ODS 1 (Fin de la Pobreza)
-        $odsPobreza = $this->manager->getRepository(ODS::class)->find(1);
+        // Asignamos el ODS 1
         if ($odsPobreza) {
-            $a2->addOd($odsPobreza); // Nota: el método suele ser addOd() o addOds() según tu Entity
+            $a3->addOd($odsPobreza);
         }
         $acts[] = $a3;
 
@@ -188,10 +202,9 @@ class AppFixtures extends Fixture
         $a4 = $this->createOrUpdateActividad($ongs[3], 'Gran Recogida de Alimentos', 'Finalizada');
         $a4->setDescripcion('Campaña de Navidad.');
         $a4->setFechaInicio((new \DateTime())->modify('-1 month')->setTime(9, 0));
-        // Asignamos el ODS 1 (Fin de la Pobreza)
-        $odsPobreza = $this->manager->getRepository(ODS::class)->find(1);
+        // Asignamos el ODS 1
         if ($odsPobreza) {
-            $a2->addOd($odsPobreza); // Nota: el método suele ser addOd() o addOds() según tu Entity
+            $a4->addOd($odsPobreza);
         }
         $acts[] = $a4;
 
@@ -208,8 +221,6 @@ class AppFixtures extends Fixture
         $this->createOrUpdateInscripcion($vols[2], $a3, 'Aceptada');
         $this->createOrUpdateInscripcion($vols[0], $a3, 'Pendiente');
 
-
-
         $manager->flush();
         echo ">>> 🎉 ¡FIXTURES CARGADAS CON ÉXITO!\n";
     }
@@ -218,7 +229,8 @@ class AppFixtures extends Fixture
     // HELPER FUNCTIONS 
     // ======================================================
 
-    private function createOrUpdateUsuario(string $rolName, string $email, string $googleId, ?string $img = null): Usuario
+    // Eliminado el parámetro $img
+    private function createOrUpdateUsuario(string $rolName, string $email, string $googleId): Usuario
     {
         $repo = $this->manager->getRepository(Usuario::class);
         $usuario = $repo->findOneBy(['correo' => $email]);
@@ -232,7 +244,7 @@ class AppFixtures extends Fixture
 
         $usuario->setDeletedAt(null);
         $usuario->setEstadoCuenta('Activa');
-        $usuario->setImgPerfil($img); // 📸 FOTO AQUÍ
+        // $usuario->setImgPerfil($img); // ❌ ELIMINADO POR PETICIÓN
 
         if (isset($this->cache['Rol'][$rolName])) {
             $usuario->setRol($this->cache['Rol'][$rolName]);
@@ -370,16 +382,22 @@ class AppFixtures extends Fixture
         $this->cache['TipoVoluntariado'][$nombre] = $tipo;
     }
 
-    private function createOrUpdateODS(int $id, string $nombre): void
+    // Actualizado para aceptar descripción
+    private function createOrUpdateODS(int $id, string $nombre, string $descripcion): void
     {
         $repo = $this->manager->getRepository(ODS::class);
         $ods = $repo->find($id);
 
         if (!$ods) {
-            // ✅ CORREGIDO: Usamos constructor normal.
-            // Al no tener @GeneratedValue, Doctrine insertará el ID que le pasamos aquí.
+            // Asumiendo que tu constructor acepta ID y Nombre
+            // Si no acepta ID, Doctrine se encarga, pero aquí parece que los IDs son fijos
             $ods = new ODS($id, $nombre);
+            $ods->setDescripcion($descripcion); // ✅ Seteamos la descripción
             $this->manager->persist($ods);
+        } else {
+            // Si ya existe, actualizamos por si acaso cambias el texto
+            $ods->setNombre($nombre);
+            $ods->setDescripcion($descripcion);
         }
     }
 

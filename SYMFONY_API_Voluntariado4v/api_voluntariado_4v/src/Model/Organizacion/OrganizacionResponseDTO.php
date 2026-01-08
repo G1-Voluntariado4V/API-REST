@@ -14,8 +14,7 @@ class OrganizacionResponseDTO
         public ?string $telefono,
         public ?string $direccion,
         public ?string $web,
-        public ?string $imgPerfil,  // Viene de Usuario
-        public string $cif          // Dato sensible, quizás solo para admin/propio usuario, pero lo pondremos aquí por ahora
+        public string $cif          // Dato sensible
     ) {}
 
     public static function fromEntity(Organizacion $org): self
@@ -31,7 +30,6 @@ class OrganizacionResponseDTO
             $org->getTelefono(),
             $org->getDireccion(),
             $org->getSitioWeb(),
-            $usuario->getImgPerfil(),
             $org->getCif() ?? ''
         );
     }

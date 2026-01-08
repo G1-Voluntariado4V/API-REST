@@ -351,7 +351,7 @@ final class ActividadController extends AbstractController
             ubicacion: $act->getUbicacion() ?? 'No definida',
             estado_publicacion: $act->getEstadoPublicacion(),
             nombre_organizacion: $org ? $org->getNombre() : 'Desconocida',
-            img_organizacion: $org && $org->getUsuario() ? $org->getUsuario()->getImgPerfil() : null,
+            img_organizacion: null, // Se obtendrá de Firebase/Google
             ods: $odsList,
             tipos: $tiposList
         );

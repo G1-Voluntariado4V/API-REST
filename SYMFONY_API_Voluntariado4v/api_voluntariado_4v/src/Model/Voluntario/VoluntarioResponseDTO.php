@@ -14,8 +14,7 @@ class VoluntarioResponseDTO
         public string $curso,
         public string $estado_cuenta,
         public array $preferencias, // Devolveremos nombres, no IDs
-        public array $idiomas,     // Devolveremos nombre y nivel
-        public ?string $img_perfil = null
+        public array $idiomas      // Devolveremos nombre y nivel
     ) {}
 
     /**
@@ -52,8 +51,7 @@ class VoluntarioResponseDTO
             curso: $voluntario->getCursoActual() ? $voluntario->getCursoActual()->getAbreviacion() : 'Sin asignar',
             estado_cuenta: $usuario->getEstadoCuenta(),
             preferencias: $prefs, // Aquí va el array de strings corregido (ej: ['Salud', 'Educación'])
-            idiomas: $idiomasList,
-            img_perfil: $voluntario->getImgPerfil()
+            idiomas: $idiomasList
         );
     }
 }

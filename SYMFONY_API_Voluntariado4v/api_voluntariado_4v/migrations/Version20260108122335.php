@@ -10,7 +10,7 @@ use Doctrine\Migrations\AbstractMigration;
 /**
  * Auto-generated Migration: Please modify to your needs!
  */
-final class Version20260103114524 extends AbstractMigration
+final class Version20260108122335 extends AbstractMigration
 {
     public function getDescription(): string
     {
@@ -41,7 +41,7 @@ final class Version20260103114524 extends AbstractMigration
         $this->addSql('CREATE TABLE ORGANIZACION (id_usuario INT NOT NULL, cif NVARCHAR(20), nombre NVARCHAR(100), descripcion VARCHAR(MAX), direccion VARCHAR(MAX), sitio_web NVARCHAR(200), telefono NVARCHAR(20), updated_at DATETIME2(6), PRIMARY KEY (id_usuario))');
         $this->addSql('CREATE UNIQUE INDEX UNIQ_9912454AA53EB8E8 ON ORGANIZACION (cif) WHERE cif IS NOT NULL');
         $this->addSql('CREATE TABLE ROL (id_rol INT IDENTITY NOT NULL, nombre_rol NVARCHAR(50) NOT NULL, PRIMARY KEY (id_rol))');
-        $this->addSql('CREATE TABLE USUARIO (id_usuario INT IDENTITY NOT NULL, correo NVARCHAR(100) NOT NULL, google_id NVARCHAR(255) NOT NULL, refresh_token NVARCHAR(500), estado_cuenta NVARCHAR(20) NOT NULL, img_perfil NVARCHAR(255), fecha_registro DATETIME2(6) NOT NULL, updated_at DATETIME2(6), deleted_at DATETIME2(6), id_rol INT NOT NULL, PRIMARY KEY (id_usuario))');
+        $this->addSql('CREATE TABLE USUARIO (id_usuario INT IDENTITY NOT NULL, correo NVARCHAR(100) NOT NULL, google_id NVARCHAR(255) NOT NULL, refresh_token NVARCHAR(500), estado_cuenta NVARCHAR(20) NOT NULL, fecha_registro DATETIME2(6) NOT NULL, updated_at DATETIME2(6), deleted_at DATETIME2(6), id_rol INT NOT NULL, PRIMARY KEY (id_usuario))');
         $this->addSql('CREATE UNIQUE INDEX UNIQ_1D204E4777040BC9 ON USUARIO (correo) WHERE correo IS NOT NULL');
         $this->addSql('CREATE UNIQUE INDEX UNIQ_1D204E4776F5C865 ON USUARIO (google_id) WHERE google_id IS NOT NULL');
         $this->addSql('CREATE INDEX IDX_1D204E4790F1D76D ON USUARIO (id_rol)');

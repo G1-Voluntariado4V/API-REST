@@ -33,9 +33,7 @@ class Usuario implements UserInterface
     #[Groups(['usuario:read'])]
     private ?string $estadoCuenta = 'Pendiente';
 
-    #[ORM\Column(length: 255, nullable: true)]
-    #[Groups(['usuario:read', 'actividad:read'])]
-    private ?string $imgPerfil = null;
+
 
     // Relación con tu tabla ROL
     #[ORM\ManyToOne]
@@ -115,17 +113,7 @@ class Usuario implements UserInterface
         return $this;
     }
 
-    public function getImgPerfil(): ?string
-    {
-        return $this->imgPerfil;
-    }
 
-    public function setImgPerfil(?string $imgPerfil): static
-    {
-        $this->imgPerfil = $imgPerfil;
-
-        return $this;
-    }
 
     public function getFechaRegistro(): ?\DateTimeInterface
     {

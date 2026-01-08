@@ -39,8 +39,8 @@ class VoluntarioCreateDTO
 
         // Arrays de IDs para relaciones (más simple que pasar objetos enteros)
         public array $preferencias_ids = [],
-        
+
         // Array de objetos simples para idiomas: [['id' => 1, 'nivel' => 'B2'], ...]
-        public array $idiomas = [] 
+        public array $idiomas = []
     ) {}
 }

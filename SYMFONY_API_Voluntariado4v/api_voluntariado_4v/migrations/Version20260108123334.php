@@ -14,7 +14,7 @@ final class Version20260103120130 extends AbstractMigration
 {
     public function getDescription(): string
     {
-        return 'Añade triggers, vistas y procedimientos almacenable';
+        return 'Añade triggers, vistas y procedimientos almacenados (Sin referencias a img_perfil)';
     }
 
     public function up(Schema $schema): void
@@ -160,7 +160,7 @@ final class Version20260103120130 extends AbstractMigration
         ");
 
         // =========================================================================
-        // 4. VISTAS
+        // 4. VISTAS (CORREGIDAS: SIN img_perfil)
         // =========================================================================
 
         $this->addSql("
@@ -168,28 +168,25 @@ final class Version20260103120130 extends AbstractMigration
             SELECT u.*, r.nombre_rol FROM USUARIO u INNER JOIN ROL r ON u.id_rol = r.id_rol WHERE u.deleted_at IS NULL
         ");
 
-        // CORREGIDO: 'v.img_perfil' cambiado a 'u.img_perfil' porque la columna ahora está en USUARIO
+
         $this->addSql("
             CREATE OR ALTER VIEW VW_Voluntarios_Activos AS
             SELECT u.id_usuario, u.correo, u.estado_cuenta, u.fecha_registro, v.nombre, v.apellidos, v.telefono, v.fecha_nac, v.carnet_conducir, 
-                   u.img_perfil, 
                    c.nombre_curso, c.abreviacion_curso, c.grado, c.nivel
             FROM USUARIO u INNER JOIN VOLUNTARIO v ON u.id_usuario = v.id_usuario LEFT JOIN CURSO c ON v.id_curso_actual = c.id_curso WHERE u.deleted_at IS NULL
         ");
 
-        // CORREGIDO: 'o.img_perfil' cambiado a 'u.img_perfil'
+
         $this->addSql("
             CREATE OR ALTER VIEW VW_Organizaciones_Activas AS
-            SELECT u.id_usuario, u.correo, u.estado_cuenta, u.fecha_registro, o.cif, o.nombre, o.descripcion, o.direccion, o.sitio_web, o.telefono, 
-                   u.img_perfil
+            SELECT u.id_usuario, u.correo, u.estado_cuenta, u.fecha_registro, o.cif, o.nombre, o.descripcion, o.direccion, o.sitio_web, o.telefono
             FROM USUARIO u INNER JOIN ORGANIZACION o ON u.id_usuario = o.id_usuario WHERE u.deleted_at IS NULL
         ");
 
-        // CORREGIDO: 'o.img_perfil' cambiado a 'u.img_perfil' y añadido JOIN con USUARIO
+
         $this->addSql("
             CREATE OR ALTER VIEW VW_Actividades_Activas AS
             SELECT a.*, o.nombre AS nombre_organizacion, 
-                   u.img_perfil AS img_organizacion,
                    (SELECT COUNT(*) FROM INSCRIPCION i WHERE i.id_actividad = a.id_actividad AND i.estado_solicitud = 'Aceptada') AS inscritos_confirmados
             FROM ACTIVIDAD a 
             INNER JOIN ORGANIZACION o ON a.id_organizacion = o.id_usuario 
@@ -197,11 +194,10 @@ final class Version20260103120130 extends AbstractMigration
             WHERE a.deleted_at IS NULL
         ");
 
-        // CORREGIDO: 'o.img_perfil' cambiado a 'u.img_perfil' (el JOIN con USUARIO ya existía)
+
         $this->addSql("
             CREATE OR ALTER VIEW VW_Actividades_Publicadas AS
             SELECT a.id_actividad, a.titulo, a.descripcion, a.fecha_inicio, a.duracion_horas, a.cupo_maximo, a.ubicacion, a.estado_publicacion, o.nombre AS nombre_organizacion, 
-                   u.img_perfil AS img_organizacion,
                    (SELECT COUNT(*) FROM INSCRIPCION i WHERE i.id_actividad = a.id_actividad AND i.estado_solicitud = 'Aceptada') AS inscritos_confirmados
                    -- , (SELECT TOP 1 url_imagen FROM IMAGEN_ACTIVIDAD img WHERE img.id_actividad = a.id_actividad) AS imagen_principal
             FROM ACTIVIDAD a 

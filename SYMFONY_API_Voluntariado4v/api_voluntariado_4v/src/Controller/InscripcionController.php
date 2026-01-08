@@ -5,15 +5,23 @@ namespace App\Controller;
 use App\Entity\Inscripcion;
 use App\Entity\Actividad;
 use App\Entity\Usuario;
+// DTOs
+use App\Model\Inscripcion\InscripcionResponseDTO;
+use App\Model\Inscripcion\InscripcionUpdateDTO;
+// Repositorios
 use App\Repository\InscripcionRepository;
 use App\Repository\ActividadRepository;
+// Core
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
+// Documentación
 use OpenApi\Attributes as OA;
+use Nelmio\ApiDocBundle\Attribute\Model;
 
 #[Route('', name: 'api_')]
 #[OA\Tag(name: 'Inscripciones (Gestión)', description: 'Gestión de solicitudes por parte de las Organizaciones')]
@@ -26,7 +34,10 @@ final class InscripcionController extends AbstractController
     #[OA\Response(
         response: 200,
         description: 'Lista de voluntarios inscritos en la actividad',
-        content: new OA\JsonContent(type: 'array', items: new OA\Items(type: 'object'))
+        content: new OA\JsonContent(
+            type: 'array',
+            items: new OA\Items(ref: new Model(type: InscripcionResponseDTO::class))
+        )
     )]
     public function listarSolicitudes(
         int $idActividad,
@@ -39,19 +50,19 @@ final class InscripcionController extends AbstractController
             return $this->json(['error' => 'Actividad no encontrada'], Response::HTTP_NOT_FOUND);
         }
 
-        // Usamos DQL para traer datos del voluntario optimizados
-        $dql = "SELECT i.estadoSolicitud, i.fechaSolicitud, 
-                       v.nombre, v.apellidos, v.imgPerfil, u.correo, u.idUsuario as id_voluntario
-                FROM App\Entity\Inscripcion i
-                JOIN i.voluntario v
-                JOIN v.usuario u
-                WHERE i.actividad = :actividad
-                ORDER BY i.fechaSolicitud DESC";
+        // Obtener todas las inscripciones de la actividad
+        $inscripciones = $em->getRepository(Inscripcion::class)->findBy(
+            ['actividad' => $actividad],
+            ['fechaSolicitud' => 'DESC']
+        );
 
-        $query = $em->createQuery($dql)->setParameter('actividad', $actividad);
-        $resultados = $query->getResult();
+        // Mapear a DTOs
+        $dtos = array_map(
+            fn(Inscripcion $ins) => InscripcionResponseDTO::fromEntity($ins),
+            $inscripciones
+        );
 
-        return $this->json($resultados, Response::HTTP_OK);
+        return $this->json($dtos, Response::HTTP_OK);
     }
 
     // ========================================================================
@@ -61,9 +72,7 @@ final class InscripcionController extends AbstractController
     #[OA\RequestBody(
         required: true,
         content: new OA\JsonContent(
-            properties: [
-                new OA\Property(property: 'estado', type: 'string', enum: ['Aceptada', 'Rechazada'], description: 'Nuevo estado')
-            ]
+            ref: new Model(type: InscripcionUpdateDTO::class)
         )
     )]
     #[OA\Response(response: 200, description: 'Estado actualizado correctamente')]
@@ -71,7 +80,7 @@ final class InscripcionController extends AbstractController
     public function cambiarEstado(
         int $idActividad,
         int $idVoluntario,
-        Request $request,
+        #[MapRequestPayload] InscripcionUpdateDTO $dto,
         EntityManagerInterface $em
     ): JsonResponse {
 
@@ -85,23 +94,15 @@ final class InscripcionController extends AbstractController
             return $this->json(['error' => 'Inscripción no encontrada'], Response::HTTP_NOT_FOUND);
         }
 
-        // 2. Leer nuevo estado
-        $data = json_decode($request->getContent(), true);
-        $nuevoEstado = $data['estado'] ?? null;
-
-        if (!in_array($nuevoEstado, ['Aceptada', 'Rechazada', 'Pendiente'])) {
-            return $this->json(['error' => 'Estado no válido. Use: Aceptada, Rechazada'], Response::HTTP_BAD_REQUEST);
-        }
-
-        // 3. Aplicar cambio
-        $inscripcion->setEstadoSolicitud($nuevoEstado);
+        // 2. Aplicar cambio desde el DTO (ya validado automáticamente)
+        $inscripcion->setEstadoSolicitud($dto->estado);
 
         try {
             // El Trigger TR_Check_Cupo_Update saltará aquí si intentamos aceptar y no hay cupo
             $em->flush();
 
             return $this->json([
-                'mensaje' => "Inscripción actualizada a: $nuevoEstado",
+                'mensaje' => "Inscripción actualizada a: {$dto->estado}",
                 'voluntario' => $idVoluntario,
                 'actividad' => $idActividad
             ], Response::HTTP_OK);
