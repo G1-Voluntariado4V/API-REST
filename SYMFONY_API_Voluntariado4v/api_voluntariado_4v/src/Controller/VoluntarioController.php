@@ -169,7 +169,7 @@ final class VoluntarioController extends AbstractController
     // 4. ACTUALIZAR (PUT) - Lógica corregida
     // ========================================================================
     #[Route('/voluntarios/{id}', name: 'actualizar_voluntario', methods: ['PUT'])]
-    #[OA\Parameter(name: 'X-User-Id', in: 'header', required: true, description: 'ID del usuario logueado')]
+    #[OA\Parameter(name: 'X-User-Id', in: 'header', required: true, description: 'ID del usuario logueado', schema: new OA\Schema(type: 'integer'))]
     #[OA\RequestBody(required: true, content: new OA\JsonContent(ref: new Model(type: VoluntarioUpdateDTO::class)))]
     #[OA\Response(response: 200, description: 'Perfil actualizado', content: new OA\JsonContent(ref: new Model(type: VoluntarioResponseDTO::class)))]
     public function actualizar(
@@ -236,7 +236,7 @@ final class VoluntarioController extends AbstractController
     // 5. INSCRIBIRSE A ACTIVIDAD (POST)
     // ========================================================================
     #[Route('/voluntarios/{id}/actividades/{idActividad}', name: 'inscribirse_actividad', methods: ['POST'])]
-    #[OA\Parameter(name: 'X-User-Id', in: 'header', required: true)]
+    #[OA\Parameter(name: 'X-User-Id', in: 'header', required: true, schema: new OA\Schema(type: 'integer'))]
     #[OA\Response(response: 201, description: 'Inscripción realizada')]
     #[OA\Response(response: 409, description: 'Error de reglas de negocio (cupo, fechas, duplicado)')]
     public function inscribirse(
@@ -285,7 +285,7 @@ final class VoluntarioController extends AbstractController
     // 6. HISTORIAL DE INSCRIPCIONES Y ESTADÍSTICAS (GET)
     // ========================================================================
     #[Route('/voluntarios/{id}/historial', name: 'historial_voluntario', methods: ['GET'])]
-    #[OA\Parameter(name: 'X-User-Id', in: 'header', required: true)]
+    #[OA\Parameter(name: 'X-User-Id', in: 'header', required: true, schema: new OA\Schema(type: 'integer'))]
     #[OA\Response(
         response: 200,
         description: 'Historial detallado y resumen',
@@ -336,7 +336,7 @@ final class VoluntarioController extends AbstractController
     // 7. DESAPUNTARSE (DELETE)
     // ========================================================================
     #[Route('/voluntarios/{id}/actividades/{idActividad}', name: 'desapuntarse_actividad', methods: ['DELETE'])]
-    #[OA\Parameter(name: 'X-User-Id', in: 'header', required: true)]
+    #[OA\Parameter(name: 'X-User-Id', in: 'header', required: true, schema: new OA\Schema(type: 'integer'))]
     public function desapuntarse(
         int $id,
         int $idActividad,
@@ -373,7 +373,7 @@ final class VoluntarioController extends AbstractController
     // 8. RECOMENDACIONES (SP)
     // ========================================================================
     #[Route('/voluntarios/{id}/recomendaciones', name: 'recomendaciones_voluntario', methods: ['GET'])]
-    #[OA\Parameter(name: 'X-User-Id', in: 'header', required: true)]
+    #[OA\Parameter(name: 'X-User-Id', in: 'header', required: true, schema: new OA\Schema(type: 'integer'))]
     public function recomendaciones(int $id, Request $request, EntityManagerInterface $em): JsonResponse
     {
         if (!$this->checkOwner($request, $id)) return $this->json(['error' => 'Acceso denegado'], 403);

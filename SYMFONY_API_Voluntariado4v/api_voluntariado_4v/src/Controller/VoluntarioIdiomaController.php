@@ -21,7 +21,7 @@ final class VoluntarioIdiomaController extends AbstractController
     // 1. ASIGNAR UN IDIOMA NUEVO (POST)
     // ========================================================================
     #[Route('/voluntarios/{idVoluntario}/idiomas', name: 'create', methods: ['POST'])]
-    #[OA\Parameter(name: 'idVoluntario', in: 'path', description: 'ID del Usuario Voluntario')]
+    #[OA\Parameter(name: 'idVoluntario', in: 'path', description: 'ID del Usuario Voluntario', schema: new OA\Schema(type: 'integer'))]
     #[OA\RequestBody(
         required: true,
         content: new OA\JsonContent(

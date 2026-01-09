@@ -110,7 +110,7 @@ final class InscripcionController extends AbstractController
             // Capturamos el error del Trigger de SQL Server
             if (str_contains($e->getMessage(), 'ERROR DE NEGOCIO') || str_contains($e->getMessage(), 'cupo')) {
                 return $this->json([
-                    'error' => 'No se puede aceptar: El cupo de la actividad está lleno (Overbooking prevented).'
+                    'error' => 'No se puede aceptar: El cupo de la actividad está lleno.'
                 ], Response::HTTP_CONFLICT);
             }
 

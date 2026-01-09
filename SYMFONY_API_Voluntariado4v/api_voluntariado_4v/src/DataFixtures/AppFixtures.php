@@ -244,7 +244,7 @@ class AppFixtures extends Fixture
 
         $usuario->setDeletedAt(null);
         $usuario->setEstadoCuenta('Activa');
-        // $usuario->setImgPerfil($img); // ❌ ELIMINADO POR PETICIÓN
+
 
         if (isset($this->cache['Rol'][$rolName])) {
             $usuario->setRol($this->cache['Rol'][$rolName]);

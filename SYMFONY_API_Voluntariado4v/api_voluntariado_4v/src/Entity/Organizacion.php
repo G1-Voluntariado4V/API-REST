@@ -6,6 +6,7 @@ use App\Repository\OrganizacionRepository;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Annotation\Groups;
+use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity(repositoryClass: OrganizacionRepository::class)]
 #[ORM\Table(name: 'ORGANIZACION')]
@@ -46,6 +47,7 @@ class Organizacion
 
     #[ORM\Column(length: 200, nullable: true, name: 'sitio_web')]
     #[Groups(['usuario:read', 'actividad:read'])] // <--- Útil para enlazar
+    #[Assert\Url(requireTld: true)]
     private ?string $sitioWeb = null;
 
     #[ORM\Column(length: 20, nullable: true)]

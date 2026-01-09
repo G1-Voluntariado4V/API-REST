@@ -17,7 +17,7 @@ class ActividadUpdateDTO
         public string $ubicacion,
 
         #[Assert\NotBlank]
-        #[Assert\Type("\DateTimeInterface")]
+        #[Assert\DateTime] // Acepta strings válidos como "2026-05-10 10:00:00"
         public string $fecha_inicio,
 
         #[Assert\Positive]

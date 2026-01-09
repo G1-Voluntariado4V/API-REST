@@ -68,7 +68,7 @@ final class RolController extends AbstractController
             $em->flush();
         } catch (\Exception $e) {
             return $this->json(
-                ['error' => 'Error al guardar en BBDD'],
+                ['error' => 'Error al guardar en la base de datos'],
                 Response::HTTP_INTERNAL_SERVER_ERROR // 500
             );
         }

@@ -1,0 +1,37 @@
+# yaml-language-server: $schema=http://json-schema.org/draft-07/schema
+# Traducciones generales de mensajes de Symfony al español
+
+# Mensajes HTTP
+"Bad Request": "Solicitud Incorrecta"
+"Unauthorized": "No Autorizado"
+"Forbidden": "Prohibido"
+"Not Found": "No Encontrado"
+"Method Not Allowed": "Método No Permitido"
+"Internal Server Error": "Error Interno del Servidor"
+"Service Unavailable": "Servicio No Disponible"
+
+# Mensajes de formulario
+"The submitted data was invalid.": "Los datos enviados no son válidos."
+"The form has errors.": "El formulario tiene errores."
+
+# Mensajes de autenticación
+"Invalid credentials.": "Credenciales inválidas."
+"Authentication required.": "Se requiere autenticación."
+"Access denied.": "Acceso denegado."
+
+#Mensajes de base de datos
+"Database error.": "Error de base de datos."
+"Record not found.": "Registro no encontrado."
+"Duplicate entry.": "Entrada duplicada."
+
+# Mensajes generales
+"Success": "Éxito"
+"Failed": "Fallido"
+"Warning": "Advertencia"
+"Info": "Información"
+"Please try again.": "Por favor, inténtalo de nuevo."
+"Operation completed successfully.": "Operación completada con éxito."
+"An error occurred.": "Ocurrió un error."
+"Invalid request.": "Solicitud inválida."
+"Resource not found.": "Recurso no encontrado."
+"Action not permitted.": "Acción no permitida."

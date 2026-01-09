@@ -102,7 +102,7 @@ final class ActividadController extends AbstractController
         // Buscamos el Usuario primero
         $usuarioOrg = $userRepo->find($dto->id_organizacion);
         if (!$usuarioOrg) {
-            return $this->json(['error' => 'Usuario Organización no encontrado'], Response::HTTP_NOT_FOUND);
+            return $this->json(['error' => 'Organización no encontrada'], Response::HTTP_NOT_FOUND);
         }
 
         // Buscamos el perfil de Organización asociado
@@ -144,11 +144,7 @@ final class ActividadController extends AbstractController
             $entityManager->persist($actividad);
             $entityManager->flush();
 
-            // 5. Devolver DTO de Respuesta (No la entidad circular)
-            // Necesitas tener el método estático `fromEntity` en tu ActividadResponseDTO (como te enseñé antes)
-            // Si no lo tienes, créalo, o mapea manualmente aquí. Asumo que lo tienes.
-            // Si te da error aquí, avísame para pasarte el mapper.
-            return $this->json($this->mapToResponse($actividad), Response::HTTP_CREATED);
+            return $this->json(ActividadResponseDTO::fromEntity($actividad), Response::HTTP_CREATED);
         } catch (\Exception $e) {
             return $this->json(['error' => 'Error al crear actividad: ' . $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
@@ -217,7 +213,7 @@ final class ActividadController extends AbstractController
 
         $entityManager->flush();
 
-        return $this->json($this->mapToResponse($actividad), Response::HTTP_OK);
+        return $this->json(ActividadResponseDTO::fromEntity($actividad), Response::HTTP_OK);
     }
 
     // ========================================================================
@@ -245,7 +241,7 @@ final class ActividadController extends AbstractController
             $conn->executeStatement('EXEC SP_SoftDelete_Actividad @id_actividad = :id', ['id' => $id]);
             return $this->json(['mensaje' => 'Actividad cancelada y eliminada correctamente'], Response::HTTP_OK);
         } catch (\Exception $e) {
-            return $this->json(['error' => 'Error al eliminar actividad: ' . $e->getMessage()], 500);
+            return $this->json(['error' => 'Error al eliminar la actividad: ' . $e->getMessage()], 500);
         }
     }
 
@@ -266,7 +262,7 @@ final class ActividadController extends AbstractController
             return $this->json(['error' => 'Actividad no encontrada'], Response::HTTP_NOT_FOUND);
         }
 
-        return $this->json($this->mapToResponse($actividad), Response::HTTP_OK);
+        return $this->json(ActividadResponseDTO::fromEntity($actividad), Response::HTTP_OK);
     }
 
     // ========================================================================
@@ -312,48 +308,7 @@ final class ActividadController extends AbstractController
                 'url' => $imagen->getUrlImagen()
             ], Response::HTTP_CREATED);
         } catch (\Exception $e) {
-            return $this->json(['error' => 'Error al guardar imagen'], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return $this->json(['error' => 'Error al guardar la imagen'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
-    }
-
-    // ========================================================================
-    // HELPER: Mapper Manual (Si no tienes el fromEntity estático en el DTO)
-    // ========================================================================
-    private function mapToResponse(Actividad $act): ActividadResponseDTO
-    {
-        // Esto es un parche por si tu DTO ActividadResponseDTO no tiene el método estático fromEntity.
-        // Si ya lo tiene, usa ActividadResponseDTO::fromEntity($act) directamente en el return.
-
-        // Mapeo de ODS a array/DTOs (según tu definición de ResponseDTO)
-        $odsList = [];
-        foreach ($act->getOds() as $o) {
-            // Asumo que tienes un OdsDTO o usas arrays simples. Ajusta según tu ResponseDTO.
-            // Por simplicidad envío objetos anónimos o lo que espere tu DTO.
-            $odsList[] = ['id' => $o->getIdOds(), 'nombre' => $o->getNombre()];
-        }
-
-        // Mapeo de Tipos
-        $tiposList = [];
-        foreach ($act->getTiposVoluntariado() as $t) {
-            $tiposList[] = ['id' => $t->getIdTipo(), 'nombre' => $t->getNombreTipo()];
-        }
-
-        $org = $act->getOrganizacion();
-
-        return new ActividadResponseDTO(
-            id: $act->getId(),
-            titulo: $act->getTitulo(),
-            descripcion: $act->getDescripcion(),
-            fecha_inicio: $act->getFechaInicio()->format('Y-m-d H:i:s'),
-            duracion_horas: $act->getDuracionHoras(),
-            cupo_maximo: $act->getCupoMaximo(),
-            inscritos_confirmados: 0, // O calcular count($act->getInscripciones()...)
-            ubicacion: $act->getUbicacion() ?? 'No definida',
-            estado_publicacion: $act->getEstadoPublicacion(),
-            nombre_organizacion: $org ? $org->getNombre() : 'Desconocida',
-            img_organizacion: null, // Se obtendrá de Firebase/Google
-            ods: $odsList,
-            tipos: $tiposList
-        );
     }
 }

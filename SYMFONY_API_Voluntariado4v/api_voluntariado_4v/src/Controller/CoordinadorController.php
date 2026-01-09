@@ -98,7 +98,7 @@ final class CoordinadorController extends AbstractController
     // 2. REGISTRAR COORDINADOR (POST)
     // ========================================================================
     #[Route('/coordinadores', name: 'registro_coordinador', methods: ['POST'])]
-    #[OA\Parameter(name: 'X-Admin-Id', in: 'header', description: 'ID de Coordinador (Solo otro coordinador puede crear)', required: true)]
+    #[OA\Parameter(name: 'X-Admin-Id', in: 'header', description: 'ID de Coordinador (Solo otro coordinador puede crear)', required: true, schema: new OA\Schema(type: 'integer'))]
     #[OA\RequestBody(required: true, content: new OA\JsonContent(ref: new Model(type: CoordinadorCreateDTO::class)))]
     #[OA\Response(response: 201, description: 'Coordinador creado', content: new OA\JsonContent(ref: new Model(type: CoordinadorResponseDTO::class)))]
     public function registrar(
@@ -154,7 +154,7 @@ final class CoordinadorController extends AbstractController
     // 3. VER MI PERFIL (GET)
     // ========================================================================
     #[Route('/coordinadores/{id}', name: 'get_coordinador', methods: ['GET'])]
-    #[OA\Parameter(name: 'X-Admin-Id', in: 'header', description: 'ID de Coordinador', required: true)]
+    #[OA\Parameter(name: 'X-Admin-Id', in: 'header', description: 'ID de Coordinador', required: true, schema: new OA\Schema(type: 'integer'))]
     public function getOne(
         int $id,
         Request $request,
@@ -185,7 +185,7 @@ final class CoordinadorController extends AbstractController
     // 4. ACTUALIZAR PERFIL (PUT) - CON DTO
     // ========================================================================
     #[Route('/coordinadores/{id}', name: 'actualizar_coordinador', methods: ['PUT'])]
-    #[OA\Parameter(name: 'X-Admin-Id', in: 'header', description: 'ID de Coordinador', required: true)]
+    #[OA\Parameter(name: 'X-Admin-Id', in: 'header', description: 'ID de Coordinador', required: true, schema: new OA\Schema(type: 'integer'))]
     #[OA\RequestBody(
         required: true,
         content: new OA\JsonContent(
@@ -242,7 +242,7 @@ final class CoordinadorController extends AbstractController
     #[OA\Response(response: 200, description: 'Estado de usuario actualizado.')]
     #[OA\Response(response: 400, description: 'Estado o Rol inválido.')]
     #[OA\Parameter(name: 'rol', description: 'Tipo de usuario (voluntarios o organizaciones)', in: 'path', schema: new OA\Schema(type: 'string', enum: ['voluntarios', 'organizaciones']))]
-    #[OA\Parameter(name: 'X-Admin-Id', in: 'header', required: true)]
+    #[OA\Parameter(name: 'X-Admin-Id', in: 'header', required: true, schema: new OA\Schema(type: 'integer'))]
     #[OA\RequestBody(
         required: true,
         content: new OA\JsonContent(
@@ -294,7 +294,7 @@ final class CoordinadorController extends AbstractController
 
     // 7.1 MODERAR ESTADO (Publicar/Rechazar)
     #[Route('/coord/actividades/{id}/estado', name: 'coord_cambiar_estado_actividad', methods: ['PATCH'])]
-    #[OA\Parameter(name: 'X-Admin-Id', in: 'header', required: true)]
+    #[OA\Parameter(name: 'X-Admin-Id', in: 'header', required: true, schema: new OA\Schema(type: 'integer'))]
     #[OA\Response(response: 200, description: 'Estado de publicación actualizado.')]
     #[OA\RequestBody(required: true, content: new OA\JsonContent(properties: [new OA\Property(property: 'estado', type: 'string', enum: ['Publicada', 'En revision', 'Cancelada'])]))]
     public function cambiarEstadoActividad(
@@ -327,7 +327,7 @@ final class CoordinadorController extends AbstractController
 
     // 7.2 BORRAR ACTIVIDAD (COORD DELETE) - Borrado forzoso
     #[Route('/coord/actividades/{id}', name: 'coord_borrar_actividad', methods: ['DELETE'])]
-    #[OA\Parameter(name: 'X-Admin-Id', in: 'header', required: true)]
+    #[OA\Parameter(name: 'X-Admin-Id', in: 'header', required: true, schema: new OA\Schema(type: 'integer'))]
     #[OA\Response(response: 200, description: 'Actividad eliminada por coordinación (Soft Delete)')]
     public function borrarActividadCoord(
         int $id,
@@ -345,13 +345,13 @@ final class CoordinadorController extends AbstractController
             $em->getConnection()->executeStatement($sql, ['id' => $id]);
             return $this->json(['mensaje' => 'Actividad eliminada por Coordinador'], Response::HTTP_OK);
         } catch (\Exception $e) {
-            return $this->json(['error' => 'Error al eliminar actividad'], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return $this->json(['error' => 'Error al eliminar la actividad'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
     // 7.3 MODIFICAR ACTIVIDAD (COORD UPDATE) - Edición de contenido
     #[Route('/coord/actividades/{id}', name: 'coord_editar_actividad', methods: ['PUT'])]
-    #[OA\Parameter(name: 'X-Admin-Id', in: 'header', required: true)]
+    #[OA\Parameter(name: 'X-Admin-Id', in: 'header', required: true, schema: new OA\Schema(type: 'integer'))]
     #[OA\RequestBody(description: 'Datos a forzar actualización', content: new OA\JsonContent(type: 'object'))]
     public function editarActividadCoord(
         int $id,
@@ -387,7 +387,7 @@ final class CoordinadorController extends AbstractController
     // 8. ELIMINAR CUENTA (Coordinador borrando usuarios o a sí mismo)
     // ========================================================================
     #[Route('/coordinadores/{id}', name: 'borrar_usuario_coord', methods: ['DELETE'])]
-    #[OA\Parameter(name: 'X-Admin-Id', in: 'header', required: true)]
+    #[OA\Parameter(name: 'X-Admin-Id', in: 'header', required: true, schema: new OA\Schema(type: 'integer'))]
     public function eliminar(
         int $id,
         Request $request,
@@ -408,7 +408,7 @@ final class CoordinadorController extends AbstractController
             $em->getConnection()->executeStatement($sql, ['id' => $id]);
             return $this->json(['mensaje' => 'Cuenta cerrada correctamente'], Response::HTTP_OK);
         } catch (\Exception $e) {
-            return $this->json(['error' => 'Error al cerrar cuenta'], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return $this->json(['error' => 'Error al cerrar la cuenta'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 }
