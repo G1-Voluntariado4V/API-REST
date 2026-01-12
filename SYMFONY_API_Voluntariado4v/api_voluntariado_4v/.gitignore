@@ -1,4 +1,3 @@
-
 ###> symfony/framework-bundle ###
 /.env.local
 /.env.local.php
@@ -13,3 +12,10 @@
 /phpunit.xml
 /.phpunit.cache/
 ###< phpunit/phpunit ###
+
+###> doctrine/doctrine-migrations-bundle ###
+# Ignorar archivos de migración (PHP) para que cada dev genere los suyos
+/migrations/*.php
+# Mantener la estructura de carpetas
+!/migrations/.gitignore
+###< doctrine/doctrine-migrations-bundle ###
