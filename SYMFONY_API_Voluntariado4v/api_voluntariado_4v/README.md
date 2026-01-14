@@ -1,63 +1,106 @@
-# API Gestión de Voluntariado (Symfony + SQL Server)
+# 🚀 API Gestión de Voluntariado (Symfony + SQL Server)
 
-Backend para la plataforma de gestión de voluntariado. Desarrollado en **Symfony 7** utilizando **Doctrine ORM** conectado a **Microsoft SQL Server**.
-
-## 📋 Requisitos Previos
-
-Antes de empezar, asegúrate de tener instalado en tu máquina:
-
-1.  **PHP 8.2+** (Recomendado versión Thread Safe - TS).
-2.  **Composer** (Gestor de paquetes PHP).
-3.  **Symfony CLI** (Opcional pero recomendado).
-4.  **Microsoft SQL Server** (Express o Developer Edition).
-5.  **SQL Server Management Studio (SSMS)**.
-6.  **Drivers PHP para SQL Server**:
-    -   Debes descargar las DLLs (`php_sqlsrv` y `php_pdo_sqlsrv`) correspondientes a tu versión de PHP. Puedes descargar desde: https://learn.microsoft.com/en-us/sql/connect/php/download-drivers-php-sql-server?view=sql-server-ver17
-    -   Pegarlas en la carpeta `ext` de tu PHP.
-    -   Activarlas en el `php.ini`:
-        `extension=php_sqlsrv_82_ts_x64.dll`
-        `extension=php_pdo_sqlsrv_82_ts_x64.dll`
+Backend para la plataforma de gestión de voluntariado 4v. Desarrollado en **Symfony 7** utilizando **Doctrine ORM** y **Microsoft SQL Server**.
 
 ---
 
-## ⚙️ 1. Configuración de SQL Server (Solo la primera vez)
+## 📋 1. Requisitos Indispensables (Qué necesitas tener instalado)
 
-Para que la aplicación conecte, necesitamos configurar el servidor y crear el usuario dedicado `symfony_app`.
+Antes de descargar el código, asegúrate de que tu entorno de desarrollo cumpla con estos requisitos.
 
-### A. Habilitar TCP/IP y Modo Mixto
+### 🛠️ Herramientas Básicas
 
-1.  Win + R > SQLServerManager16.msc
-2.  Configuración de Red de SQL Server > Protocolos de ['nombreInstancia'] > TCP/IP
-3.  Habilita **TCP/IP**. En propiedades > Direcciones IP > **IPAll**, pon el puerto **1433**.
-4.  **Reinicia el servicio de SQL Server**.
-5.  Abre **SSMS**, clic derecho en el Servidor > Propiedades > Seguridad.
-6.  Marca **"Modo de autenticación de SQL Server y de Windows"**.
+| Herramienta     | Versión  | Notas                                                                                                            |
+| --------------- | -------- | ---------------------------------------------------------------------------------------------------------------- |
+| **PHP**         | 8.2+     | **Importante:** Se recomienda la versión **Thread Safe (TS)** para compatibilidad con los drivers de SQL Server. |
+| **Composer**    | Última   | Gestor de dependencias de PHP.                                                                                   |
+| **Symfony CLI** | Opcional | Recomendado para ejecutar el servidor local y gestionar certificados TLS.                                        |
+| **Git**         | -        | Para clonar el repositorio.                                                                                      |
 
-### B. Ejecutar Script de Instalación
+### 🗄️ Base de Datos (SQL Server)
 
-Hemos preparado un script que crea la BBDD y el usuario automáticamente.
+-   **Microsoft SQL Server** (Express o Developer Edition 2019+).
+-   **SQL Server Management Studio (SSMS)**: Para administrar la BD manualmente.
 
-1.  Abre el archivo `docs/database/setup_dev_env.sql` (o crea uno con el código de abajo).
-2.  Ábrelo en **SSMS** y ejecútalo (F5).
+### 🔌 Drivers PHP para SQL Server
 
-````sql
+Para que PHP pueda comunicarse con SQL Server, necesitas instalar los drivers de Microsoft:
+
+1.  Descarga los drivers desde [Microsoft Download Center](https://learn.microsoft.com/en-us/sql/connect/php/download-drivers-php-sql-server).
+2.  Descomprime y copia los archivos `.dll` que coincidan con tu versión de PHP (ej. `php_sqlsrv_82_ts_x64.dll` y `php_pdo_sqlsrv_82_ts_x64.dll`) en la carpeta `ext` de tu instalación de PHP.
+3.  Habilítalos en tu archivo `php.ini` añadiendo:
+    ```ini
+    extension=php_sqlsrv_82_ts_x64.dll
+    extension=php_pdo_sqlsrv_82_ts_x64.dll
+    ```
+4.  Reinicia tu terminal o servidor para aplicar los cambios.
+
+---
+
+## ⚙️ 2. Configuración Inicial del Proyecto
+
+Sigue estos pasos ordenados para poner en marcha la API.
+
+### Paso 1: Clonar e Instalar Dependencias
+
+Abrir una terminal en la carpeta deseada y ejecutar:
+
+```bash
+# Clonar repositorio
+git clone <url-del-repositorio>
+cd api_voluntariado_4v
+
+# Instalar librerías PHP
+composer install
+```
+
+### Paso 2: Configuración del Entorno (.env)
+
+Este proyecto utiliza variables de entorno.
+
+1. Crea un archivo llamado `.env.local` en la raíz del proyecto (copiando el `.env` existente).
+2. Define tu conexión a base de datos. Ejemplo para **SQL Express**:
+
+```bash
+# .env.local
+DATABASE_URL="sqlsrv://symfony_app:Symfony2025!@127.0.0.1/VoluntariadoDB?instance=SQLEXPRESS&trustServerCertificate=true&charset=UTF-8"
+```
+
+_Asegúrate de ajustar la instancia (`SQLEXPRESS`) si tu instalación tiene otro nombre._
+
+### Paso 3: Configuración de SQL Server
+
+Para que la API conecte, necesitamos configurar el servidor y crear el usuario dedicado.
+
+**A. Configuración de Red (Solo primera vez)**
+
+1. Abre **SQL Server Configuration Manager** (`SQLServerManager16.msc`).
+2. Ve a _SQL Server Network Configuration > Protocols for [Instancia]_.
+3. Habilita **TCP/IP**.
+4. En propiedades de TCP/IP > IP Addresses > **IPAll**, asegura que el puerto TCP es **1433**.
+5. **Reinicia el servicio SQL Server**.
+
+**B. Crear Base de Datos y Usuario**
+Puedes ejecutar este script SQL en **SSMS** para configurar todo automáticamente:
+
+```sql
 /* setup_dev_env.sql */
 USE master;
 GO
--- Crear Login y Usuario
+-- 1. Crear Login y Usuario
 IF NOT EXISTS (SELECT * FROM sys.server_principals WHERE name = 'symfony_app')
 BEGIN
     CREATE LOGIN symfony_app WITH PASSWORD = 'Symfony2025!';
     ALTER LOGIN symfony_app ENABLE;
 END
 GO
--- Crear Base de Datos
+-- 2. Crear Base de Datos
 IF NOT EXISTS (SELECT * FROM sys.databases WHERE name = 'VoluntariadoDB')
 BEGIN
     CREATE DATABASE VoluntariadoDB;
 END
 GO
--- Asignar permisos
+-- 3. Asignar permisos
 USE VoluntariadoDB;
 GO
 IF NOT EXISTS (SELECT * FROM sys.database_principals WHERE name = 'symfony_app')
@@ -66,166 +109,98 @@ BEGIN
     ALTER ROLE db_owner ADD MEMBER symfony_app;
 END
 GO
+```
+
+_Asegúrate de que la "Autenticación de SQL Server y Windows" (Modo Mixto) esté activada en las propiedades del servidor._
 
 ---
 
+## 🗄️ 3. Crear Tablas y Datos de Prueba
 
+Una vez configurada la conexión, inicializa la estructura de la base de datos:
 
-
-## ⚙️ 2. Instalación del Proyecto Symfony
-
-1. Clonar el repositorio:
-```bash
-git clone https://github.com/your-repo/api_voluntariado_4v.git
-````
-
-2. Instalar dependencias:
-
-```bash
-cd api_voluntariado_4v
-composer install
-```
-
-DATABASE_URL="sqlsrv://symfony_app:Symfony2025!@127.0.0.1/VoluntariadoDB?instance=SQLEXPRESS&trustServerCertificate=true&charset=UTF-8"
-
-4. En el archivo doctrine.yaml, asegúrate de que el driver esté configurado como 'sqlsrv'.
-
-```yaml
-doctrine:
-    dbal:
-        url: "%env(resolve:DATABASE_URL)%"
-        driver: "sqlsrv" # Esto es lo único fijo importante
-```
-
-5. Verificar conexión: Ejecuta este comando. Si ves la versión de SQL Server, todo está correcto.
-
-```bash
-php bin/console doctrine:query:sql "SELECT @@VERSION"
-```
-
----
-
-## 3. Crear Base de Datos(Migraciones)
-
-Este proyecto usa Code First. No crees tablas manualmente.
-
-### Paso 1: Ejecutar Migraciones:
-
-Este comando crea todas las tablas (USUARIO, VOLUNTARIO, ORGANIZACION...) automáticamente.
+### 1. Ejecutar Migraciones (Crear Tablas)
 
 ```bash
 php bin/console doctrine:migrations:migrate
 ```
 
-## 4. Cargar Datos de Prueba (Fixtures)
+### 2. Cargar Datos de Prueba (Fixtures)
 
-Para poder entrar en la aplicación nada más instalarla, hemos preparado un set de datos.
-
-1. Ejecuta el comando de carga: (Escribe 'yes' cuando pregunte si quieres purgar la base de datos).
+Carga usuarios y datos iniciales para empezar a trabajar de inmediato:
 
 ```bash
 php bin/console doctrine:fixtures:load
+# Escribe 'yes' cuando te pida confirmación.
 ```
 
-2. Usuarios disponibles tras la carga
-   Rol Correo (Login Google) Estado Notas
-   Coordinador maitesolam@gmail.com Activo Usuario Admin Principal
-   Voluntario pepe.voluntario@test.com Activo Usuario Ficticio
-   Organización ayuda@ong.com Activo Usuario Ficticio
+#### 👥 Usuarios Disponibles (Fixtures)
 
-⚠️ Nota para Desarrolladores (Frontend):
+| Rol              | Email (Login)              | Password      | Notas                   |
+| ---------------- | -------------------------- | ------------- | ----------------------- |
+| **Coordinador**  | `maitesolam@gmail.com`     | (Google Auth) | Usuario Admin Principal |
+| **Voluntario**   | `pepe.voluntario@test.com` | (Ficticio)    | -                       |
+| **Organización** | `ayuda@ong.com`            | (Ficticio)    | -                       |
 
-Para ser Admin: Si queréis entrar como Coordinador con vuestra cuenta de Google, id a src/DataFixtures/AppFixtures.php, cambiad el UID de Maite por el vuestro real y ejecutad de nuevo el comando de fixtures.
+> **Nota:** Para desarrollo, puedes modificar los UIDs en `src/DataFixtures/AppFixtures.php` para que coincidan con tu usuario real de Google/Firebase si necesitas loguearte como admin.
 
-Para probar Voluntario/ONG: Usad el formulario de registro del frontend o editad el UID en base de datos para suplantar a los usuarios ficticios.
+---
 
-## ▶️ 5. Ejecutar el Servidor
+## ▶️ 4. Ejecutar el Servidor
 
-Para iniciar el servidor de desarrollo, usa una de estas opciones:
+Inicia el servidor local de desarrollo:
 
-**Opción 1: Usar Symfony CLI (Recomendado)**
+**Opción A: Symfony CLI (Recomendado)**
+
 ```bash
 symfony server:start
 ```
 
-**Opción 2: Usar servidor PHP built-in**
+_Disponible en: https://127.0.0.1:8000_
+
+**Opción B: PHP Built-in**
+
 ```bash
 php bin/console server:start
 ```
 
-La API estará disponible en http://127.0.0.1:8000.
+_Disponible en: http://127.0.0.1:8000_
 
-## 📝 6. Documentación
+---
 
-La documentación de la API se encuentra en el archivo `voluntariado_api.yaml`.
+## 🧪 5. Testing
 
-## 7. 🛠️ Solución de Problemas Comunes
+El proyecto tiene una suite de tests automatizados (Unitarios, Integración y E2E).
 
-Error SQLSTATE[HY000] [2002]:
-
-Symfony está intentando conectar a MySQL.
-
-Solución: Asegúrate de que en config/packages/doctrine.yaml tienes driver: 'sqlsrv' y borra la caché con php bin/console cache:clear.
-
-Error Login failed for user 'root':
-
-No has configurado el usuario en el .env o la caché está sucia.
-
-Solución: Revisa el .env.local y ejecuta php bin/console cache:clear.
-
-Error SSL Provider... certificate chain...:
-
-Falta confiar en el certificado.
-
-Solución: Asegúrate de que la URL en el .env termina con &trustServerCertificate=true.
-
-# 7.1. Error de autenticación de usuario en SQLServer
-
-Error 18456: Login failed for user 'root'
-
-Solución: Asegúrate de que en el .env. tienes la URL correcta con el usuario y contraseña.
-
-Solución 2: Asegurate de que en SQL server en tu usuario
-    Carpeta Security
-        Logins
-            symfony_app (clic derecho)
-                properties
-                    General: Enforce password policy: No
-                    User Mapping: Esté la base de datos seleccionada y que esté marcado como db_owner
-                    status: Enabled
-
-# 🧪 8. QA y Testing (Documentación Oficial)
-
-Este proyecto sigue una estrategia de testing piramidal, cubriendo Unitarios, Integración y Funcionales.
-
-## 8.1 Ejecutar Tests según Capa
-
-### **1. Tests Unitarios (Lógica de Negocio)**
-Verifican el comportamiento interno de las Entidades y Servicios sin tocar la Base de Datos.
-- **Ubicación**: `tests/Entity`
-- **Comando**:
 ```bash
-php bin/phpunit --testdox tests/Entity
-```
+# Ejecutar todos los tests
+php bin/phpunit --testdox
 
-### **2. Tests de Integración (Capa de Datos)**
-Verifican que el repositorio y el driver conectan correctamente con SQL Server y las Vistas/SP.
-- **Ubicación**: `tests/Integration`
-- **Comando**:
-```bash
-php bin/phpunit --testdox tests/Integration
-```
-
-### **3. Tests Funcionales (Endpoints API)**
-Prueban la aplicación completa simulando peticiones HTTP reales. Validan rutas, seguridad y respuestas JSON.
-- **Ubicación**: `tests/Controller`
-- **Comando**:
-```bash
+# Ejecutar solo tests de Controladores (API)
 php bin/phpunit --testdox tests/Controller
 ```
 
-## 8.2 Ejecución Global
-Para lanzar toda la suite de QA:
-```bash
-php bin/phpunit --testdox
-```
+---
+
+## 📚 Documentación
+
+-   **OpenAPI/Swagger**: Archivo `openapi.yaml` en la raíz. Importable en Postman.
+-   **Rutas**: Puedes ver todas las rutas registradas con `php bin/console debug:router`.
+
+---
+
+## 🛠️ Solución de Problemas Comunes
+
+**Error: `SQLSTATE[HY000] [2002]`**
+
+-   **Causa:** Symfony intenta conectar a MySQL por defecto o no detecta el driver `sqlsrv`.
+-   **Solución:** Verifica `config/packages/doctrine.yaml` y asegura `driver: 'sqlsrv'`. Limpia caché: `php bin/console cache:clear`.
+
+**Error: `Login failed for user 'root'` o similar**
+
+-   **Causa:** Configuración de `.env` incorrecta.
+-   **Solución:** Revisa `.env.local` y asegura que usas el usuario `symfony_app` creado anteriormente.
+
+**Error: `SSL Provider... certificate chain...`**
+
+-   **Solución:** Falta confiar en el certificado autofirmado de SQL Server. Asegura `&trustServerCertificate=true` en tu `DATABASE_URL`.
