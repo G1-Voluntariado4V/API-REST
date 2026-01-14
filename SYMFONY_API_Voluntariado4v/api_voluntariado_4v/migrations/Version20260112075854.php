@@ -23,42 +23,42 @@ final class Version20260103120130 extends AbstractMigration
         // 1. TRIGGERS DE FECHA (UPDATED_AT)
         // =========================================================================
         $this->addSql("
-            CREATE OR ALTER TRIGGER TR_Usuario_UpdatedAt ON USUARIO AFTER UPDATE AS 
-            BEGIN 
-                SET NOCOUNT ON; 
-                UPDATE USUARIO SET updated_at = GETDATE() FROM USUARIO u INNER JOIN inserted i ON u.id_usuario = i.id_usuario; 
+            CREATE OR ALTER TRIGGER TR_Usuario_UpdatedAt ON USUARIO AFTER UPDATE AS
+            BEGIN
+                SET NOCOUNT ON;
+                UPDATE USUARIO SET updated_at = GETDATE() FROM USUARIO u INNER JOIN inserted i ON u.id_usuario = i.id_usuario;
             END
         ");
 
         $this->addSql("
-            CREATE OR ALTER TRIGGER TR_Voluntario_UpdatedAt ON VOLUNTARIO AFTER UPDATE AS 
-            BEGIN 
-                SET NOCOUNT ON; 
-                UPDATE VOLUNTARIO SET updated_at = GETDATE() FROM VOLUNTARIO v INNER JOIN inserted i ON v.id_usuario = i.id_usuario; 
+            CREATE OR ALTER TRIGGER TR_Voluntario_UpdatedAt ON VOLUNTARIO AFTER UPDATE AS
+            BEGIN
+                SET NOCOUNT ON;
+                UPDATE VOLUNTARIO SET updated_at = GETDATE() FROM VOLUNTARIO v INNER JOIN inserted i ON v.id_usuario = i.id_usuario;
             END
         ");
 
         $this->addSql("
-            CREATE OR ALTER TRIGGER TR_Organizacion_UpdatedAt ON ORGANIZACION AFTER UPDATE AS 
-            BEGIN 
-                SET NOCOUNT ON; 
-                UPDATE ORGANIZACION SET updated_at = GETDATE() FROM ORGANIZACION o INNER JOIN inserted i ON o.id_usuario = i.id_usuario; 
+            CREATE OR ALTER TRIGGER TR_Organizacion_UpdatedAt ON ORGANIZACION AFTER UPDATE AS
+            BEGIN
+                SET NOCOUNT ON;
+                UPDATE ORGANIZACION SET updated_at = GETDATE() FROM ORGANIZACION o INNER JOIN inserted i ON o.id_usuario = i.id_usuario;
             END
         ");
 
         $this->addSql("
-            CREATE OR ALTER TRIGGER TR_Actividad_UpdatedAt ON ACTIVIDAD AFTER UPDATE AS 
-            BEGIN 
-                SET NOCOUNT ON; 
-                UPDATE ACTIVIDAD SET updated_at = GETDATE() FROM ACTIVIDAD a INNER JOIN inserted i ON a.id_actividad = i.id_actividad; 
+            CREATE OR ALTER TRIGGER TR_Actividad_UpdatedAt ON ACTIVIDAD AFTER UPDATE AS
+            BEGIN
+                SET NOCOUNT ON;
+                UPDATE ACTIVIDAD SET updated_at = GETDATE() FROM ACTIVIDAD a INNER JOIN inserted i ON a.id_actividad = i.id_actividad;
             END
         ");
 
         $this->addSql("
-            CREATE OR ALTER TRIGGER TR_Inscripcion_UpdatedAt ON INSCRIPCION AFTER UPDATE AS 
-            BEGIN 
-                SET NOCOUNT ON; 
-                UPDATE INSCRIPCION SET updated_at = GETDATE() FROM INSCRIPCION ins INNER JOIN inserted i ON ins.id_voluntario = i.id_voluntario AND ins.id_actividad = i.id_actividad; 
+            CREATE OR ALTER TRIGGER TR_Inscripcion_UpdatedAt ON INSCRIPCION AFTER UPDATE AS
+            BEGIN
+                SET NOCOUNT ON;
+                UPDATE INSCRIPCION SET updated_at = GETDATE() FROM INSCRIPCION ins INNER JOIN inserted i ON ins.id_voluntario = i.id_voluntario AND ins.id_actividad = i.id_actividad;
             END
         ");
 
@@ -82,7 +82,7 @@ final class Version20260103120130 extends AbstractMigration
             CREATE OR ALTER TRIGGER TR_Check_Cupo_Actividad ON INSCRIPCION INSTEAD OF INSERT AS
             BEGIN
                 SET NOCOUNT ON;
-                
+
                 -- 1. VALIDACIÓN: Estado y Fecha
                 IF EXISTS (
                     SELECT 1 FROM inserted i JOIN ACTIVIDAD a ON i.id_actividad = a.id_actividad
@@ -171,7 +171,7 @@ final class Version20260103120130 extends AbstractMigration
 
         $this->addSql("
             CREATE OR ALTER VIEW VW_Voluntarios_Activos AS
-            SELECT u.id_usuario, u.correo, u.estado_cuenta, u.fecha_registro, v.nombre, v.apellidos, v.telefono, v.fecha_nac, v.carnet_conducir, 
+            SELECT u.id_usuario, u.correo, u.estado_cuenta, u.fecha_registro, v.nombre, v.apellidos, v.telefono, v.fecha_nac, v.carnet_conducir,
                    c.nombre_curso, c.abreviacion_curso, c.grado, c.nivel
             FROM USUARIO u INNER JOIN VOLUNTARIO v ON u.id_usuario = v.id_usuario LEFT JOIN CURSO c ON v.id_curso_actual = c.id_curso WHERE u.deleted_at IS NULL
         ");
@@ -186,10 +186,10 @@ final class Version20260103120130 extends AbstractMigration
 
         $this->addSql("
             CREATE OR ALTER VIEW VW_Actividades_Activas AS
-            SELECT a.*, o.nombre AS nombre_organizacion, 
+            SELECT a.*, o.nombre AS nombre_organizacion,
                    (SELECT COUNT(*) FROM INSCRIPCION i WHERE i.id_actividad = a.id_actividad AND i.estado_solicitud = 'Aceptada') AS inscritos_confirmados
-            FROM ACTIVIDAD a 
-            INNER JOIN ORGANIZACION o ON a.id_organizacion = o.id_usuario 
+            FROM ACTIVIDAD a
+            INNER JOIN ORGANIZACION o ON a.id_organizacion = o.id_usuario
             INNER JOIN USUARIO u ON o.id_usuario = u.id_usuario
             WHERE a.deleted_at IS NULL
         ");
@@ -197,11 +197,11 @@ final class Version20260103120130 extends AbstractMigration
 
         $this->addSql("
             CREATE OR ALTER VIEW VW_Actividades_Publicadas AS
-            SELECT a.id_actividad, a.titulo, a.descripcion, a.fecha_inicio, a.duracion_horas, a.cupo_maximo, a.ubicacion, a.estado_publicacion, o.nombre AS nombre_organizacion, 
+            SELECT a.id_actividad, a.titulo, a.descripcion, a.fecha_inicio, a.duracion_horas, a.cupo_maximo, a.ubicacion, a.estado_publicacion, o.nombre AS nombre_organizacion,
                    (SELECT COUNT(*) FROM INSCRIPCION i WHERE i.id_actividad = a.id_actividad AND i.estado_solicitud = 'Aceptada') AS inscritos_confirmados
                    -- , (SELECT TOP 1 url_imagen FROM IMAGEN_ACTIVIDAD img WHERE img.id_actividad = a.id_actividad) AS imagen_principal
-            FROM ACTIVIDAD a 
-            INNER JOIN ORGANIZACION o ON a.id_organizacion = o.id_usuario 
+            FROM ACTIVIDAD a
+            INNER JOIN ORGANIZACION o ON a.id_organizacion = o.id_usuario
             INNER JOIN USUARIO u ON o.id_usuario = u.id_usuario
             WHERE a.deleted_at IS NULL AND a.estado_publicacion = 'Publicada' AND u.deleted_at IS NULL
         ");
@@ -238,9 +238,9 @@ final class Version20260103120130 extends AbstractMigration
 
                 SELECT DISTINCT a.titulo, o.nombre AS organizacion, a.fecha_inicio, ods.nombre AS causa_ods
                 FROM ACTIVIDAD a
-                INNER JOIN ACTIVIDAD_ODS ao ON a.id_actividad = ao.id_actividad 
-                INNER JOIN ODS ods ON ao.id_ods = ods.id_ods 
-                INNER JOIN ORGANIZACION o ON a.id_organizacion = o.id_usuario 
+                INNER JOIN ACTIVIDAD_ODS ao ON a.id_actividad = ao.id_actividad
+                INNER JOIN ODS ods ON ao.id_ods = ods.id_ods
+                INNER JOIN ORGANIZACION o ON a.id_organizacion = o.id_usuario
                 WHERE ao.id_ods IN (
                     SELECT id_tipo FROM PREFERENCIA_VOLUNTARIO WHERE id_voluntario = @id_voluntario
                 )
