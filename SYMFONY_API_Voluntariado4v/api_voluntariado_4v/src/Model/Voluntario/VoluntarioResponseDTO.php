@@ -13,6 +13,7 @@ class VoluntarioResponseDTO
         public string $correo,
         public string $curso,
         public string $estado_cuenta,
+        public ?string $descripcion,   // Descripción personal
         public array $preferencias, // Devolveremos nombres, no IDs
         public array $idiomas      // Devolveremos nombre y nivel
     ) {}
@@ -50,6 +51,7 @@ class VoluntarioResponseDTO
             // Manejo seguro por si no tiene curso asignado aún
             curso: $voluntario->getCursoActual() ? $voluntario->getCursoActual()->getAbreviacion() : 'Sin asignar',
             estado_cuenta: $usuario->getEstadoCuenta(),
+            descripcion: $voluntario->getDescripcion(),
             preferencias: $prefs, // Aquí va el array de strings corregido (ej: ['Salud', 'Educación'])
             idiomas: $idiomasList
         );

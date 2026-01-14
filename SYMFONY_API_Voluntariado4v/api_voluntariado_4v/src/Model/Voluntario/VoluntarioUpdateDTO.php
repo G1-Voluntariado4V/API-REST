@@ -20,6 +20,10 @@ class VoluntarioUpdateDTO
     #[Assert\Date(message: "El formato debe ser YYYY-MM-DD.")]
     public ?string $fechaNac = null;
 
+    // Descripción personal del voluntario
+    #[Assert\Length(max: 500, maxMessage: "La descripción no puede tener más de 500 caracteres")]
+    public ?string $descripcion = null;
+
     // Preferencias opcionales
     public ?array $preferencias_ids = null;
 }

@@ -99,55 +99,165 @@ class AppFixtures extends Fixture
         // ======================================================
 
         // --- Coordinador ---
-        // Eliminado el argumento de imagen
         $coordUser = $this->createOrUpdateUsuario('Coordinador', 'maitesolam@gmail.com', 'google_uid_maite');
 
         // 🛠️ FIX 1: Hacemos flush AQUÍ para que $coordUser tenga ID real de BBDD
         $this->manager->flush();
 
-        $this->createOrUpdatePerfilCoordinador($coordUser, 'Maite', 'Sola');
+        $coord = $this->createOrUpdatePerfilCoordinador($coordUser, 'Maite', 'Sola');
+        // Asignar teléfono al coordinador
+        $coord->setTelefono('948000000');
 
         // --- ONGs ---
         $ongs = [];
+        // Formato: [Nombre, Email, GoogleUID, Descripción, Teléfono, CIF]
         $ongData = [
-            ['Tech For Good', 'info@techforgood.org', 'uid_org_tech', 'Tecnología Social'],
-            ['EcoVida', 'contacto@ecovida.org', 'uid_org_eco', 'Medioambiente'],
-            ['Animal Rescue', 'help@animalrescue.org', 'uid_org_animal', 'Refugio Animales'],
-            ['Cruz Roja Local', 'cruzroja@org.com', 'uid_cr', 'Ayuda Humanitaria']
+            [
+                'Tech For Good',
+                'info@techforgood.org',
+                'uid_org_tech',
+                'ONG dedicada a promover la tecnología social y la alfabetización digital. Organizamos talleres y eventos para acercar la tecnología a colectivos vulnerables.',
+                '948123456',
+                'G31234567'
+            ],
+            [
+                'EcoVida',
+                'contacto@ecovida.org',
+                'uid_org_eco',
+                'Asociación ecologista comprometida con la protección del medio ambiente. Realizamos actividades de limpieza, reforestación y educación ambiental.',
+                '948234567',
+                'G31234568'
+            ],
+            [
+                'Animal Rescue',
+                'help@animalrescue.org',
+                'uid_org_animal',
+                'Refugio de animales abandonados. Buscamos voluntarios para paseos, cuidados y eventos de adopción responsable.',
+                '948345678',
+                'G31234569'
+            ],
+            [
+                'Cruz Roja Local',
+                'cruzroja@org.com',
+                'uid_cr',
+                'Delegación local de Cruz Roja. Realizamos campañas de recogida de alimentos, ayuda a personas sin hogar y emergencias sociales.',
+                '948456789',
+                'G31234570'
+            ]
         ];
+
         foreach ($ongData as $d) {
-            // Eliminado el argumento de imagen (índice 4 en tu array original)
             $u = $this->createOrUpdateUsuario('Organizacion', $d[1], $d[2]);
 
             // 🛠️ FIX 2: Flush para obtener ID del Usuario antes de crear la Organización
             $this->manager->flush();
 
-            $ongs[] = $this->createOrUpdatePerfilOrganizacion($u, $d[0], $d[3]);
+            $org = $this->createOrUpdatePerfilOrganizacion($u, $d[0], $d[3]);
+
+            // Asignar teléfono y CIF específicos
+            if (isset($d[4])) {
+                $org->setTelefono($d[4]);
+            }
+            if (isset($d[5])) {
+                $org->setCif($d[5]);
+            }
+
+            $ongs[] = $org;
         }
 
         // --- Voluntarios ---
         $vols = [];
         // Actualizado para usar las abreviaciones nuevas (DAM, SMR, etc.)
+        // Formato: [Nombre, Apellidos, Email, GoogleUID, Curso, Preferencias, Descripción]
         $volData = [
-            ['Pepe', 'Pérez', 'pepe@test.com', 'uid_pepe', 'DAM', ['Tecnológico / Digital']],
-            ['Laura', 'Gómez', 'laura@test.com', 'uid_laura', 'SMR', ['Salud / Sanitario']], // Puesto SMR por variar
-            ['Carlos', 'Ruiz', 'carlos@test.com', 'uid_carlos', 'TL', ['Deportivo', 'Protección Animal']], // Puesto TL
-            ['Ana', 'López', 'ana@test.com', 'uid_ana', 'GVEC', ['Acción Social', 'Educación']] // Puesto GVEC
+            [
+                'Pepe',
+                'Pérez',
+                'pepe@test.com',
+                'uid_pepe',
+                'DAM',
+                ['Tecnológico / Digital'],
+                'Estudiante de DAM apasionado por la tecnología y el desarrollo de apps. Me encanta ayudar a otras personas a aprender programación.'
+            ],
+            [
+                'Laura',
+                'Gómez',
+                'laura@test.com',
+                'uid_laura',
+                'SMR',
+                ['Salud / Sanitario'],
+                'Técnica en sistemas con interés en la salud digital. Busco experiencias de voluntariado en el sector sanitario.'
+            ],
+            [
+                'Carlos',
+                'Ruiz',
+                'carlos@test.com',
+                'uid_carlos',
+                'TL',
+                ['Deportivo', 'Protección Animal'],
+                'Amante del deporte y los animales. Estudiante de Transporte y Logística con ganas de ayudar en refugios y eventos deportivos.'
+            ],
+            [
+                'Ana',
+                'López',
+                'ana@test.com',
+                'uid_ana',
+                'GVEC',
+                ['Acción Social', 'Educación'],
+                'Estudiante de Gestión de Ventas y Espacios Comerciales. Me motiva el trabajo social y la educación de jóvenes.'
+            ]
         ];
+
         foreach ($volData as $d) {
-            // Eliminado el argumento de imagen (índice 6 en tu array original)
             $u = $this->createOrUpdateUsuario('Voluntario', $d[2], $d[3]);
 
             // 🛠️ FIX 3: Flush para obtener ID del Usuario antes de crear el Voluntario
             $this->manager->flush();
 
-            $v = $this->createOrUpdatePerfilVoluntario($u, $d[0], $d[1], $d[4]);
+            $v = $this->createOrUpdatePerfilVoluntario($u, $d[0], $d[1], $d[4], $d[6]);
 
-            // ... lógica de preferencias ...
-            // Aquí deberías añadir la lógica para las preferencias usando $d[5] si la tienes implementada
+            // ✅ Añadir preferencias al voluntario
+            if (isset($d[5]) && is_array($d[5])) {
+                foreach ($d[5] as $prefNombre) {
+                    if (isset($this->cache['TipoVoluntariado'][$prefNombre])) {
+                        $v->addPreferencia($this->cache['TipoVoluntariado'][$prefNombre]);
+                    }
+                }
+            }
 
             $vols[] = $v;
         }
+
+        // --- Voluntarios de PRUEBA con diferentes estados ---
+        // Estos son útiles para probar el AuthController con diferentes escenarios
+
+        // Voluntario con cuenta BLOQUEADA
+        $uBloqueado = $this->createOrUpdateUsuario('Voluntario', 'bloqueado@test.com', 'uid_bloqueado');
+        $uBloqueado->setEstadoCuenta('Bloqueada');
+        $this->manager->flush();
+        $vBloqueado = $this->createOrUpdatePerfilVoluntario($uBloqueado, 'Usuario', 'Bloqueado', 'DAM', 'Cuenta de prueba - Bloqueada');
+        $vols[] = $vBloqueado;
+
+        // Voluntario con cuenta PENDIENTE
+        $uPendiente = $this->createOrUpdateUsuario('Voluntario', 'pendiente@test.com', 'uid_pendiente');
+        $uPendiente->setEstadoCuenta('Pendiente');
+        $this->manager->flush();
+        $vPendiente = $this->createOrUpdatePerfilVoluntario($uPendiente, 'Usuario', 'Pendiente', 'SMR', 'Cuenta de prueba - Pendiente de aprobación');
+        $vols[] = $vPendiente;
+
+        // Voluntario con cuenta RECHAZADA
+        $uRechazado = $this->createOrUpdateUsuario('Voluntario', 'rechazado@test.com', 'uid_rechazado');
+        $uRechazado->setEstadoCuenta('Rechazada');
+        $this->manager->flush();
+        $vRechazado = $this->createOrUpdatePerfilVoluntario($uRechazado, 'Usuario', 'Rechazado', 'GVEC', 'Cuenta de prueba - Rechazada');
+        $vols[] = $vRechazado;
+
+        // Voluntario ELIMINADO (soft delete)
+        $uEliminado = $this->createOrUpdateUsuario('Voluntario', 'eliminado@test.com', 'uid_eliminado');
+        $uEliminado->setDeletedAt(new \DateTimeImmutable());
+        $this->manager->flush();
+        $vEliminado = $this->createOrUpdatePerfilVoluntario($uEliminado, 'Usuario', 'Eliminado', 'TL', 'Cuenta de prueba - Eliminada');
+        $vols[] = $vEliminado;
 
         // 🛠️ FIX 4: Un último flush general para guardar los perfiles (Voluntarios/Orgs)
         $manager->flush();
@@ -254,7 +364,7 @@ class AppFixtures extends Fixture
         return $usuario;
     }
 
-    private function createOrUpdatePerfilVoluntario(Usuario $u, string $nom, string $ape, string $cursoAbrev): Voluntario
+    private function createOrUpdatePerfilVoluntario(Usuario $u, string $nom, string $ape, string $cursoAbrev, ?string $descripcion = null): Voluntario
     {
         $repo = $this->manager->getRepository(Voluntario::class);
         $vol = $repo->findOneBy(['usuario' => $u]);
@@ -265,6 +375,7 @@ class AppFixtures extends Fixture
         }
         $vol->setNombre($nom);
         $vol->setApellidos($ape);
+        $vol->setDescripcion($descripcion);
         if (!$vol->getDni()) $vol->setDni(rand(10000000, 99999999) . 'X');
         if (!$vol->getTelefono()) $vol->setTelefono('600' . rand(100000, 999999));
 

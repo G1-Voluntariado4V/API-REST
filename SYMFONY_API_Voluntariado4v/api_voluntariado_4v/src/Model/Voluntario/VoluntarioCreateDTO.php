@@ -37,6 +37,10 @@ class VoluntarioCreateDTO
         #[Assert\NotBlank]
         public int $id_curso_actual,
 
+        // Descripción personal del voluntario (opcional)
+        #[Assert\Length(max: 500, maxMessage: "La descripción no puede tener más de 500 caracteres")]
+        public ?string $descripcion = null,
+
         // Arrays de IDs para relaciones (más simple que pasar objetos enteros)
         public array $preferencias_ids = [],
 

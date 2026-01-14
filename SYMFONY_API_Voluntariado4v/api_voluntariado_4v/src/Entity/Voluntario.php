@@ -22,9 +22,9 @@ class Voluntario
 
     #[ORM\OneToOne(targetEntity: Usuario::class, cascade: ['persist', 'remove'])]
     #[ORM\JoinColumn(
-        name: 'id_usuario', 
-        referencedColumnName: 'id_usuario', 
-        nullable: false, 
+        name: 'id_usuario',
+        referencedColumnName: 'id_usuario',
+        nullable: false,
         onDelete: 'CASCADE'
     )]
     private ?Usuario $usuario = null;
@@ -44,6 +44,10 @@ class Voluntario
     #[ORM\Column(length: 20, nullable: true)]
     #[Groups(['usuario:read'])]
     private ?string $telefono = null;
+
+    #[ORM\Column(type: Types::TEXT, nullable: true)]
+    #[Groups(['usuario:read'])]
+    private ?string $descripcion = null;
 
     #[ORM\Column(type: Types::DATE_MUTABLE, nullable: true, name: 'fecha_nac')]
     private ?\DateTimeInterface $fechaNac = null;
@@ -150,6 +154,16 @@ class Voluntario
         return $this;
     }
 
+    public function getDescripcion(): ?string
+    {
+        return $this->descripcion;
+    }
+    public function setDescripcion(?string $descripcion): static
+    {
+        $this->descripcion = $descripcion;
+        return $this;
+    }
+
     public function getFechaNac(): ?\DateTimeInterface
     {
         return $this->fechaNac;
@@ -170,7 +184,7 @@ class Voluntario
         return $this;
     }
 
-    
+
     public function getCursoActual(): ?Curso
     {
         return $this->cursoActual;

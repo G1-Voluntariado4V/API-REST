@@ -101,6 +101,7 @@ final class VoluntarioController extends AbstractController
             $voluntario->setDni($dto->dni);
             $voluntario->setTelefono($dto->telefono);
             $voluntario->setCarnetConducir($dto->carnet_conducir);
+            $voluntario->setDescripcion($dto->descripcion);
 
             // Manejo seguro de fecha
             try {
@@ -197,6 +198,11 @@ final class VoluntarioController extends AbstractController
         $voluntario->setNombre($dto->nombre);
         $voluntario->setApellidos($dto->apellidos);
         $voluntario->setTelefono($dto->telefono);
+
+        // Actualizar descripción si se proporciona
+        if ($dto->descripcion !== null) {
+            $voluntario->setDescripcion($dto->descripcion);
+        }
 
         // IMPORTANTE: ¡Te faltaba esto! Convertir el string fecha a DateTime
         if ($dto->fechaNac) {
