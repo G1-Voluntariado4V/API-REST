@@ -52,17 +52,20 @@ cd api_voluntariado_4v
 
 # Instalar librerías PHP
 composer install
+
+# Crear carpeta de migraciones (necesario si está ignorada en git)
+mkdir migrations
 ```
 
 ### Paso 2: Configuración del Entorno (.env)
 
 Este proyecto utiliza variables de entorno.
 
-1. Crea un archivo llamado `.env.local` en la raíz del proyecto (copiando el `.env` existente).
-2. Define tu conexión a base de datos. Ejemplo para **SQL Express**:
+1. Busca un archivo llamado `.env` en la raíz del proyecto.
+2. Define tu conexión a base de datos. Ejemplo para **SQL Express** mira que la conexión esté escrita correctamente:
 
 ```bash
-# .env.local
+# .env
 DATABASE_URL="sqlsrv://symfony_app:Symfony2025!@127.0.0.1/VoluntariadoDB?instance=SQLEXPRESS&trustServerCertificate=true&charset=UTF-8"
 ```
 
@@ -117,22 +120,43 @@ _Asegúrate de que la "Autenticación de SQL Server y Windows" (Modo Mixto) est�
 
 ## 🗄️ 3. Crear Tablas y Datos de Prueba
 
-Una vez configurada la conexión, inicializa la estructura de la base de datos:
+Una vez configurada la conexión, inicializa la estructura de la base de datos siguiendo este orden estricto:
 
-### 1. Ejecutar Migraciones (Crear Tablas)
+### 1. Generar y Ejecutar Migración Inicial (Tablas)
+
+Como las migraciones no se incluyen en el repositorio (gitignore), créalas desde cero:
 
 ```bash
+# Generar migración base
+php bin/console make:migration
+
+# Aplicar migración para crear tablas
 php bin/console doctrine:migrations:migrate
 ```
 
 ### 2. Cargar Datos de Prueba (Fixtures)
 
-Carga usuarios y datos iniciales para empezar a trabajar de inmediato:
+Es necesario tener las tablas creadas.
 
 ```bash
 php bin/console doctrine:fixtures:load
 # Escribe 'yes' cuando te pida confirmación.
 ```
+
+### 3. Añadir Triggers, Vistas y Procedimientos
+
+La lógica avanzada de SQL Server se añade en una migración separada.
+
+1.  Genera una migración vacía:
+    ```bash
+    php bin/console make:migration
+    ```
+2.  Abre el nuevo archivo generado en la carpeta `migrations/`.
+3.  Copia el contenido del archivo `migracionTriggers.txt` (ubicado en la raíz del proyecto) y úsalo para reemplazar el contenido de la migración generada.
+4.  Ejecuta esta migración:
+    ```bash
+    php bin/console doctrine:migrations:migrate
+    ```
 
 #### 👥 Usuarios Disponibles (Fixtures)
 
@@ -185,6 +209,7 @@ php bin/phpunit --testdox tests/Controller
 ## 📚 Documentación
 
 -   **OpenAPI/Swagger**: Archivo `openapi.yaml` en la raíz. Importable en Postman.
+-   **Interfaz Visual (Swagger UI)**: Consulta y prueba los endpoints interactivamente en [http://127.0.0.1:8000/doc](http://127.0.0.1:8000/doc).
 -   **Rutas**: Puedes ver todas las rutas registradas con `php bin/console debug:router`.
 
 ---
