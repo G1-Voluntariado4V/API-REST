@@ -61,7 +61,7 @@ final class OrganizacionController extends AbstractController
     // ========================================================================
     // 2. DETALLE ORGANIZACION (GET) - CON DTO
     // ========================================================================
-    #[Route('/organizaciones/{id}', name: 'detalle_organizacion', methods: ['GET'])]
+    #[Route('/organizaciones/{id}', name: 'detalle_organizacion', methods: ['GET'], requirements: ['id' => '\d+'])]
     #[OA\Response(
         response: 200,
         description: 'Detalle público de la Organización',
@@ -90,7 +90,7 @@ final class OrganizacionController extends AbstractController
     // ========================================================================
     // 3. ACTUALIZAR PERFIL (PUT) - CON VALIDACIÓN DTO
     // ========================================================================
-    #[Route('/organizaciones/{id}', name: 'update_organizacion', methods: ['PUT'])]
+    #[Route('/organizaciones/{id}', name: 'update_organizacion', methods: ['PUT'], requirements: ['id' => '\d+'])]
     #[OA\RequestBody(
         description: 'Datos a actualizar',
         required: true,
@@ -544,5 +544,90 @@ final class OrganizacionController extends AbstractController
             'message' => 'Organización creada con éxito',
             'id' => $usuario->getId()
         ], 201);
+    }
+
+    // ========================================================================
+    // 9. TOP 3 ORGANIZACIONES POR NÚMERO DE VOLUNTARIOS REALIZADOS (GET)
+    // ========================================================================
+    #[Route('/organizaciones/top-voluntarios', name: 'top_organizaciones_voluntarios', methods: ['GET'])]
+    #[OA\Response(
+        response: 200,
+        description: 'Top 3 de organizaciones con más voluntarios que han realizado actividades',
+        content: new OA\JsonContent(
+            type: 'array',
+            items: new OA\Items(
+                properties: [
+                    new OA\Property(property: 'posicion', type: 'integer', example: 1),
+                    new OA\Property(property: 'id_organizacion', type: 'integer', example: 5),
+                    new OA\Property(property: 'nombre', type: 'string', example: 'Cruz Roja'),
+                    new OA\Property(property: 'cif', type: 'string', example: 'G12345678'),
+                    new OA\Property(property: 'total_voluntarios', type: 'integer', example: 156, description: 'Voluntarios únicos con actividades Aceptadas o Finalizadas'),
+                    new OA\Property(property: 'total_actividades', type: 'integer', example: 45),
+                    new OA\Property(property: 'descripcion', type: 'string', example: 'Ayuda humanitaria')
+                ]
+            )
+        )
+    )]
+    public function topVoluntarios(EntityManagerInterface $em): JsonResponse
+    {
+        $conn = $em->getConnection();
+
+        try {
+            // Query SQL optimizada: solo cuenta voluntarios con actividades REALIZADAS (Aceptada o Finalizada)
+            $sql = "
+                SELECT TOP 3
+                    o.id_usuario as id_organizacion,
+                    o.nombre,
+                    o.cif,
+                    o.descripcion,
+                    o.telefono,
+                    o.sitio_web,
+                    COUNT(DISTINCT i.id_voluntario) as total_voluntarios,
+                    COUNT(DISTINCT a.id_actividad) as total_actividades
+                FROM ORGANIZACION o
+                INNER JOIN USUARIO u ON o.id_usuario = u.id_usuario
+                INNER JOIN ACTIVIDAD a ON o.id_usuario = a.id_organizacion 
+                INNER JOIN INSCRIPCION i ON a.id_actividad = i.id_actividad
+                WHERE u.deleted_at IS NULL 
+                    AND u.estado_cuenta = 'Activa'
+                    AND a.deleted_at IS NULL
+                    AND i.estado_solicitud IN ('Aceptada', 'Finalizada')
+                GROUP BY 
+                    o.id_usuario, 
+                    o.nombre, 
+                    o.cif, 
+                    o.descripcion, 
+                    o.telefono, 
+                    o.sitio_web
+                HAVING COUNT(DISTINCT i.id_voluntario) > 0
+                ORDER BY total_voluntarios DESC, total_actividades DESC
+            ";
+
+            $resultados = $conn->executeQuery($sql)->fetchAllAssociative();
+
+            // Añadir posición al ranking
+            $respuesta = [];
+            $posicion = 1;
+            foreach ($resultados as $org) {
+                $respuesta[] = [
+                    'posicion' => $posicion++,
+                    'id_organizacion' => (int)$org['id_organizacion'],
+                    'nombre' => $org['nombre'],
+                    'cif' => $org['cif'],
+                    'total_voluntarios' => (int)$org['total_voluntarios'],
+                    'total_actividades' => (int)$org['total_actividades'],
+                    'descripcion' => $org['descripcion'],
+                    'telefono' => $org['telefono'],
+                    'sitio_web' => $org['sitio_web']
+                ];
+            }
+
+            return $this->json($respuesta, Response::HTTP_OK);
+        } catch (\Exception $e) {
+            return $this->json(
+                ['error' => 'Error al obtener el ranking: ' . $e->getMessage()],
+                Response::HTTP_INTERNAL_SERVER_ERROR
+            );
+        }
     }
 }

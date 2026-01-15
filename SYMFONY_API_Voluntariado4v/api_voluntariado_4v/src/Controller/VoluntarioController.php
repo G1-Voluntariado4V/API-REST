@@ -393,4 +393,63 @@ final class VoluntarioController extends AbstractController
             return $this->json(['error' => 'Error al calcular recomendaciones'], 500);
         }
     }
+
+    // ========================================================================
+    // 9. HORAS TOTALES DE VOLUNTARIADO (GET) - Campo calculado
+    // ========================================================================
+    #[Route('/voluntarios/{id}/horas-totales', name: 'horas_totales_voluntario', methods: ['GET'])]
+    #[OA\Parameter(name: 'X-User-Id', in: 'header', required: true, schema: new OA\Schema(type: 'integer'))]
+    #[OA\Response(
+        response: 200,
+        description: 'Total de horas de voluntariado realizadas (campo calculado)',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'horas_totales', type: 'integer', example: 45, description: 'Suma total de horas de actividades Aceptadas o Finalizadas')
+            ]
+        )
+    )]
+    public function horasTotales(int $id, Request $request, UsuarioRepository $userRepo, EntityManagerInterface $em): JsonResponse
+    {
+        // 1. Seguridad: Solo el propio voluntario puede ver sus horas
+        if (!$this->checkOwner($request, $id)) {
+            return $this->json(['error' => 'Acceso denegado'], Response::HTTP_FORBIDDEN);
+        }
+
+        // 2. Buscar al voluntario
+        $usuario = $userRepo->find($id);
+        if (!$usuario || $usuario->getDeletedAt()) {
+            return $this->json(['error' => 'Usuario no encontrado'], Response::HTTP_NOT_FOUND);
+        }
+
+        $voluntario = $em->getRepository(Voluntario::class)->findOneBy(['usuario' => $usuario]);
+        if (!$voluntario) {
+            return $this->json(['error' => 'Perfil de voluntario no encontrado'], Response::HTTP_NOT_FOUND);
+        }
+
+        // 3. Calcular horas totales usando solo SQL para mejor rendimiento
+        $conn = $em->getConnection();
+
+        $sql = "
+            SELECT COALESCE(SUM(a.duracion_horas), 0) as horas_totales
+            FROM INSCRIPCION i
+            INNER JOIN ACTIVIDAD a ON i.id_actividad = a.id_actividad
+            WHERE i.id_voluntario = :id_voluntario
+            AND i.estado_solicitud IN ('Aceptada', 'Finalizada')
+            AND a.deleted_at IS NULL
+        ";
+
+        try {
+            $result = $conn->executeQuery($sql, ['id_voluntario' => $id])->fetchAssociative();
+            $horasTotales = (int)$result['horas_totales'];
+
+            return $this->json([
+                'horas_totales' => $horasTotales
+            ], Response::HTTP_OK);
+        } catch (\Exception $e) {
+            return $this->json(
+                ['error' => 'Error al calcular horas totales'],
+                Response::HTTP_INTERNAL_SERVER_ERROR
+            );
+        }
+    }
 }

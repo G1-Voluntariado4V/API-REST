@@ -196,4 +196,81 @@ class VoluntarioControllerTest extends WebTestCase
         $statusCode = $this->client->getResponse()->getStatusCode();
         $this->assertTrue(in_array($statusCode, [200, 404]));
     }
+
+    /**
+     * Test: GET /voluntarios/{id}/horas-totales
+     * Prueba el nuevo endpoint de estadísticas de horas
+     */
+    public function testHorasTotalesVoluntario(): void
+    {
+        $this->client->request(
+            'GET',
+            '/voluntarios/1/horas-totales',
+            [],
+            [],
+            ['HTTP_X-User-Id' => '1']
+        );
+
+        $statusCode = $this->client->getResponse()->getStatusCode();
+
+        // Si existe el voluntario, debe retornar 200 con estructura correcta
+        if ($statusCode === 200) {
+            $data = json_decode($this->client->getResponse()->getContent(), true);
+
+            // Verificar estructura de respuesta
+            $this->assertArrayHasKey('id_voluntario', $data);
+            $this->assertArrayHasKey('nombre_completo', $data);
+            $this->assertArrayHasKey('horas_totales', $data);
+            $this->assertArrayHasKey('actividades_completadas', $data);
+            $this->assertArrayHasKey('nivel_experiencia', $data);
+            $this->assertArrayHasKey('detalles', $data);
+
+            // Verificar tipos de datos
+            $this->assertIsInt($data['id_voluntario']);
+            $this->assertIsString($data['nombre_completo']);
+            $this->assertIsInt($data['horas_totales']);
+            $this->assertIsInt($data['actividades_completadas']);
+            $this->assertIsString($data['nivel_experiencia']);
+            $this->assertIsArray($data['detalles']);
+
+            // Verificar nivel de experiencia válido
+            $this->assertContains($data['nivel_experiencia'], ['Principiante', 'Intermedio', 'Experto']);
+
+            // Verificar horas no negativas
+            $this->assertGreaterThanOrEqual(0, $data['horas_totales']);
+
+            // Si hay detalles, verificar estructura
+            if (count($data['detalles']) > 0) {
+                $detalle = $data['detalles'][0];
+                $this->assertArrayHasKey('titulo_actividad', $detalle);
+                $this->assertArrayHasKey('duracion_horas', $detalle);
+                $this->assertArrayHasKey('fecha_inicio', $detalle);
+                $this->assertArrayHasKey('estado', $detalle);
+                $this->assertArrayHasKey('organizacion', $detalle);
+            }
+        }
+
+        // Debe ser 200 (éxito), 403 (sin permiso) o 404 (no encontrado)
+        $this->assertTrue(in_array($statusCode, [200, 403, 404]));
+    }
+
+    /**
+     * Test: Acceso denegado a horas totales de otro voluntario
+     */
+    public function testHorasTotalesAccesoDenegado(): void
+    {
+        // Intentar acceder a las horas del voluntario 2 con header de voluntario 1
+        $this->client->request(
+            'GET',
+            '/voluntarios/2/horas-totales',
+            [],
+            [],
+            ['HTTP_X-User-Id' => '1'] // Voluntario 1 intentando ver horas del 2
+        );
+
+        $statusCode = $this->client->getResponse()->getStatusCode();
+
+        // Debe retornar 403 (Forbidden) si ambos existen, o 404 si el voluntario 2 no existe
+        $this->assertTrue(in_array($statusCode, [403, 404]));
+    }
 }

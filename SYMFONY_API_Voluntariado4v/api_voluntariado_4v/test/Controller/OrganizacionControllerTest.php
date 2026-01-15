@@ -174,4 +174,83 @@ class OrganizacionControllerTest extends WebTestCase
         $statusCode = $this->client->getResponse()->getStatusCode();
         $this->assertTrue(in_array($statusCode, [200, 403, 404]));
     }
+
+    /**
+     * Test: GET /organizaciones/top-voluntarios
+     * Prueba el nuevo endpoint de ranking de organizaciones
+     */
+    public function testTopOrganizacionesVoluntarios(): void
+    {
+        $this->client->request('GET', '/organizaciones/top-voluntarios');
+
+        $this->assertResponseIsSuccessful();
+        $this->assertResponseHeaderSame('content-type', 'application/json');
+
+        $data = json_decode($this->client->getResponse()->getContent(), true);
+
+        // Verificar que es un array
+        $this->assertIsArray($data);
+
+        // El TOP puede tener hasta 3 organizaciones (o menos si hay pocas en BD)
+        $this->assertLessThanOrEqual(3, count($data));
+
+        // Si hay resultados, verificar estructura y orden
+        if (count($data) > 0) {
+            // Verificar estructura del primer elemento
+            $primera = $data[0];
+            $this->assertArrayHasKey('posicion', $primera);
+            $this->assertArrayHasKey('id_organizacion', $primera);
+            $this->assertArrayHasKey('nombre', $primera);
+            $this->assertArrayHasKey('cif', $primera);
+            $this->assertArrayHasKey('total_voluntarios', $primera);
+            $this->assertArrayHasKey('total_actividades', $primera);
+            $this->assertArrayHasKey('descripcion', $primera);
+
+            // La primera posición debe ser 1
+            $this->assertEquals(1, $primera['posicion']);
+
+            // Verificar tipos de datos
+            $this->assertIsInt($primera['posicion']);
+            $this->assertIsInt($primera['id_organizacion']);
+            $this->assertIsString($primera['nombre']);
+            $this->assertIsInt($primera['total_voluntarios']);
+            $this->assertIsInt($primera['total_actividades']);
+
+            // Los totales no pueden ser negativos
+            $this->assertGreaterThanOrEqual(0, $primera['total_voluntarios']);
+            $this->assertGreaterThanOrEqual(0, $primera['total_actividades']);
+
+            // Si hay más de una organización, verificar que están ordenadas
+            if (count($data) > 1) {
+                $segunda = $data[1];
+                $this->assertEquals(2, $segunda['posicion']);
+
+                // La primera debe tener más o igual voluntarios que la segunda
+                $this->assertGreaterThanOrEqual(
+                    $segunda['total_voluntarios'],
+                    $primera['total_voluntarios'],
+                    'El ranking debe estar ordenado por total_voluntarios descendente'
+                );
+            }
+
+            // Si hay 3, verificar la tercera
+            if (count($data) === 3) {
+                $tercera = $data[2];
+                $this->assertEquals(3, $tercera['posicion']);
+            }
+        }
+    }
+
+    /**
+     * Test: Verificar que el endpoint top-voluntarios es público
+     * No debe requerir autenticación
+     */
+    public function testTopOrganizacionesEsPublico(): void
+    {
+        // Sin ningún header de autenticación
+        $this->client->request('GET', '/organizaciones/top-voluntarios');
+
+        // Debe funcionar sin autenticación (200)
+        $this->assertResponseIsSuccessful();
+    }
 }

@@ -71,11 +71,13 @@ class AppFixtures extends Fixture
             $this->createOrUpdateODS($d[0], $d[1], $d[2]);
         }
 
-        // CURSOS (Basados en las imágenes proporcionadas)
-        // Nivel 2 = Grado Superior, Nivel 1 = Grado Medio
-        $cursosData = [
+        // CURSOS CUATROVIENTOS (REALES)
+        // Lógica: Generamos 1º y 2º para cada titulación.
+        // Nivel DB: 2 = Grado Superior, 1 = Grado Medio
+        
+        $titulaciones = [
             // GRADO SUPERIOR (Nivel 2)
-            ['Desarrollo de Aplicaciones Multiplataforma Dual', 'DAM', 'Grado Superior', 2],
+            ['Desarrollo de Aplicaciones Multiplataforma', 'DAM', 'Grado Superior', 2],
             ['Administración de Sistemas Informáticos en Red Dual', 'ASIR', 'Grado Superior', 2],
             ['Transporte y Logística Dual', 'TL', 'Grado Superior', 2],
             ['Gestión de Ventas y Espacios Comerciales Dual', 'GVEC', 'Grado Superior', 2],
@@ -88,8 +90,17 @@ class AppFixtures extends Fixture
             ['Gestión Administrativa Bilingüe', 'GA', 'Grado Medio', 1]
         ];
 
-        foreach ($cursosData as $d) {
-            $this->createOrUpdateCurso($d[0], $d[1], $d[2], $d[3]);
+        foreach ($titulaciones as $titulacion) {
+            $nombreBase = $titulacion[0];
+            $abrevBase = $titulacion[1];
+            $grado = $titulacion[2];
+            $nivelDb = $titulacion[3];
+
+            // Crear 1º Curso
+            $this->createOrUpdateCurso("1º " . $nombreBase, "1" . $abrevBase, $grado, $nivelDb);
+            
+            // Crear 2º Curso
+            $this->createOrUpdateCurso("2º " . $nombreBase, "2" . $abrevBase, $grado, $nivelDb);
         }
 
         $manager->flush();
@@ -167,24 +178,24 @@ class AppFixtures extends Fixture
 
         // --- Voluntarios ---
         $vols = [];
-        // Actualizado para usar las abreviaciones nuevas (DAM, SMR, etc.)
-        // Formato: [Nombre, Apellidos, Email, GoogleUID, Curso, Preferencias, Descripción]
+        // Actualizado para usar las NUEVAS abreviaciones (1DAM, 2DAM, etc.)
+        // Formato: [Nombre, Apellidos, Email, GoogleUID, CursoAbrev, Preferencias, Descripción]
         $volData = [
             [
                 'Pepe',
                 'Pérez',
                 'pepe@test.com',
                 'uid_pepe',
-                'DAM',
+                '2DAM', // Pepe está en 2º
                 ['Tecnológico / Digital'],
-                'Estudiante de DAM apasionado por la tecnología y el desarrollo de apps. Me encanta ayudar a otras personas a aprender programación.'
+                'Estudiante de 2º de DAM apasionado por la tecnología y el desarrollo de apps. Me encanta ayudar a otras personas a aprender programación.'
             ],
             [
                 'Laura',
                 'Gómez',
                 'laura@test.com',
                 'uid_laura',
-                'SMR',
+                '1SMR', // Laura está en 1º
                 ['Salud / Sanitario'],
                 'Técnica en sistemas con interés en la salud digital. Busco experiencias de voluntariado en el sector sanitario.'
             ],
@@ -193,7 +204,7 @@ class AppFixtures extends Fixture
                 'Ruiz',
                 'carlos@test.com',
                 'uid_carlos',
-                'TL',
+                '2TL', // Carlos está en 2º
                 ['Deportivo', 'Protección Animal'],
                 'Amante del deporte y los animales. Estudiante de Transporte y Logística con ganas de ayudar en refugios y eventos deportivos.'
             ],
@@ -202,7 +213,7 @@ class AppFixtures extends Fixture
                 'López',
                 'ana@test.com',
                 'uid_ana',
-                'GVEC',
+                '1GVEC', // Ana está en 1º
                 ['Acción Social', 'Educación'],
                 'Estudiante de Gestión de Ventas y Espacios Comerciales. Me motiva el trabajo social y la educación de jóvenes.'
             ]
@@ -229,34 +240,33 @@ class AppFixtures extends Fixture
         }
 
         // --- Voluntarios de PRUEBA con diferentes estados ---
-        // Estos son útiles para probar el AuthController con diferentes escenarios
-
-        // Voluntario con cuenta BLOQUEADA
+        
+        // Voluntario con cuenta BLOQUEADA (2º DAM)
         $uBloqueado = $this->createOrUpdateUsuario('Voluntario', 'bloqueado@test.com', 'uid_bloqueado');
         $uBloqueado->setEstadoCuenta('Bloqueada');
         $this->manager->flush();
-        $vBloqueado = $this->createOrUpdatePerfilVoluntario($uBloqueado, 'Usuario', 'Bloqueado', 'DAM', 'Cuenta de prueba - Bloqueada');
+        $vBloqueado = $this->createOrUpdatePerfilVoluntario($uBloqueado, 'Usuario', 'Bloqueado', '2DAM', 'Cuenta de prueba - Bloqueada');
         $vols[] = $vBloqueado;
 
-        // Voluntario con cuenta PENDIENTE
+        // Voluntario con cuenta PENDIENTE (1º SMR)
         $uPendiente = $this->createOrUpdateUsuario('Voluntario', 'pendiente@test.com', 'uid_pendiente');
         $uPendiente->setEstadoCuenta('Pendiente');
         $this->manager->flush();
-        $vPendiente = $this->createOrUpdatePerfilVoluntario($uPendiente, 'Usuario', 'Pendiente', 'SMR', 'Cuenta de prueba - Pendiente de aprobación');
+        $vPendiente = $this->createOrUpdatePerfilVoluntario($uPendiente, 'Usuario', 'Pendiente', '1SMR', 'Cuenta de prueba - Pendiente de aprobación');
         $vols[] = $vPendiente;
 
-        // Voluntario con cuenta RECHAZADA
+        // Voluntario con cuenta RECHAZADA (1º GVEC)
         $uRechazado = $this->createOrUpdateUsuario('Voluntario', 'rechazado@test.com', 'uid_rechazado');
         $uRechazado->setEstadoCuenta('Rechazada');
         $this->manager->flush();
-        $vRechazado = $this->createOrUpdatePerfilVoluntario($uRechazado, 'Usuario', 'Rechazado', 'GVEC', 'Cuenta de prueba - Rechazada');
+        $vRechazado = $this->createOrUpdatePerfilVoluntario($uRechazado, 'Usuario', 'Rechazado', '1GVEC', 'Cuenta de prueba - Rechazada');
         $vols[] = $vRechazado;
 
-        // Voluntario ELIMINADO (soft delete)
+        // Voluntario ELIMINADO (soft delete) (2º TL)
         $uEliminado = $this->createOrUpdateUsuario('Voluntario', 'eliminado@test.com', 'uid_eliminado');
         $uEliminado->setDeletedAt(new \DateTimeImmutable());
         $this->manager->flush();
-        $vEliminado = $this->createOrUpdatePerfilVoluntario($uEliminado, 'Usuario', 'Eliminado', 'TL', 'Cuenta de prueba - Eliminada');
+        $vEliminado = $this->createOrUpdatePerfilVoluntario($uEliminado, 'Usuario', 'Eliminado', '2TL', 'Cuenta de prueba - Eliminada');
         $vols[] = $vEliminado;
 
         // 🛠️ FIX 4: Un último flush general para guardar los perfiles (Voluntarios/Orgs)
@@ -288,7 +298,7 @@ class AppFixtures extends Fixture
         if (isset($this->cache['TipoVoluntariado']['Medioambiente'])) {
             $a2->addTiposVoluntariado($this->cache['TipoVoluntariado']['Medioambiente']);
         }
-        // Asignamos el ODS 1 (Fin de la Pobreza) - (Ojo, quizás ODS 13 o 15 encaje mejor, pero mantengo tu lógica)
+        // Asignamos el ODS 1 (Fin de la Pobreza)
         $odsPobreza = $this->manager->getRepository(ODS::class)->find(1);
         if ($odsPobreza) {
             $a2->addOd($odsPobreza);
@@ -339,7 +349,6 @@ class AppFixtures extends Fixture
     // HELPER FUNCTIONS 
     // ======================================================
 
-    // Eliminado el parámetro $img
     private function createOrUpdateUsuario(string $rolName, string $email, string $googleId): Usuario
     {
         $repo = $this->manager->getRepository(Usuario::class);
@@ -493,20 +502,16 @@ class AppFixtures extends Fixture
         $this->cache['TipoVoluntariado'][$nombre] = $tipo;
     }
 
-    // Actualizado para aceptar descripción
     private function createOrUpdateODS(int $id, string $nombre, string $descripcion): void
     {
         $repo = $this->manager->getRepository(ODS::class);
         $ods = $repo->find($id);
 
         if (!$ods) {
-            // Asumiendo que tu constructor acepta ID y Nombre
-            // Si no acepta ID, Doctrine se encarga, pero aquí parece que los IDs son fijos
             $ods = new ODS($id, $nombre);
-            $ods->setDescripcion($descripcion); // ✅ Seteamos la descripción
+            $ods->setDescripcion($descripcion);
             $this->manager->persist($ods);
         } else {
-            // Si ya existe, actualizamos por si acaso cambias el texto
             $ods->setNombre($nombre);
             $ods->setDescripcion($descripcion);
         }
