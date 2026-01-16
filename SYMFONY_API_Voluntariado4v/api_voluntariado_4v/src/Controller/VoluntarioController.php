@@ -78,20 +78,19 @@ final class VoluntarioController extends AbstractController
         RolRepository $rolRepository
     ): JsonResponse {
 
-        $em->beginTransaction();
         try {
             // A. USUARIO BASE
             $usuario = new Usuario();
             $usuario->setCorreo($dto->correo);
             $usuario->setGoogleId($dto->google_id);
-            $usuario->setEstadoCuenta('Activa');
+            $usuario->setEstadoCuenta('Pendiente');
 
             $rolVoluntario = $rolRepository->findOneBy(['nombre' => 'Voluntario']);
             if (!$rolVoluntario) throw new \Exception("Rol 'Voluntario' no encontrado");
             $usuario->setRol($rolVoluntario);
 
             $em->persist($usuario);
-            $em->flush();
+            $em->flush(); // Necesario para obtener el ID del usuario
 
             // B. PERFIL VOLUNTARIO
             $voluntario = new Voluntario();
@@ -135,15 +134,13 @@ final class VoluntarioController extends AbstractController
 
             $em->persist($voluntario);
             $em->flush();
-            $em->commit();
 
             // Refrescamos para traer las relaciones cargadas
             $em->refresh($voluntario);
 
             return $this->json(VoluntarioResponseDTO::fromEntity($voluntario), Response::HTTP_CREATED);
         } catch (\Exception $e) {
-            $em->rollback();
-            if (str_contains($e->getMessage(), 'Duplicate')) {
+            if (str_contains($e->getMessage(), 'Duplicate') || str_contains($e->getMessage(), 'UNIQUE')) {
                 return $this->json(['error' => 'El usuario (correo/DNI) ya existe'], 409);
             }
             return $this->json(['error' => 'Error registro: ' . $e->getMessage()], 500);
