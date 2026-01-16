@@ -327,7 +327,9 @@ final class CoordinadorController extends AbstractController
                 a.ubicacion, 
                 a.estado_publicacion,
                 COALESCE(o.nombre, 'Organización Desconocida') as nombre_organizacion,
-                COALESCE(u.id_usuario, 0) as id_organizacion
+                COALESCE(u.id_usuario, 0) as id_organizacion,
+                (SELECT COUNT(*) FROM INSCRIPCION i WHERE i.id_actividad = a.id_actividad AND (i.estado_solicitud = 'Aceptada' OR i.estado_solicitud = 'Confirmada')) as inscritos_confirmados,
+                (SELECT COUNT(*) FROM INSCRIPCION i WHERE i.id_actividad = a.id_actividad AND i.estado_solicitud = 'Pendiente') as inscritos_pendientes
             FROM ACTIVIDAD a
             LEFT JOIN ORGANIZACION o ON a.id_organizacion = o.id_usuario
             LEFT JOIN USUARIO u ON o.id_usuario = u.id_usuario

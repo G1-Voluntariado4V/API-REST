@@ -18,6 +18,7 @@ class ActividadResponseDTO
 
         // Campo calculado útil para la barra de progreso en el Frontend
         public int $inscritos_confirmados,
+        public int $inscritos_pendientes,
 
         public string $ubicacion,
         public string $estado_publicacion,
@@ -53,11 +54,14 @@ class ActividadResponseDTO
         // Obtener organización
         $org = $act->getOrganizacion();
 
-        // Contar inscritos confirmados
+        // Contar inscritos confirmados y pendientes
         $inscritosConfirmados = 0;
+        $inscritosPendientes = 0;
         foreach ($act->getInscripciones() as $insc) {
-            if ($insc->getEstadoSolicitud() === 'Confirmada') {
+            if ($insc->getEstadoSolicitud() === 'Confirmada' || $insc->getEstadoSolicitud() === 'Aceptada') {
                 $inscritosConfirmados++;
+            } elseif ($insc->getEstadoSolicitud() === 'Pendiente') {
+                $inscritosPendientes++;
             }
         }
 
@@ -69,6 +73,7 @@ class ActividadResponseDTO
             duracion_horas: $act->getDuracionHoras(),
             cupo_maximo: $act->getCupoMaximo(),
             inscritos_confirmados: $inscritosConfirmados,
+            inscritos_pendientes: $inscritosPendientes,
             ubicacion: $act->getUbicacion() ?? 'No definida',
             estado_publicacion: $act->getEstadoPublicacion(),
             nombre_organizacion: $org ? $org->getNombre() : 'Desconocida',

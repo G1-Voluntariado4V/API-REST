@@ -78,20 +78,19 @@ final class VoluntarioController extends AbstractController
         RolRepository $rolRepository
     ): JsonResponse {
 
-        $em->beginTransaction();
         try {
             // A. USUARIO BASE
             $usuario = new Usuario();
             $usuario->setCorreo($dto->correo);
             $usuario->setGoogleId($dto->google_id);
-            $usuario->setEstadoCuenta('Activa');
+            $usuario->setEstadoCuenta('Pendiente');
 
             $rolVoluntario = $rolRepository->findOneBy(['nombre' => 'Voluntario']);
             if (!$rolVoluntario) throw new \Exception("Rol 'Voluntario' no encontrado");
             $usuario->setRol($rolVoluntario);
 
             $em->persist($usuario);
-            $em->flush();
+            $em->flush(); // Necesario para obtener el ID del usuario
 
 
             // B. PERFIL VOLUNTARIO
@@ -141,33 +140,14 @@ final class VoluntarioController extends AbstractController
 
             // FLUSH FINAL: Guarda voluntario + relaciones
             $em->flush();
-            $em->commit();
 
             // Refrescamos para traer las relaciones cargadas
             $em->refresh($voluntario);
 
             return $this->json(VoluntarioResponseDTO::fromEntity($voluntario), Response::HTTP_CREATED);
         } catch (\Exception $e) {
-            $em->rollback();
-
-            $errorMsg = $e->getMessage();
-
-            // Detectar errores de duplicados (SQL Server usa "duplicada" o "UNIQUE")
-            if (
-                str_contains($errorMsg, 'duplicada') ||
-                str_contains($errorMsg, 'Duplicate') ||
-                str_contains($errorMsg, 'UNIQUE') ||
-                str_contains($errorMsg, '2601')
-            ) { // Código de error SQL Server para clave duplicada
-
-                // Determinar si es el correo o el DNI
-                if (str_contains($errorMsg, 'UNIQ_1D204E4777040BC9') || str_contains($errorMsg, 'correo')) {
-                    return $this->json(['error' => 'Ese correo electrónico ya está registrado en nuestra base de datos'], Response::HTTP_CONFLICT);
-                } elseif (str_contains($errorMsg, 'UNIQ_2AFD2CC17F8F253B') || str_contains($errorMsg, 'dni')) {
-                    return $this->json(['error' => 'Ese DNI ya está registrado en nuestra base de datos'], Response::HTTP_CONFLICT);
-                } else {
-                    return $this->json(['error' => 'Ese voluntario ya está registrado en nuestra base de datos'], Response::HTTP_CONFLICT);
-                }
+            if (str_contains($e->getMessage(), 'Duplicate') || str_contains($e->getMessage(), 'UNIQUE')) {
+                return $this->json(['error' => 'El usuario (correo/DNI) ya existe'], 409);
             }
 
             // Otros errores
