@@ -14,7 +14,13 @@ class InscripcionResponseDTO
         // Datos de la Actividad (Para el historial del Voluntario)
         public int $id_actividad,
         public string $titulo_actividad,
+        public string $descripcion,
+        public string $ubicacion,
+        public int $duracion_horas,
         public string $fecha_actividad,
+        public string $nombre_organizacion,
+        public array $ods,
+        public array $tipos,
 
         // Datos del Voluntario (Para la gestión de la ONG)
         public int $id_voluntario,
@@ -30,6 +36,21 @@ class InscripcionResponseDTO
         // Create composite ID from the two primary key components
         $compositeId = $userVol->getId() . '-' . $act->getId();
 
+        // Map ODS
+        $ods = [];
+        foreach ($act->getOds() as $od) {
+            $ods[] = [
+                'id' => $od->getId(),
+                'nombre' => $od->getNombre()
+            ];
+        }
+
+        // Map Tipos (Returning strings directly as expected by frontend history)
+        $tipos = [];
+        foreach ($act->getTiposVoluntariado() as $tipo) {
+            $tipos[] = $tipo->getNombreTipo();
+        }
+
         return new self(
             $compositeId,
             $ins->getEstadoSolicitud(),
@@ -37,9 +58,15 @@ class InscripcionResponseDTO
 
             $act->getId(),
             $act->getTitulo(),
+            $act->getDescripcion() ?? '',
+            $act->getUbicacion() ?? '',
+            $act->getDuracionHoras(),
             $act->getFechaInicio()->format('Y-m-d H:i'),
+            $act->getOrganizacion()->getNombre(),
+            $ods,
+            $tipos,
 
-            $userVol->getId(), // Ojo: Usamos ID de Usuario como identificador público
+            $userVol->getId(),
             $vol->getNombre() . ' ' . $vol->getApellidos()
         );
     }

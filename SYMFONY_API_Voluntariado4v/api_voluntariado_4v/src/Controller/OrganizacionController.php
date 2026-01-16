@@ -436,9 +436,13 @@ final class OrganizacionController extends AbstractController
             $voluntarios = $conn->executeQuery(
                 'SELECT 
                     v.id_usuario as id_voluntario,
-                    u.nombre,
-                    u.apellidos,
-                    u.email,
+                    v.nombre,
+                    v.apellidos,
+                    v.dni,
+                    v.telefono,
+                    v.descripcion as bio,
+                    v.fecha_nac,
+                    u.correo as email,
                     i.fecha_solicitud,
                     i.estado_solicitud
                  FROM INSCRIPCION i
