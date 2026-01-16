@@ -93,6 +93,7 @@ final class VoluntarioController extends AbstractController
             $em->persist($usuario);
             $em->flush();
 
+
             // B. PERFIL VOLUNTARIO
             $voluntario = new Voluntario();
             $voluntario->setUsuario($usuario);
@@ -110,9 +111,14 @@ final class VoluntarioController extends AbstractController
                 // El DTO ya valida el formato, esto es por seguridad extra
             }
 
+            // IMPORTANTE: Asignar el curso ANTES del persist
             $curso = $em->getRepository(Curso::class)->find($dto->id_curso_actual);
             if ($curso) $voluntario->setCursoActual($curso);
 
+            // PERSISTIR primero para generar el ID
+            $em->persist($voluntario);
+
+            // Ahora sí, añadir las relaciones Many-to-Many e Idiomas
             // Preferencias (Tipos)
             $tipoRepo = $em->getRepository(TipoVoluntariado::class);
             foreach ($dto->preferencias_ids as $tipoId) {
@@ -133,7 +139,7 @@ final class VoluntarioController extends AbstractController
                 }
             }
 
-            $em->persist($voluntario);
+            // FLUSH FINAL: Guarda voluntario + relaciones
             $em->flush();
             $em->commit();
 
@@ -143,10 +149,29 @@ final class VoluntarioController extends AbstractController
             return $this->json(VoluntarioResponseDTO::fromEntity($voluntario), Response::HTTP_CREATED);
         } catch (\Exception $e) {
             $em->rollback();
-            if (str_contains($e->getMessage(), 'Duplicate')) {
-                return $this->json(['error' => 'El usuario (correo/DNI) ya existe'], 409);
+
+            $errorMsg = $e->getMessage();
+
+            // Detectar errores de duplicados (SQL Server usa "duplicada" o "UNIQUE")
+            if (
+                str_contains($errorMsg, 'duplicada') ||
+                str_contains($errorMsg, 'Duplicate') ||
+                str_contains($errorMsg, 'UNIQUE') ||
+                str_contains($errorMsg, '2601')
+            ) { // Código de error SQL Server para clave duplicada
+
+                // Determinar si es el correo o el DNI
+                if (str_contains($errorMsg, 'UNIQ_1D204E4777040BC9') || str_contains($errorMsg, 'correo')) {
+                    return $this->json(['error' => 'Ese correo electrónico ya está registrado en nuestra base de datos'], Response::HTTP_CONFLICT);
+                } elseif (str_contains($errorMsg, 'UNIQ_2AFD2CC17F8F253B') || str_contains($errorMsg, 'dni')) {
+                    return $this->json(['error' => 'Ese DNI ya está registrado en nuestra base de datos'], Response::HTTP_CONFLICT);
+                } else {
+                    return $this->json(['error' => 'Ese voluntario ya está registrado en nuestra base de datos'], Response::HTTP_CONFLICT);
+                }
             }
-            return $this->json(['error' => 'Error registro: ' . $e->getMessage()], 500);
+
+            // Otros errores
+            return $this->json(['error' => 'Error al registrar el voluntario. Por favor, revisa los datos e inténtalo de nuevo.'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 

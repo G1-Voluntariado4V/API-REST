@@ -508,42 +508,79 @@ final class OrganizacionController extends AbstractController
             return $this->json(['error' => 'Rol de Organización no encontrado en la base de datos'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
 
-        // 3. Crear primero el USUARIO (Padre)
-        $usuario = new Usuario();
-        $usuario->setCorreo($data['correo']); // Coherencia con BBDD
-        $usuario->setGoogleId($data['google_id'] ?? 'generado_' . uniqid());
-        $usuario->setRol($rolOrganizacion);
-        $usuario->setEstadoCuenta('Pendiente'); // Valor por defecto seguro
+        // ========================================================================
+        // 🔒 TRANSACCIÓN: Garantiza atomicidad (Usuario + Organización juntos)
+        // ========================================================================
+        $em->beginTransaction();
+        try {
+            // 3. Crear primero el USUARIO (Padre)
+            $usuario = new Usuario();
+            $usuario->setCorreo($data['correo']); // Coherencia con BBDD
+            $usuario->setGoogleId($data['google_id'] ?? 'generado_' . uniqid());
+            $usuario->setRol($rolOrganizacion);
+            $usuario->setEstadoCuenta('Pendiente'); // Valor por defecto seguro
 
-        // ---------------------------------------------------------------------
-        // 4. PRIMER GUARDADO (CRÍTICO: Generar ID de Usuario)
-        // ---------------------------------------------------------------------
-        $em->persist($usuario);
-        $em->flush();
+            $em->persist($usuario);
+            $em->flush(); // Generar ID dentro de la transacción
 
-        // Ahora $usuario->getId() ya tiene un valor real gracias al flush anterior
+            // 4. Crear la ORGANIZACION (Hija) vinculada a ese ID
+            $organizacion = new Organizacion();
+            $organizacion->setUsuario($usuario);
 
-        // 5. Crear la ORGANIZACION (Hija) vinculada a ese ID
-        $organizacion = new Organizacion();
-        $organizacion->setUsuario($usuario); // Doctrine usa el ID del usuario recién creado
+            // Asignar datos específicos
+            $organizacion->setNombre($data['nombre']);
+            $organizacion->setCif($data['cif']);
+            $organizacion->setTelefono($data['telefono'] ?? null);
+            $organizacion->setDireccion($data['direccion'] ?? null);
+            $organizacion->setDescripcion($data['descripcion'] ?? null);
+            $organizacion->setSitioWeb($data['sitio_web'] ?? null);
 
-        // Asignar datos específicos
-        $organizacion->setNombre($data['nombre']);
-        $organizacion->setCif($data['cif']);
-        $organizacion->setTelefono($data['telefono'] ?? null); // Nullsafe
-        $organizacion->setDireccion($data['direccion'] ?? null); // Nullsafe
-        $organizacion->setDescripcion($data['descripcion'] ?? null);
-        $organizacion->setSitioWeb($data['sitio_web'] ?? null);
+            $em->persist($organizacion);
+            $em->flush();
 
-        // 6. SEGUNDO GUARDADO (Persistir la Organización con el ID correcto)
-        $em->persist($organizacion);
-        $em->flush();
+            // 5. COMMIT: Si llegamos aquí, todo fue bien
+            $em->commit();
 
-        // 7. Responder
-        return $this->json([
-            'message' => 'Organización creada con éxito',
-            'id' => $usuario->getId()
-        ], 201);
+            // 6. Responder
+            return $this->json([
+                'message' => 'Organización creada con éxito',
+                'id' => $usuario->getId()
+            ], Response::HTTP_CREATED);
+        } catch (\Exception $e) {
+            // 7. ROLLBACK: Deshace USUARIO + ORGANIZACIÓN si algo falla
+            $em->rollback();
+
+            $errorMsg = $e->getMessage();
+
+            // Detectar errores de duplicados (SQL Server usa "duplicada" o "UNIQUE")
+            if (
+                str_contains($errorMsg, 'duplicada') ||
+                str_contains($errorMsg, 'Duplicate') ||
+                str_contains($errorMsg, 'UNIQUE') ||
+                str_contains($errorMsg, '2601')
+            ) { // Código de error SQL Server para clave duplicada
+
+                // Determinar si es el correo o el CIF
+                if (str_contains($errorMsg, 'UNIQ_1D204E4777040BC9') || str_contains($errorMsg, 'correo')) {
+                    return $this->json([
+                        'error' => 'Ese correo electrónico ya está registrado en nuestra base de datos'
+                    ], Response::HTTP_CONFLICT);
+                } elseif (str_contains($errorMsg, 'UNIQ_9912454AA53EB8E8') || str_contains($errorMsg, 'cif')) {
+                    return $this->json([
+                        'error' => 'Ese CIF ya está registrado en nuestra base de datos'
+                    ], Response::HTTP_CONFLICT);
+                } else {
+                    return $this->json([
+                        'error' => 'Esa organización ya está registrada en nuestra base de datos'
+                    ], Response::HTTP_CONFLICT);
+                }
+            }
+
+            // Otros errores
+            return $this->json([
+                'error' => 'Error al registrar la organización. Por favor, revisa los datos e inténtalo de nuevo.'
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
     }
 
     // ========================================================================
