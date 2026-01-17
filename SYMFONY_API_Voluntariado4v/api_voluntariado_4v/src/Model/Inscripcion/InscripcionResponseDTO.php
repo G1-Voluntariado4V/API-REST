@@ -18,7 +18,10 @@ class InscripcionResponseDTO
         public string $ubicacion,
         public int $duracion_horas,
         public string $fecha_actividad,
+        public int $id_organizacion,    
         public string $nombre_organizacion,
+        public int $cupo_maximo,          
+        public int $inscritos_confirmados,  
         public array $ods,
         public array $tipos,
 
@@ -52,6 +55,17 @@ class InscripcionResponseDTO
             $tipos[] = $tipo->getNombreTipo();
         }
 
+        // Calculate inscritos confirmados
+        $inscritosConfirmados = 0;
+        // Check if getInscripciones returns something iterable
+        if ($act->getInscripciones()) {
+            foreach ($act->getInscripciones() as $otherIns) {
+                if ($otherIns->getEstadoSolicitud() === 'Confirmada' || $otherIns->getEstadoSolicitud() === 'Aceptada') {
+                    $inscritosConfirmados++;
+                }
+            }
+        }
+
         return new self(
             $compositeId,
             $ins->getEstadoSolicitud(),
@@ -62,14 +76,17 @@ class InscripcionResponseDTO
             $act->getDescripcion() ?? '',
             $act->getUbicacion() ?? '',
             $act->getDuracionHoras(),
-            $act->getFechaInicio()->format('Y-m-d H:i'),
+            $act->getFechaInicio()->format('Y-m-d H:i:s'),
+            $act->getOrganizacion()->getId(),
             $act->getOrganizacion()->getNombre(),
+            $act->getCupoMaximo(),      // ADDED
+            $inscritosConfirmados,      // ADDED
             $ods,
             $tipos,
 
             $userVol->getId(),
             $vol->getNombre() . ' ' . $vol->getApellidos(),
-            null // imagen_actividad
+            null
         );
     }
 }
