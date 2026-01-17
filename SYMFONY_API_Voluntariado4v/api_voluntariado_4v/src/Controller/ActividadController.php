@@ -64,6 +64,43 @@ final class ActividadController extends AbstractController
 
         try {
             $actividades = $qb->executeQuery()->fetchAllAssociative();
+
+            foreach ($actividades as &$actividad) {
+                $id = $actividad['id_actividad'];
+                
+                // 1. TIPOS DE VOLUNTARIADO (Desde Entidad Actividad)
+                $entity = $em->getRepository(Actividad::class)->find($id);
+                if ($entity) {
+                    $nombresTipos = [];
+                    foreach ($entity->getTiposVoluntariado() as $tipoEntity) {
+                        if ($tipoEntity->getNombreTipo()) {
+                             $nombresTipos[] = $tipoEntity->getNombreTipo();
+                        }
+                    }
+                    if (count($nombresTipos) > 0) {
+                        $actividad['tipo'] = implode(', ', $nombresTipos);
+                    }
+                    
+                    // ASEGURAR ID ORGANIZACIÓN (Crucial para navegación)
+                    if ($entity->getOrganizacion()) {
+                        $actividad['id_organizacion'] = $entity->getOrganizacion()->getId();
+                        $actividad['nombre_organizacion'] = $entity->getOrganizacion()->getNombre() ?? $actividad['nombre_organizacion'];
+                    }
+                }
+
+                // 2. IMAGEN (Desde ImagenActividadRepository)
+                $imgRepo = $em->getRepository(ImagenActividad::class);
+                // findOneBy devuelve la primera que encuentre 
+                $imagenEntity = $imgRepo->findOneBy(['actividad' => $id]);
+                
+                if ($imagenEntity) {
+                    $actividad['imagen_actividad'] = $imagenEntity->getUrlImagen();
+                } else {
+                    $actividad['imagen_actividad'] = null;
+                }
+            }
+            unset($actividad);
+
             return $this->json($actividades, Response::HTTP_OK);
         } catch (\Exception $e) {
             return $this->json(
@@ -256,13 +293,21 @@ final class ActividadController extends AbstractController
             ref: new Model(type: ActividadResponseDTO::class)
         )
     )]
-    public function detalle(?Actividad $actividad = null): JsonResponse
+    public function detalle(?Actividad $actividad = null, EntityManagerInterface $em): JsonResponse
     {
         if (!$actividad) {
             return $this->json(['error' => 'Actividad no encontrada'], Response::HTTP_NOT_FOUND);
         }
 
-        return $this->json(ActividadResponseDTO::fromEntity($actividad), Response::HTTP_OK);
+        $dto = ActividadResponseDTO::fromEntity($actividad);
+
+        // Enriquecer con Imagen (buscando en repositorio inverso)
+        $imagenEntity = $em->getRepository(ImagenActividad::class)->findOneBy(['actividad' => $actividad->getId()]);
+        if ($imagenEntity) {
+            $dto->imagen_actividad = $imagenEntity->getUrlImagen();
+        }
+
+        return $this->json($dto, Response::HTTP_OK);
     }
 
     // ========================================================================

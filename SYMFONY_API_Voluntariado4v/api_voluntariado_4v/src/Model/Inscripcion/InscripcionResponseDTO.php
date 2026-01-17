@@ -24,7 +24,8 @@ class InscripcionResponseDTO
 
         // Datos del Voluntario (Para la gestión de la ONG)
         public int $id_voluntario,
-        public string $nombre_voluntario
+        public string $nombre_voluntario,
+        public ?string $imagen_actividad = null 
     ) {}
 
     public static function fromEntity(Inscripcion $ins): self
@@ -67,7 +68,8 @@ class InscripcionResponseDTO
             $tipos,
 
             $userVol->getId(),
-            $vol->getNombre() . ' ' . $vol->getApellidos()
+            $vol->getNombre() . ' ' . $vol->getApellidos(),
+            null // imagen_actividad
         );
     }
 }

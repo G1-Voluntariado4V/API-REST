@@ -24,6 +24,7 @@ class ActividadResponseDTO
         public string $estado_publicacion,
 
         // Información de la organización para no enviar solo el ID
+        public int $id_organizacion, 
         public string $nombre_organizacion,
         public ?string $img_organizacion,
 
@@ -31,7 +32,9 @@ class ActividadResponseDTO
         public array $ods = [],
 
         /** @var TipoVoluntariadoDTO[] */
-        public array $tipos = []
+        public array $tipos = [],
+
+        public ?string $imagen_actividad = null
     ) {}
 
     /**
@@ -69,17 +72,19 @@ class ActividadResponseDTO
             id: $act->getId(),
             titulo: $act->getTitulo(),
             descripcion: $act->getDescripcion(),
-            fecha_inicio: $act->getFechaInicio()->format('Y-m-d H:i:s'),
+            fecha_inicio: $act->getFechaInicio() ? $act->getFechaInicio()->format('Y-m-d H:i:s') : '',
             duracion_horas: $act->getDuracionHoras(),
             cupo_maximo: $act->getCupoMaximo(),
             inscritos_confirmados: $inscritosConfirmados,
             inscritos_pendientes: $inscritosPendientes,
             ubicacion: $act->getUbicacion() ?? 'No definida',
             estado_publicacion: $act->getEstadoPublicacion(),
+            id_organizacion: $org ? $org->getId() : 0,
             nombre_organizacion: $org ? $org->getNombre() : 'Desconocida',
             img_organizacion: null, // Se obtendrá de Firebase/Google
             ods: $odsList,
-            tipos: $tiposList
+            tipos: $tiposList,
+            imagen_actividad: null 
         );
     }
 }

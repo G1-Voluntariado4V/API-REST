@@ -7,6 +7,7 @@ use App\Entity\Actividad;
 use App\Entity\Inscripcion;
 use App\Entity\Organizacion;
 use App\Entity\Usuario;
+use App\Entity\ImagenActividad; 
 use App\Model\Actividad\ActividadCreateDTO;
 use App\Model\Actividad\ActividadResponseDTO;
 use App\Model\Organizacion\OrganizacionCreateDTO;
@@ -247,7 +248,8 @@ final class OrganizacionController extends AbstractController
         int $id,
         UsuarioRepository $userRepo,
         OrganizacionRepository $orgRepo,
-        ActividadRepository $actividadRepo
+        ActividadRepository $actividadRepo,
+        EntityManagerInterface $em
     ): JsonResponse {
         $usuario = $userRepo->find($id);
         if (!$usuario || $usuario->getDeletedAt()) {
@@ -269,8 +271,21 @@ final class OrganizacionController extends AbstractController
             ->getResult();
 
         $respuesta = [];
+        $imgRepo = $em->getRepository(ImagenActividad::class);
+
         foreach ($actividades as $actividad) {
-            $respuesta[] = ActividadResponseDTO::fromEntity($actividad);
+            $dto = ActividadResponseDTO::fromEntity($actividad);
+            
+            // Inyectar imagen manualmente
+            $imagenEntity = $imgRepo->findOneBy(['actividad' => $actividad->getId()]);
+            if ($imagenEntity) {
+                $dto->imagen_actividad = $imagenEntity->getUrlImagen();
+            }
+
+            // Asegurar ID Organizacion
+            $dto->id_organizacion = $id;
+
+            $respuesta[] = $dto;
         }
 
         return $this->json($respuesta, Response::HTTP_OK);
