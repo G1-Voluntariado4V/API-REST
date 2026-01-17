@@ -9,13 +9,19 @@ class VoluntarioResponseDTO
 {
     public function __construct(
         public int $id_usuario,
+        public string $nombre,
+        public string $apellidos,
         public string $nombre_completo,
         public string $correo,
+        public ?string $dni,
+        public ?string $telefono,
+        public ?string $fecha_nac,
+        public bool $carnet_conducir,
         public string $curso,
         public string $estado_cuenta,
-        public ?string $descripcion,   // Descripción personal
-        public array $preferencias, // Devolveremos nombres, no IDs
-        public array $idiomas      // Devolveremos nombre y nivel
+        public ?string $descripcion,
+        public array $preferencias,
+        public array $idiomas
     ) {}
 
     /**
@@ -24,11 +30,8 @@ class VoluntarioResponseDTO
     public static function fromEntity(Voluntario $voluntario): self
     {
         // 1. Aplanar Preferencias (TIPOS DE VOLUNTARIADO)
-        // Corrección: Iteramos sobre entidades TipoVoluntariado, no ODS.
         $prefs = [];
         foreach ($voluntario->getPreferencias() as $tipoVoluntariado) {
-            // Asumo que en tu entidad TipoVoluntariado el getter es getNombreTipo()
-            // porque en BBDD el campo es 'nombre_tipo'
             $prefs[] = $tipoVoluntariado->getNombreTipo();
         }
 
@@ -36,6 +39,7 @@ class VoluntarioResponseDTO
         $idiomasList = [];
         foreach ($voluntario->getVoluntarioIdiomas() as $vi) {
             $idiomasList[] = [
+                'id_idioma' => $vi->getIdioma()->getId(),
                 'idioma' => $vi->getIdioma()->getNombre(),
                 'nivel'  => $vi->getNivel()
             ];
@@ -46,14 +50,20 @@ class VoluntarioResponseDTO
 
         return new self(
             id_usuario: $usuario->getId(),
+            nombre: $voluntario->getNombre(),
+            apellidos: $voluntario->getApellidos(),
             nombre_completo: $voluntario->getNombre() . ' ' . $voluntario->getApellidos(),
             correo: $usuario->getCorreo(),
-            // Manejo seguro por si no tiene curso asignado aún
+            dni: $voluntario->getDni(),
+            telefono: $voluntario->getTelefono(),
+            fecha_nac: $voluntario->getFechaNac()?->format('Y-m-d'),
+            carnet_conducir: (bool) $voluntario->isCarnetConducir(),
             curso: $voluntario->getCursoActual() ? $voluntario->getCursoActual()->getAbreviacion() : 'Sin asignar',
             estado_cuenta: $usuario->getEstadoCuenta(),
             descripcion: $voluntario->getDescripcion(),
-            preferencias: $prefs, // Aquí va el array de strings corregido (ej: ['Salud', 'Educación'])
+            preferencias: $prefs,
             idiomas: $idiomasList
         );
     }
 }
+

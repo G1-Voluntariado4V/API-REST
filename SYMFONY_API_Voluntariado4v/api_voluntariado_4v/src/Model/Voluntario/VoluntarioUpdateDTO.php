@@ -16,9 +16,11 @@ class VoluntarioUpdateDTO
     #[Assert\Regex(pattern: "/^[0-9+ ]+$/", message: "El teléfono solo puede contener números.")]
     public ?string $telefono = null;
 
-    // Validamos que sea una fecha válida
     #[Assert\Date(message: "El formato debe ser YYYY-MM-DD.")]
     public ?string $fechaNac = null;
+
+    // Carnet de conducir
+    public ?bool $carnet_conducir = null;
 
     // Descripción personal del voluntario
     #[Assert\Length(max: 500, maxMessage: "La descripción no puede tener más de 500 caracteres")]
@@ -27,3 +29,4 @@ class VoluntarioUpdateDTO
     // Preferencias opcionales
     public ?array $preferencias_ids = null;
 }
+

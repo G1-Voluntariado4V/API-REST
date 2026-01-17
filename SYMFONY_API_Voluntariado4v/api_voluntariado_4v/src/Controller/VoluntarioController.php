@@ -218,6 +218,11 @@ final class VoluntarioController extends AbstractController
             }
         }
 
+        // Actualizar carnet de conducir si se proporciona
+        if ($dto->carnet_conducir !== null) {
+            $voluntario->setCarnetConducir($dto->carnet_conducir);
+        }
+
         // NOTA: Aquí NO tocamos $usuario->setImgPerfil(). La foto es inmutable (Google).
 
         // 4. Sincronización de Preferencias (Many-to-Many)
