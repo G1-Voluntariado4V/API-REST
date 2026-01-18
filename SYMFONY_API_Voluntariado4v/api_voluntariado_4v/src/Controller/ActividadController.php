@@ -7,7 +7,7 @@ use App\Entity\ImagenActividad;
 use App\Entity\Organizacion;
 // Modelos / DTOs
 use App\Model\Actividad\ActividadCreateDTO;
-use App\Model\Actividad\ActividadUpdateDTO; // <--- El nuevo que acabamos de crear
+use App\Model\Actividad\ActividadUpdateDTO;
 use App\Model\Actividad\ActividadResponseDTO;
 // Repositorios
 use App\Repository\ActividadRepository;
@@ -67,20 +67,20 @@ final class ActividadController extends AbstractController
 
             foreach ($actividades as &$actividad) {
                 $id = $actividad['id_actividad'];
-                
+
                 // 1. TIPOS DE VOLUNTARIADO (Desde Entidad Actividad)
                 $entity = $em->getRepository(Actividad::class)->find($id);
                 if ($entity) {
                     $nombresTipos = [];
                     foreach ($entity->getTiposVoluntariado() as $tipoEntity) {
                         if ($tipoEntity->getNombreTipo()) {
-                             $nombresTipos[] = $tipoEntity->getNombreTipo();
+                            $nombresTipos[] = $tipoEntity->getNombreTipo();
                         }
                     }
                     if (count($nombresTipos) > 0) {
                         $actividad['tipo'] = implode(', ', $nombresTipos);
                     }
-                    
+
                     // ASEGURAR ID ORGANIZACIÓN (Crucial para navegación)
                     if ($entity->getOrganizacion()) {
                         $actividad['id_organizacion'] = $entity->getOrganizacion()->getId();
@@ -92,7 +92,7 @@ final class ActividadController extends AbstractController
                 $imgRepo = $em->getRepository(ImagenActividad::class);
                 // findOneBy devuelve la primera que encuentre 
                 $imagenEntity = $imgRepo->findOneBy(['actividad' => $id]);
-                
+
                 if ($imagenEntity) {
                     $actividad['imagen_actividad'] = $imagenEntity->getUrlImagen();
                 } else {
@@ -128,7 +128,7 @@ final class ActividadController extends AbstractController
         )
     )]
     public function crear(
-        #[MapRequestPayload] ActividadCreateDTO $dto, // <--- Validación automática
+        #[MapRequestPayload] ActividadCreateDTO $dto,
         EntityManagerInterface $entityManager,
         UsuarioRepository $userRepo,
         ODSRepository $odsRepo,
@@ -194,7 +194,7 @@ final class ActividadController extends AbstractController
     #[OA\RequestBody(
         required: true,
         content: new OA\JsonContent(
-            ref: new Model(type: ActividadUpdateDTO::class) // <--- DTO Sin id_organizacion
+            ref: new Model(type: ActividadUpdateDTO::class)
         )
     )]
     #[OA\Response(

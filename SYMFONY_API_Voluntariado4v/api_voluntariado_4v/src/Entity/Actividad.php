@@ -228,7 +228,7 @@ class Actividad
     {
         if (!$this->inscripciones->contains($inscripcion)) {
             $this->inscripciones->add($inscripcion);
-            // CORRECCIÓN: Sincronizar el lado propietario
+            // Sincronizar el lado propietario
             $inscripcion->setActividad($this);
         }
         return $this;
@@ -244,16 +244,12 @@ class Actividad
         }
         return $this;
     }
-    // Fechas
-
-    // ... tus setters anteriores ...
 
     public function getUpdatedAt(): ?\DateTimeInterface
     {
         return $this->updatedAt;
     }
 
-    // IMPORTANTE: Este es el que usa tu controlador para filtrar borrados
     public function getDeletedAt(): ?\DateTimeImmutable
     {
         return $this->deletedAt;

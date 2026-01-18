@@ -27,7 +27,7 @@ class ActividadUpdateDTO
         public int $cupo_maximo,
 
         // Relaciones (Solo los IDs necesarios para sincronizar)
-        // NOTA: No incluimos id_organizacion aquí 🚫
+        // NOTA: No incluimos id_organizacion aquí
 
         #[Assert\All([new Assert\Type('integer')])]
         public array $odsIds = [],

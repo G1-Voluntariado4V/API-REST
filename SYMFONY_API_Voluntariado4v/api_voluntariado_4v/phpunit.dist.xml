@@ -7,7 +7,7 @@
          failOnDeprecation="true"
          failOnNotice="true"
          failOnWarning="true"
-         bootstrap="test/bootstrap.php"
+         bootstrap="tests/bootstrap.php"
          cacheDirectory=".phpunit.cache"
 >
     <php>
@@ -18,8 +18,17 @@
     </php>
 
     <testsuites>
-        <testsuite name="Project Test Suite">
-            <directory>test</directory>
+        <testsuite name="Entity Tests">
+            <directory>tests/Entity</directory>
+        </testsuite>
+        <testsuite name="DTO Tests">
+            <directory>tests/DTO</directory>
+        </testsuite>
+        <testsuite name="Controller Tests">
+            <directory>tests/Controller</directory>
+        </testsuite>
+        <testsuite name="Integration Tests">
+            <directory>tests/Integration</directory>
         </testsuite>
     </testsuites>
 
