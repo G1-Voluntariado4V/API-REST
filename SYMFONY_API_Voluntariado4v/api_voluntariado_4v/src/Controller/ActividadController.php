@@ -335,13 +335,46 @@ final class ActividadController extends AbstractController
         }
 
         $data = json_decode($request->getContent(), true);
-        if (empty($data['url_imagen'])) {
+        $urlImagen = $data['url_imagen'] ?? null;
+
+        if (empty($urlImagen)) {
             return $this->json(['error' => 'Falta la URL de la imagen'], Response::HTTP_BAD_REQUEST);
+        }
+
+        // LOGICA BASE64: Si empieza por data:image, lo convertimos a archivo
+        if (preg_match('/^data:image\/(\w+);base64,/', $urlImagen, $type)) {
+            $dataBase64 = substr($urlImagen, strpos($urlImagen, ',') + 1);
+            $extension = strtolower($type[1]); // jpg, png, etc.
+
+            if (!in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'webp'])) {
+                return $this->json(['error' => 'Formato de imagen no soportado (solo jpg, png, gif, webp)'], Response::HTTP_BAD_REQUEST);
+            }
+
+            $decodedData = base64_decode($dataBase64);
+            if ($decodedData === false) {
+                return $this->json(['error' => 'Error al decodificar Base64'], Response::HTTP_BAD_REQUEST);
+            }
+
+            // Crear directorio si no existe
+            $uploadDir = $this->getParameter('kernel.project_dir') . '/public/uploads/actividades';
+            if (!file_exists($uploadDir)) {
+                mkdir($uploadDir, 0777, true);
+            }
+
+            // Guardar archivo
+            $filename = uniqid('act_' . $id . '_') . '.' . $extension;
+            try {
+                file_put_contents($uploadDir . '/' . $filename, $decodedData);
+                // Sobrescribimos la variable con la ruta relativa para la BBDD
+                $urlImagen = '/uploads/actividades/' . $filename;
+            } catch (\Exception $e) {
+                return $this->json(['error' => 'No se pudo guardar la imagen en el servidor'], Response::HTTP_INTERNAL_SERVER_ERROR);
+            }
         }
 
         $imagen = new ImagenActividad();
         $imagen->setActividad($actividad);
-        $imagen->setUrlImagen($data['url_imagen']);
+        $imagen->setUrlImagen($urlImagen);
         $imagen->setDescripcionPieFoto($data['descripcion'] ?? null);
 
         try {
