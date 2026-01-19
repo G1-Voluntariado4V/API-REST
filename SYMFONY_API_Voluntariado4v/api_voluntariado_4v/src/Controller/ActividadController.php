@@ -389,4 +389,111 @@ final class ActividadController extends AbstractController
             return $this->json(['error' => 'Error al guardar la imagen'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
+    // ========================================================================
+    // 7. LISTAR INSCRIPCIONES (GET) - Para coordinadores
+    // ========================================================================
+    #[Route('/actividades/{id}/participantes-detalle', name: 'listar_inscripciones_actividad_detalle', methods: ['GET'])]
+    public function obtenerInscripciones(
+        int $id,
+        ActividadRepository $actRepo,
+        EntityManagerInterface $em
+    ): JsonResponse {
+        $actividad = $actRepo->find($id);
+        if (!$actividad) return $this->json(['error' => 'No encontrada'], 404);
+
+        $conn = $em->getConnection();
+        // SQL directo para obtener datos de voluntarios rápidamente
+        // SQL corregido: INSCRIPCION tiene PK compuesta, no id_inscripcion
+        $sql = "
+            SELECT 
+                CONCAT(i.id_voluntario, '-', i.id_actividad) as id_inscripcion,
+                i.fecha_solicitud as fecha_solicitud,
+                i.estado_solicitud as estado_solicitud,
+                v.id_usuario as id_voluntario,
+                v.nombre as nombre,
+                v.apellidos as apellidos,
+                u.correo as email,
+                v.telefono as telefono
+            FROM INSCRIPCION i
+            INNER JOIN VOLUNTARIO v ON i.id_voluntario = v.id_usuario
+            INNER JOIN USUARIO u ON v.id_usuario = u.id_usuario
+            WHERE i.id_actividad = :id
+            ORDER BY i.fecha_solicitud DESC
+        ";
+
+        try {
+            $rawInscritos = $conn->executeQuery($sql, ['id' => $id])->fetchAllAssociative();
+            
+            // GARANTIZAR MINÚSCULAS: Normalizamos las claves del array
+            $inscritos = array_map(function($row) {
+                return array_change_key_case($row, CASE_LOWER);
+            }, $rawInscritos);
+
+            return $this->json($inscritos);
+        } catch (\Exception $e) {
+            return $this->json(['error' => 'Error al obtener inscripciones: ' . $e->getMessage()], 500);
+        }
+        }
+
+
+    // ========================================================================
+    // 8. GESTIONAR INSCRIPCIÓN (PATCH) - Aceptar/Rechazar
+    // ========================================================================
+    #[Route('/actividades/{idActividad}/inscripciones/{idVoluntario}', name: 'gestionar_inscripcion', methods: ['PATCH'])]
+    public function gestionarEstadoInscripcion(
+        int $idActividad,
+        int $idVoluntario,
+        Request $request,
+        EntityManagerInterface $em
+    ): JsonResponse {
+        $conn = $em->getConnection();
+        $data = json_decode($request->getContent(), true);
+        $nuevoEstado = $data['estado'] ?? null;
+
+        if (!$nuevoEstado) {
+            return $this->json(['error' => 'Falta el estado'], 400);
+        }
+
+        try {
+            $sql = "UPDATE INSCRIPCION SET estado_solicitud = :estado WHERE id_actividad = :idAct AND id_voluntario = :idVol";
+            $count = $conn->executeStatement($sql, [
+                'estado' => $nuevoEstado,
+                'idAct' => $idActividad,
+                'idVol' => $idVoluntario // id_voluntario == id_usuario en BBDD
+            ]);
+
+            if ($count === 0) {
+                return $this->json(['error' => 'Inscripción no encontrada'], 404);
+            }
+            return $this->json(['mensaje' => 'Estado actualizado correctamente']);
+        } catch (\Exception $e) {
+            return $this->json(['error' => 'Error al actualizar inscripción'], 500);
+        }
+    }
+
+    // ========================================================================
+    // 9. ELIMINAR INSCRIPCIÓN (DELETE) - "Quitar" voluntario
+    // ========================================================================
+    #[Route('/actividades/{idActividad}/inscripciones/{idVoluntario}', name: 'eliminar_inscripcion_admin', methods: ['DELETE'])]
+    public function eliminarInscripcion(
+        int $idActividad,
+        int $idVoluntario,
+        EntityManagerInterface $em
+    ): JsonResponse {
+        $conn = $em->getConnection();
+        try {
+            $sql = "DELETE FROM INSCRIPCION WHERE id_actividad = :idAct AND id_voluntario = :idVol";
+            $count = $conn->executeStatement($sql, [
+                'idAct' => $idActividad,
+                'idVol' => $idVoluntario
+            ]);
+
+            if ($count === 0) {
+                return $this->json(['error' => 'Inscripción no encontrada'], 404);
+            }
+            return $this->json(['mensaje' => 'Inscripción eliminada correctamente']);
+        } catch (\Exception $e) {
+            return $this->json(['error' => 'Error al eliminar inscripción'], 500);
+        }
+    }
 }

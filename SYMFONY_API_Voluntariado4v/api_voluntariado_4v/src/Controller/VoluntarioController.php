@@ -41,6 +41,11 @@ final class VoluntarioController extends AbstractController
     // ========================================================================
     private function checkOwner(Request $request, int $resourceId): bool
     {
+        // Permitir si es Admin/Coordinador
+        if ($request->headers->has('X-Admin-Id')) {
+            return true;
+        }
+
         $headerId = $request->headers->get('X-User-Id');
         // Si no hay header o no coincide, denegamos
         return $headerId && (int)$headerId === $resourceId;
@@ -222,6 +227,14 @@ final class VoluntarioController extends AbstractController
         // Actualizar carnet de conducir si se proporciona
         if ($dto->carnet_conducir !== null) {
             $voluntario->setCarnetConducir($dto->carnet_conducir);
+        }
+
+        // Actualizar curso si se proporciona
+        if ($dto->id_curso_actual) {
+            $curso = $em->getRepository(Curso::class)->find($dto->id_curso_actual);
+            if ($curso) {
+                $voluntario->setCursoActual($curso);
+            }
         }
 
         // NOTA: Aquí NO tocamos $usuario->setImgPerfil(). La foto es inmutable (Google).
