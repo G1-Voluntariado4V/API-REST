@@ -10,7 +10,7 @@ use App\Entity\Actividad;
 use App\Entity\Curso;
 use App\Entity\TipoVoluntariado;
 use App\Entity\Idioma;
-use App\Entity\ImagenActividad; 
+use App\Entity\ImagenActividad;
 // DTOs
 use App\Model\Voluntario\VoluntarioCreateDTO;
 use App\Model\Voluntario\VoluntarioResponseDTO;
@@ -37,7 +37,7 @@ use Nelmio\ApiDocBundle\Attribute\Model;
 final class VoluntarioController extends AbstractController
 {
     // ========================================================================
-    // HELPER: Seguridad Básica (Tu ID debe coincidir con el header)
+    // HELPER: Seguridad Básica
     // ========================================================================
     private function checkOwner(Request $request, int $resourceId): bool
     {
@@ -178,7 +178,7 @@ final class VoluntarioController extends AbstractController
     }
 
     // ========================================================================
-    // 4. ACTUALIZAR (PUT) - Lógica corregida
+    // 4. ACTUALIZAR (PUT)
     // ========================================================================
     #[Route('/voluntarios/{id}', name: 'actualizar_voluntario', methods: ['PUT'])]
     #[OA\Parameter(name: 'X-User-Id', in: 'header', required: true, description: 'ID del usuario logueado', schema: new OA\Schema(type: 'integer'))]
@@ -192,7 +192,7 @@ final class VoluntarioController extends AbstractController
         EntityManagerInterface $em
     ): JsonResponse {
 
-        // 1. Seguridad: Solo tú puedes editar tu perfil
+        // 1. Seguridad: Solo el usuario propietario puede editar su perfil
         if (!$this->checkOwner($request, $id)) {
             return $this->json(['error' => 'No tienes permiso para editar este perfil'], Response::HTTP_FORBIDDEN);
         }
@@ -215,7 +215,7 @@ final class VoluntarioController extends AbstractController
             $voluntario->setDescripcion($dto->descripcion);
         }
 
-        // IMPORTANTE: ¡Te faltaba esto! Convertir el string fecha a DateTime
+        // Convertir el string fecha a DateTime
         if ($dto->fechaNac) {
             try {
                 $voluntario->setFechaNac(new \DateTime($dto->fechaNac));
@@ -339,7 +339,7 @@ final class VoluntarioController extends AbstractController
 
         $inscripciones = $em->getRepository(Inscripcion::class)->findBy(['voluntario' => $voluntario], ['fechaSolicitud' => 'DESC']);
 
-        // A. Calcular Estadísticas (Tu lógica original era buena, la mantenemos)
+        // A. Calcular Estadísticas
         $horasTotales = 0;
         $participacionesConfirmadas = 0;
         foreach ($inscripciones as $insc) {
@@ -361,7 +361,7 @@ final class VoluntarioController extends AbstractController
             }
             $actividadesDTOs[] = $dto;
         }
-        
+
         return $this->json([
             'resumen' => [
                 'total_participaciones' => $participacionesConfirmadas,
@@ -387,9 +387,8 @@ final class VoluntarioController extends AbstractController
         if (!$this->checkOwner($request, $id)) return $this->json(['error' => 'Acceso denegado'], 403);
 
         // Buscamos la inscripción (PK Compuesta: voluntario + actividad)
-        // Ojo: Doctrine espera los objetos, pero si pasamos IDs a veces es listo. 
-        // Para ser seguros, mejor buscar el objeto voluntario primero.
-        $voluntarioRef = $em->getReference(Voluntario::class, $id); // Referencia ligera sin query extra
+        // Usamos referencia para evitar query extra al obtener el voluntario
+        $voluntarioRef = $em->getReference(Voluntario::class, $id);
 
         $inscripcion = $em->getRepository(Inscripcion::class)->findOneBy([
             'voluntario' => $voluntarioRef,

@@ -56,8 +56,6 @@ class Voluntario
     #[ORM\Column(type: 'boolean', nullable: true, name: 'carnet_conducir')]
     private ?bool $carnetConducir = false;
 
-    // --- LOS NUEVOS CAMPOS ---
-
     // Relación con CURSO (id_curso_actual)
     #[ORM\ManyToOne(targetEntity: Curso::class)]
     #[ORM\JoinColumn(name: 'id_curso_actual', referencedColumnName: 'id_curso', nullable: true)]
@@ -66,13 +64,12 @@ class Voluntario
     #[ORM\Column(type: Types::DATETIME_MUTABLE, nullable: true, name: 'updated_at')]
     private ?\DateTimeInterface $updatedAt = null;
 
-    // --- NUEVA PROPIEDAD PARA IDIOMAS ---
     #[ORM\OneToMany(mappedBy: 'voluntario', targetEntity: VoluntarioIdioma::class, cascade: ['persist', 'remove'])]
-    #[Groups(['usuario:read'])] // Para que salgan los idiomas al pedir el usuario
+    #[Groups(['usuario:read'])]
     private Collection $voluntarioIdiomas;
 
     #[ORM\OneToMany(mappedBy: 'voluntario', targetEntity: Inscripcion::class, cascade: ['persist', 'remove'])]
-    #[Groups(['usuario:read'])] // IMPORTANTE: Para ver "Mis inscripciones"
+    #[Groups(['usuario:read'])]
     private Collection $inscripciones;
 
     // RELACIÓN: PREFERENCIAS DEL VOLUNTARIO (M:N)

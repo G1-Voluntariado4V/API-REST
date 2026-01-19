@@ -18,17 +18,17 @@ class InscripcionResponseDTO
         public string $ubicacion,
         public int $duracion_horas,
         public string $fecha_actividad,
-        public int $id_organizacion,    
+        public int $id_organizacion,
         public string $nombre_organizacion,
-        public int $cupo_maximo,          
-        public int $inscritos_confirmados,  
+        public int $cupo_maximo,
+        public int $inscritos_confirmados,
         public array $ods,
         public array $tipos,
 
         // Datos del Voluntario (Para la gestión de la ONG)
         public int $id_voluntario,
         public string $nombre_voluntario,
-        public ?string $imagen_actividad = null 
+        public ?string $imagen_actividad = null
     ) {}
 
     public static function fromEntity(Inscripcion $ins): self
@@ -79,8 +79,8 @@ class InscripcionResponseDTO
             $act->getFechaInicio()->format('Y-m-d H:i:s'),
             $act->getOrganizacion()->getId(),
             $act->getOrganizacion()->getNombre(),
-            $act->getCupoMaximo(),      // ADDED
-            $inscritosConfirmados,      // ADDED
+            $act->getCupoMaximo(),
+            $inscritosConfirmados,
             $ods,
             $tipos,
 
