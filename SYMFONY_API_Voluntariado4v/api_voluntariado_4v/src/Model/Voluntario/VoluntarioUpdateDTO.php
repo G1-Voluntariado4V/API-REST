@@ -28,5 +28,8 @@ class VoluntarioUpdateDTO
 
     // Preferencias opcionales
     public ?array $preferencias_ids = null;
+
+    // Curso actual
+    public ?int $id_curso_actual = null;
 }
 
