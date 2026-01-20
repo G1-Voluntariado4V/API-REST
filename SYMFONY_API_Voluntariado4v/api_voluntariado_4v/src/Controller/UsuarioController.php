@@ -155,4 +155,82 @@ final class UsuarioController extends AbstractController
             );
         }
     }
+    // ========================================================================
+    // 4. SUBIR FOTO PERFIL (POST)
+    // ========================================================================
+    #[Route('/usuarios/{id}/imagen', name: 'upload_imagen_usuario', methods: ['POST'])]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'url_imagen', type: 'string', description: 'Base64 image string')
+            ]
+        )
+    )]
+    #[OA\Response(response: 200, description: 'Imagen de perfil actualizada')]
+    public function uploadImagen(
+        int $id,
+        Request $request,
+        UsuarioRepository $usuarioRepo,
+        EntityManagerInterface $em
+    ): JsonResponse {
+        $usuario = $usuarioRepo->find($id);
+        if (!$usuario) {
+            return $this->json(['error' => 'Usuario no encontrado'], Response::HTTP_NOT_FOUND);
+        }
+
+        $data = json_decode($request->getContent(), true);
+        $urlImagen = $data['url_imagen'] ?? null;
+
+        if (empty($urlImagen)) {
+            return $this->json(['error' => 'Falta la imagen (base64)'], Response::HTTP_BAD_REQUEST);
+        }
+
+        // LOGICA BASE64
+        if (preg_match('/^data:image\/(\w+);base64,/', $urlImagen, $type)) {
+            $dataBase64 = substr($urlImagen, strpos($urlImagen, ',') + 1);
+            $extension = strtolower($type[1]); // jpg, png, etc.
+
+            if (!in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'webp'])) {
+                return $this->json(['error' => 'Formato de imagen no soportado (solo jpg, png, gif, webp)'], Response::HTTP_BAD_REQUEST);
+            }
+
+            $decodedData = base64_decode($dataBase64);
+            if ($decodedData === false) {
+                return $this->json(['error' => 'Error al decodificar Base64'], Response::HTTP_BAD_REQUEST);
+            }
+
+            // Validar Tamaño (Max 2MB)
+            if (strlen($decodedData) > 2 * 1024 * 1024) {
+                return $this->json(['error' => 'La imagen supera el tamaño máximo permitido (2MB)'], Response::HTTP_BAD_REQUEST);
+            }
+
+            // Crear directorio si no existe (Usuarios/Perfiles)
+            $uploadDir = $this->getParameter('kernel.project_dir') . '/public/uploads/perfiles';
+            if (!file_exists($uploadDir)) {
+                mkdir($uploadDir, 0777, true);
+            }
+
+            // Guardar archivo
+            $filename = uniqid('usr_' . $id . '_') . '.' . $extension;
+            try {
+                file_put_contents($uploadDir . '/' . $filename, $decodedData);
+
+                $relativePath = '/uploads/perfiles/' . $filename;
+
+                // Guardar en ENTIDAD USUARIO
+                $usuario->setImgPerfil($relativePath);
+                $em->flush();
+
+                return $this->json([
+                    'mensaje' => 'Foto de perfil actualizada correctamente',
+                    'url' => $relativePath
+                ], Response::HTTP_OK);
+            } catch (\Exception $e) {
+                return $this->json(['error' => 'No se pudo guardar la imagen en el servidor'], Response::HTTP_INTERNAL_SERVER_ERROR);
+            }
+        }
+
+        return $this->json(['error' => 'Formato de imagen inválido (debe ser base64)'], Response::HTTP_BAD_REQUEST);
+    }
 }

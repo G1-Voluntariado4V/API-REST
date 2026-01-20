@@ -10,7 +10,7 @@ use App\Entity\Actividad;
 use App\Entity\Curso;
 use App\Entity\TipoVoluntariado;
 use App\Entity\Idioma;
-use App\Entity\ImagenActividad;
+
 // DTOs
 use App\Model\Voluntario\VoluntarioCreateDTO;
 use App\Model\Voluntario\VoluntarioResponseDTO;
@@ -349,17 +349,11 @@ final class VoluntarioController extends AbstractController
             }
         }
 
-        // B. Mapear a DTO con inyeccion de imagen
-        $imgRepo = $em->getRepository(ImagenActividad::class);
+        // B. Mapear a DTO (La imagen ya se inyecta en el DTO fromEntity)
         $actividadesDTOs = [];
 
         foreach ($inscripciones as $ins) {
-            $dto = InscripcionResponseDTO::fromEntity($ins);
-            $img = $imgRepo->findOneBy(['actividad' => $ins->getActividad()->getId()]);
-            if ($img) {
-                $dto->imagen_actividad = $img->getUrlImagen();
-            }
-            $actividadesDTOs[] = $dto;
+            $actividadesDTOs[] = InscripcionResponseDTO::fromEntity($ins);
         }
 
         return $this->json([

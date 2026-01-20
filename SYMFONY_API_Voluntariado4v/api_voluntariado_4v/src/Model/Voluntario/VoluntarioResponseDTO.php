@@ -13,6 +13,7 @@ class VoluntarioResponseDTO
         public string $apellidos,
         public string $nombre_completo,
         public string $correo,
+        public ?string $img_perfil,
         public ?string $dni,
         public ?string $telefono,
         public ?string $fecha_nac,
@@ -55,6 +56,7 @@ class VoluntarioResponseDTO
             apellidos: $voluntario->getApellidos(),
             nombre_completo: $voluntario->getNombre() . ' ' . $voluntario->getApellidos(),
             correo: $usuario->getCorreo(),
+            img_perfil: $usuario->getImgPerfil(),
             dni: $voluntario->getDni(),
             telefono: $voluntario->getTelefono(),
             fecha_nac: $voluntario->getFechaNac()?->format('Y-m-d'),
@@ -68,4 +70,3 @@ class VoluntarioResponseDTO
         );
     }
 }
-

@@ -7,7 +7,6 @@ use App\Entity\Actividad;
 use App\Entity\Inscripcion;
 use App\Entity\Organizacion;
 use App\Entity\Usuario;
-use App\Entity\ImagenActividad; 
 use App\Model\Actividad\ActividadCreateDTO;
 use App\Model\Actividad\ActividadResponseDTO;
 use App\Model\Organizacion\OrganizacionCreateDTO;
@@ -271,16 +270,13 @@ final class OrganizacionController extends AbstractController
             ->getResult();
 
         $respuesta = [];
-        $imgRepo = $em->getRepository(ImagenActividad::class);
 
         foreach ($actividades as $actividad) {
             $dto = ActividadResponseDTO::fromEntity($actividad);
-            
-            // Inyectar imagen manualmente
-            $imagenEntity = $imgRepo->findOneBy(['actividad' => $actividad->getId()]);
-            if ($imagenEntity) {
-                $dto->imagen_actividad = $imagenEntity->getUrlImagen();
-            }
+
+            // Inyectar imagen manualmente (desde la entidad, aunque el DTO ya lo hace si se actualizó)
+            // Si el DTO ya tiene $dto->imagen_actividad = $act->getImgActividad(), esto es redundante pero seguro.
+            $dto->imagen_actividad = $actividad->getImgActividad();
 
             // Asegurar ID Organizacion
             $dto->id_organizacion = $id;

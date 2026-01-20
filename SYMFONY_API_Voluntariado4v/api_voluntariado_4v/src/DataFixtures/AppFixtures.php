@@ -25,7 +25,7 @@ class AppFixtures extends Fixture
     {
         $this->manager = $manager;
 
-        echo ">>> 🚀 Iniciando carga de Fixtures (Modo Firebase/Google)...\n";
+        echo ">>> 🚀 Iniciando carga de Fixtures (Estructura Simplificada con ImgPerfil/ImgActividad)...\n";
 
         // ======================================================
         // 1. CATÁLOGOS 
@@ -72,9 +72,6 @@ class AppFixtures extends Fixture
         }
 
         // CURSOS CUATROVIENTOS (REALES)
-        // Lógica: Generamos 1º y 2º para cada titulación.
-        // Nivel DB: 2 = Grado Superior, 1 = Grado Medio
-        
         $titulaciones = [
             // GRADO SUPERIOR (Nivel 2)
             ['Desarrollo de Aplicaciones Multiplataforma', 'DAM', 'Grado Superior', 2],
@@ -106,22 +103,18 @@ class AppFixtures extends Fixture
         $manager->flush();
 
         // ======================================================
-        // 2. USUARIOS (SIN IMÁGENES)
+        // 2. USUARIOS (SIN IMÁGENES POR AHORA)
         // ======================================================
 
         // --- Coordinador ---
         $coordUser = $this->createOrUpdateUsuario('Coordinador', 'maitesolam@gmail.com', 'google_uid_maite');
-
-        // 🛠️ FIX 1: Hacemos flush AQUÍ para que $coordUser tenga ID real de BBDD
         $this->manager->flush();
 
         $coord = $this->createOrUpdatePerfilCoordinador($coordUser, 'Maite', 'Sola');
-        // Asignar teléfono al coordinador
         $coord->setTelefono('948000000');
 
         // --- ONGs ---
         $ongs = [];
-        // Formato: [Nombre, Email, GoogleUID, Descripción, Teléfono, CIF]
         $ongData = [
             [
                 'Tech For Good',
@@ -159,13 +152,10 @@ class AppFixtures extends Fixture
 
         foreach ($ongData as $d) {
             $u = $this->createOrUpdateUsuario('Organizacion', $d[1], $d[2]);
-
-            // 🛠️ FIX 2: Flush para obtener ID del Usuario antes de crear la Organización
             $this->manager->flush();
 
             $org = $this->createOrUpdatePerfilOrganizacion($u, $d[0], $d[3]);
 
-            // Asignar teléfono y CIF específicos
             if (isset($d[4])) {
                 $org->setTelefono($d[4]);
             }
@@ -178,15 +168,13 @@ class AppFixtures extends Fixture
 
         // --- Voluntarios ---
         $vols = [];
-        // Actualizado para usar las NUEVAS abreviaciones (1DAM, 2DAM, etc.)
-        // Formato: [Nombre, Apellidos, Email, GoogleUID, CursoAbrev, Preferencias, Descripción]
         $volData = [
             [
                 'Pepe',
                 'Pérez',
                 'pepe@test.com',
                 'uid_pepe',
-                '2DAM', // Pepe está en 2º
+                '2DAM', 
                 ['Tecnológico / Digital'],
                 'Estudiante de 2º de DAM apasionado por la tecnología y el desarrollo de apps. Me encanta ayudar a otras personas a aprender programación.'
             ],
@@ -195,7 +183,7 @@ class AppFixtures extends Fixture
                 'Gómez',
                 'laura@test.com',
                 'uid_laura',
-                '1SMR', // Laura está en 1º
+                '1SMR', 
                 ['Salud / Sanitario'],
                 'Técnica en sistemas con interés en la salud digital. Busco experiencias de voluntariado en el sector sanitario.'
             ],
@@ -204,7 +192,7 @@ class AppFixtures extends Fixture
                 'Ruiz',
                 'carlos@test.com',
                 'uid_carlos',
-                '2TL', // Carlos está en 2º
+                '2TL', 
                 ['Deportivo', 'Protección Animal'],
                 'Amante del deporte y los animales. Estudiante de Transporte y Logística con ganas de ayudar en refugios y eventos deportivos.'
             ],
@@ -213,7 +201,7 @@ class AppFixtures extends Fixture
                 'López',
                 'ana@test.com',
                 'uid_ana',
-                '1GVEC', // Ana está en 1º
+                '1GVEC', 
                 ['Acción Social', 'Educación'],
                 'Estudiante de Gestión de Ventas y Espacios Comerciales. Me motiva el trabajo social y la educación de jóvenes.'
             ]
@@ -221,13 +209,10 @@ class AppFixtures extends Fixture
 
         foreach ($volData as $d) {
             $u = $this->createOrUpdateUsuario('Voluntario', $d[2], $d[3]);
-
-            // 🛠️ FIX 3: Flush para obtener ID del Usuario antes de crear el Voluntario
             $this->manager->flush();
 
             $v = $this->createOrUpdatePerfilVoluntario($u, $d[0], $d[1], $d[4], $d[6]);
 
-            // ✅ Añadir preferencias al voluntario
             if (isset($d[5]) && is_array($d[5])) {
                 foreach ($d[5] as $prefNombre) {
                     if (isset($this->cache['TipoVoluntariado'][$prefNombre])) {
@@ -241,39 +226,38 @@ class AppFixtures extends Fixture
 
         // --- Voluntarios de PRUEBA con diferentes estados ---
         
-        // Voluntario con cuenta BLOQUEADA (2º DAM)
+        // Voluntario BLOQUEADO
         $uBloqueado = $this->createOrUpdateUsuario('Voluntario', 'bloqueado@test.com', 'uid_bloqueado');
         $uBloqueado->setEstadoCuenta('Bloqueada');
         $this->manager->flush();
         $vBloqueado = $this->createOrUpdatePerfilVoluntario($uBloqueado, 'Usuario', 'Bloqueado', '2DAM', 'Cuenta de prueba - Bloqueada');
         $vols[] = $vBloqueado;
 
-        // Voluntario con cuenta PENDIENTE (1º SMR)
+        // Voluntario PENDIENTE
         $uPendiente = $this->createOrUpdateUsuario('Voluntario', 'pendiente@test.com', 'uid_pendiente');
         $uPendiente->setEstadoCuenta('Pendiente');
         $this->manager->flush();
         $vPendiente = $this->createOrUpdatePerfilVoluntario($uPendiente, 'Usuario', 'Pendiente', '1SMR', 'Cuenta de prueba - Pendiente de aprobación');
         $vols[] = $vPendiente;
 
-        // Voluntario con cuenta RECHAZADA (1º GVEC)
+        // Voluntario RECHAZADO
         $uRechazado = $this->createOrUpdateUsuario('Voluntario', 'rechazado@test.com', 'uid_rechazado');
         $uRechazado->setEstadoCuenta('Rechazada');
         $this->manager->flush();
         $vRechazado = $this->createOrUpdatePerfilVoluntario($uRechazado, 'Usuario', 'Rechazado', '1GVEC', 'Cuenta de prueba - Rechazada');
         $vols[] = $vRechazado;
 
-        // Voluntario ELIMINADO (soft delete) (2º TL)
+        // Voluntario ELIMINADO
         $uEliminado = $this->createOrUpdateUsuario('Voluntario', 'eliminado@test.com', 'uid_eliminado');
         $uEliminado->setDeletedAt(new \DateTimeImmutable());
         $this->manager->flush();
         $vEliminado = $this->createOrUpdatePerfilVoluntario($uEliminado, 'Usuario', 'Eliminado', '2TL', 'Cuenta de prueba - Eliminada');
         $vols[] = $vEliminado;
 
-        // 🛠️ FIX 4: Un último flush general para guardar los perfiles (Voluntarios/Orgs)
         $manager->flush();
 
         // ======================================================
-        // 3. ACTIVIDADES
+        // 3. ACTIVIDADES (SIN IMÁGENES POR AHORA)
         // ======================================================
         $acts = [];
 
@@ -284,7 +268,6 @@ class AppFixtures extends Fixture
         if (isset($this->cache['TipoVoluntariado']['Tecnológico / Digital'])) {
             $a1->addTiposVoluntariado($this->cache['TipoVoluntariado']['Tecnológico / Digital']);
         }
-        // Asignamos el ODS 4 (Educación de Calidad)
         $odsEducacion = $this->manager->getRepository(ODS::class)->find(4);
         if ($odsEducacion) {
             $a1->addOd($odsEducacion);
@@ -298,7 +281,6 @@ class AppFixtures extends Fixture
         if (isset($this->cache['TipoVoluntariado']['Medioambiente'])) {
             $a2->addTiposVoluntariado($this->cache['TipoVoluntariado']['Medioambiente']);
         }
-        // Asignamos el ODS 1 (Fin de la Pobreza)
         $odsPobreza = $this->manager->getRepository(ODS::class)->find(1);
         if ($odsPobreza) {
             $a2->addOd($odsPobreza);
@@ -312,7 +294,6 @@ class AppFixtures extends Fixture
         if (isset($this->cache['TipoVoluntariado']['Protección Animal'])) {
             $a3->addTiposVoluntariado($this->cache['TipoVoluntariado']['Protección Animal']);
         }
-        // Asignamos el ODS 1
         if ($odsPobreza) {
             $a3->addOd($odsPobreza);
         }
@@ -322,7 +303,6 @@ class AppFixtures extends Fixture
         $a4 = $this->createOrUpdateActividad($ongs[3], 'Gran Recogida de Alimentos', 'Finalizada');
         $a4->setDescripcion('Campaña de Navidad.');
         $a4->setFechaInicio((new \DateTime())->modify('-1 month')->setTime(9, 0));
-        // Asignamos el ODS 1
         if ($odsPobreza) {
             $a4->addOd($odsPobreza);
         }
@@ -364,6 +344,8 @@ class AppFixtures extends Fixture
         $usuario->setDeletedAt(null);
         $usuario->setEstadoCuenta('Activa');
 
+        // 🔥 NUEVO: Inicializamos imgPerfil a null explícitamente (para pruebas Postman después)
+        $usuario->setImgPerfil(null);
 
         if (isset($this->cache['Rol'][$rolName])) {
             $usuario->setRol($this->cache['Rol'][$rolName]);
@@ -443,6 +425,9 @@ class AppFixtures extends Fixture
         }
         $act->setDeletedAt(null);
         $act->setEstadoPublicacion($estado);
+
+        // 🔥 NUEVO: Inicializamos imgActividad a null explícitamente
+        $act->setImgActividad(null);
 
         $this->manager->persist($act);
         return $act;

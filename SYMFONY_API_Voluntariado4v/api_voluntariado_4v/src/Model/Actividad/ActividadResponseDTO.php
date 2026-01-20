@@ -24,7 +24,7 @@ class ActividadResponseDTO
         public string $estado_publicacion,
 
         // Información de la organización para no enviar solo el ID
-        public int $id_organizacion, 
+        public int $id_organizacion,
         public string $nombre_organizacion,
         public ?string $img_organizacion,
 
@@ -84,7 +84,7 @@ class ActividadResponseDTO
             img_organizacion: null, // Se obtendrá de Firebase/Google
             ods: $odsList,
             tipos: $tiposList,
-            imagen_actividad: null 
+            imagen_actividad: $act->getImgActividad()
         );
     }
 }

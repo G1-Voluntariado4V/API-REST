@@ -86,7 +86,7 @@ class InscripcionResponseDTO
 
             $userVol->getId(),
             $vol->getNombre() . ' ' . $vol->getApellidos(),
-            null
+            $act->getImgActividad()
         );
     }
 }

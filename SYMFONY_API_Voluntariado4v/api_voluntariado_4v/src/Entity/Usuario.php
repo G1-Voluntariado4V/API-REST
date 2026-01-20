@@ -33,6 +33,10 @@ class Usuario implements UserInterface
     #[Groups(['usuario:read'])]
     private ?string $estadoCuenta = 'Pendiente';
 
+    #[ORM\Column(length: 255, nullable: true, name: 'img_perfil')]
+    #[Groups(['usuario:read'])]
+    private ?string $imgPerfil = null;
+
 
 
     // Relación con tu tabla ROL
@@ -100,6 +104,16 @@ class Usuario implements UserInterface
     public function setEstadoCuenta(string $estadoCuenta): static
     {
         $this->estadoCuenta = $estadoCuenta;
+        return $this;
+    }
+
+    public function getImgPerfil(): ?string
+    {
+        return $this->imgPerfil;
+    }
+    public function setImgPerfil(?string $imgPerfil): static
+    {
+        $this->imgPerfil = $imgPerfil;
         return $this;
     }
 

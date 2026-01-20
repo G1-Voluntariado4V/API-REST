@@ -33,7 +33,7 @@ class ActividadCreateDTO
         public array $odsIds = [],
 
         /** @var TipoVoluntariadoDTO[] */
+        #[Assert\Count(min: 1, minMessage: "Debes seleccionar al menos un tipo de voluntariado")]
         public array $tiposIds = []
-    ) {
-    }
+    ) {}
 }

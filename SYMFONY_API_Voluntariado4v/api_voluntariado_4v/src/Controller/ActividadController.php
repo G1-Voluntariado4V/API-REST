@@ -3,7 +3,6 @@
 namespace App\Controller;
 
 use App\Entity\Actividad;
-use App\Entity\ImagenActividad;
 use App\Entity\Organizacion;
 // Modelos / DTOs
 use App\Model\Actividad\ActividadCreateDTO;
@@ -81,20 +80,13 @@ final class ActividadController extends AbstractController
                         $actividad['tipo'] = implode(', ', $nombresTipos);
                     }
 
-                    // ASEGURAR ID ORGANIZACIÓN (Crucial para navegación)
                     if ($entity->getOrganizacion()) {
                         $actividad['id_organizacion'] = $entity->getOrganizacion()->getId();
                         $actividad['nombre_organizacion'] = $entity->getOrganizacion()->getNombre() ?? $actividad['nombre_organizacion'];
                     }
-                }
 
-                // 2. IMAGEN (Desde ImagenActividadRepository)
-                $imgRepo = $em->getRepository(ImagenActividad::class);
-                // findOneBy devuelve la primera que encuentre 
-                $imagenEntity = $imgRepo->findOneBy(['actividad' => $id]);
-
-                if ($imagenEntity) {
-                    $actividad['imagen_actividad'] = $imagenEntity->getUrlImagen();
+                    // 2. IMAGEN (Directamente de la entidad)
+                    $actividad['imagen_actividad'] = $entity->getImgActividad();
                 } else {
                     $actividad['imagen_actividad'] = null;
                 }
@@ -300,16 +292,14 @@ final class ActividadController extends AbstractController
         }
 
         $dto = ActividadResponseDTO::fromEntity($actividad);
-
-        // Enriquecer con Imagen (buscando en repositorio inverso)
-        $imagenEntity = $em->getRepository(ImagenActividad::class)->findOneBy(['actividad' => $actividad->getId()]);
-        if ($imagenEntity) {
-            $dto->imagen_actividad = $imagenEntity->getUrlImagen();
-        }
+        // Imagen ya se incluye en el DTO fromEntity
 
         return $this->json($dto, Response::HTTP_OK);
     }
 
+    // ========================================================================
+    // 6. AÑADIR IMAGEN (POST)
+    // ========================================================================
     // ========================================================================
     // 6. AÑADIR IMAGEN (POST)
     // ========================================================================
@@ -318,8 +308,7 @@ final class ActividadController extends AbstractController
         required: true,
         content: new OA\JsonContent(
             properties: [
-                new OA\Property(property: 'url_imagen', type: 'string'),
-                new OA\Property(property: 'descripcion', type: 'string')
+                new OA\Property(property: 'url_imagen', type: 'string', description: 'Base64 image string')
             ]
         )
     )]
@@ -338,10 +327,10 @@ final class ActividadController extends AbstractController
         $urlImagen = $data['url_imagen'] ?? null;
 
         if (empty($urlImagen)) {
-            return $this->json(['error' => 'Falta la URL de la imagen'], Response::HTTP_BAD_REQUEST);
+            return $this->json(['error' => 'Falta la imagen (base64)'], Response::HTTP_BAD_REQUEST);
         }
 
-        // LOGICA BASE64: Si empieza por data:image, lo convertimos a archivo
+        // LOGICA BASE64
         if (preg_match('/^data:image\/(\w+);base64,/', $urlImagen, $type)) {
             $dataBase64 = substr($urlImagen, strpos($urlImagen, ',') + 1);
             $extension = strtolower($type[1]); // jpg, png, etc.
@@ -355,6 +344,11 @@ final class ActividadController extends AbstractController
                 return $this->json(['error' => 'Error al decodificar Base64'], Response::HTTP_BAD_REQUEST);
             }
 
+            // Validar Tamaño (Max 2MB)
+            if (strlen($decodedData) > 2 * 1024 * 1024) {
+                return $this->json(['error' => 'La imagen supera el tamaño máximo permitido (2MB)'], Response::HTTP_BAD_REQUEST);
+            }
+
             // Crear directorio si no existe
             $uploadDir = $this->getParameter('kernel.project_dir') . '/public/uploads/actividades';
             if (!file_exists($uploadDir)) {
@@ -365,29 +359,24 @@ final class ActividadController extends AbstractController
             $filename = uniqid('act_' . $id . '_') . '.' . $extension;
             try {
                 file_put_contents($uploadDir . '/' . $filename, $decodedData);
-                // Sobrescribimos la variable con la ruta relativa para la BBDD
-                $urlImagen = '/uploads/actividades/' . $filename;
+                // Si había una imagen anterior, podríamos borrarla aquí...
+
+                $relativePath = '/uploads/actividades/' . $filename;
+
+                // Guardar en ENTIDAD ACTIVIDAD
+                $actividad->setImgActividad($relativePath);
+                $em->flush();
+
+                return $this->json([
+                    'mensaje' => 'Imagen actualizada correctamente',
+                    'url' => $relativePath
+                ], Response::HTTP_OK);
             } catch (\Exception $e) {
                 return $this->json(['error' => 'No se pudo guardar la imagen en el servidor'], Response::HTTP_INTERNAL_SERVER_ERROR);
             }
         }
 
-        $imagen = new ImagenActividad();
-        $imagen->setActividad($actividad);
-        $imagen->setUrlImagen($urlImagen);
-        $imagen->setDescripcionPieFoto($data['descripcion'] ?? null);
-
-        try {
-            $em->persist($imagen);
-            $em->flush();
-            return $this->json([
-                'mensaje' => 'Imagen añadida correctamente',
-                'id_imagen' => $imagen->getId(),
-                'url' => $imagen->getUrlImagen()
-            ], Response::HTTP_CREATED);
-        } catch (\Exception $e) {
-            return $this->json(['error' => 'Error al guardar la imagen'], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
+        return $this->json(['error' => 'Formato de imagen inválido (debe ser base64)'], Response::HTTP_BAD_REQUEST);
     }
     // ========================================================================
     // 7. LISTAR INSCRIPCIONES (GET) - Para coordinadores
@@ -423,9 +412,9 @@ final class ActividadController extends AbstractController
 
         try {
             $rawInscritos = $conn->executeQuery($sql, ['id' => $id])->fetchAllAssociative();
-            
+
             // GARANTIZAR MINÚSCULAS: Normalizamos las claves del array
-            $inscritos = array_map(function($row) {
+            $inscritos = array_map(function ($row) {
                 return array_change_key_case($row, CASE_LOWER);
             }, $rawInscritos);
 
@@ -433,7 +422,7 @@ final class ActividadController extends AbstractController
         } catch (\Exception $e) {
             return $this->json(['error' => 'Error al obtener inscripciones: ' . $e->getMessage()], 500);
         }
-        }
+    }
 
 
     // ========================================================================

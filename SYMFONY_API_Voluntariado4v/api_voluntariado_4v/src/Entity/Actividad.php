@@ -27,6 +27,10 @@ class Actividad
     #[Groups(['actividad:read'])]
     private ?string $descripcion = null;
 
+    #[ORM\Column(length: 255, nullable: true, name: 'img_actividad')]
+    #[Groups(['actividad:read'])]
+    private ?string $imgActividad = null;
+
     #[ORM\Column(type: Types::DATETIME_MUTABLE, name: 'fecha_inicio')]
     #[Groups(['actividad:read'])]
     private ?\DateTimeInterface $fechaInicio = null;
@@ -120,6 +124,16 @@ class Actividad
     public function setDescripcion(?string $descripcion): static
     {
         $this->descripcion = $descripcion;
+        return $this;
+    }
+
+    public function getImgActividad(): ?string
+    {
+        return $this->imgActividad;
+    }
+    public function setImgActividad(?string $imgActividad): static
+    {
+        $this->imgActividad = $imgActividad;
         return $this;
     }
 

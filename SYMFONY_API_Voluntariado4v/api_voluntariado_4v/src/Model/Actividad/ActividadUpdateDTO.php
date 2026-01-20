@@ -33,6 +33,7 @@ class ActividadUpdateDTO
         public array $odsIds = [],
 
         #[Assert\All([new Assert\Type('integer')])]
+        #[Assert\Count(min: 1, minMessage: "Debes seleccionar al menos un tipo de voluntariado")]
         public array $tiposIds = []
     ) {}
 }
