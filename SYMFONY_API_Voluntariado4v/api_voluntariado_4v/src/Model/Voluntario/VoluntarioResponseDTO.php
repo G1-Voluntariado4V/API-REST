@@ -4,25 +4,71 @@
 namespace App\Model\Voluntario;
 
 use App\Entity\Voluntario;
+use OpenApi\Attributes as OA;
 
 class VoluntarioResponseDTO
 {
     public function __construct(
+        #[OA\Property(example: 10)]
         public int $id_usuario,
+
+        #[OA\Property(example: "Ana")]
         public string $nombre,
+
+        #[OA\Property(example: "García")]
         public string $apellidos,
+
+        #[OA\Property(example: "Ana García")]
         public string $nombre_completo,
+
+        #[OA\Property(example: "ana@test.com")]
         public string $correo,
+
+        #[OA\Property(example: "usr_10_pic.jpg", nullable: true)]
         public ?string $img_perfil,
+
+        #[OA\Property(example: "12345678Z")]
         public ?string $dni,
+
+        #[OA\Property(example: "+34 600 00 00 00")]
         public ?string $telefono,
+
+        #[OA\Property(example: "1995-05-20")]
         public ?string $fecha_nac,
+
+        #[OA\Property(example: true)]
         public bool $carnet_conducir,
+
+        #[OA\Property(example: 2)]
         public ?int $id_curso,
+
+        #[OA\Property(example: "2º DAM")]
         public string $curso,
+
+        #[OA\Property(example: "Activa")]
         public string $estado_cuenta,
+
+        #[OA\Property(example: "Me encanta participar en actvidades sociales.")]
         public ?string $descripcion,
+
+        #[OA\Property(
+            description: "Tipos de voluntariado preferidos",
+            type: "array",
+            items: new OA\Items(type: "string", example: "Social")
+        )]
         public array $preferencias,
+
+        #[OA\Property(
+            description: "Idiomas del voluntario",
+            type: "array",
+            items: new OA\Items(
+                properties: [
+                    new OA\Property(property: "id_idioma", type: "integer", example: 1),
+                    new OA\Property(property: "idioma", type: "string", example: "Inglés"),
+                    new OA\Property(property: "nivel", type: "string", example: "B2")
+                ]
+            )
+        )]
         public array $idiomas
     ) {}
 

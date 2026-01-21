@@ -38,7 +38,25 @@ final class ActividadController extends AbstractController
     #[OA\Response(
         response: 200,
         description: 'Catálogo de actividades publicadas (Vista SQL optimizada)',
-        content: new OA\JsonContent(type: 'array', items: new OA\Items(type: 'object'))
+        content: new OA\JsonContent(
+            type: 'array',
+            items: new OA\Items(
+                properties: [
+                    new OA\Property(property: 'id_actividad', type: 'integer', example: 10),
+                    new OA\Property(property: 'titulo', type: 'string', example: 'Limpieza de Playa'),
+                    new OA\Property(property: 'descripcion', type: 'string', example: 'Recogida de plásticos...'),
+                    new OA\Property(property: 'fecha_inicio', type: 'string', format: 'date-time', example: '2026-06-15 09:00:00'),
+                    new OA\Property(property: 'duracion_horas', type: 'integer', example: 4),
+                    new OA\Property(property: 'cupo_maximo', type: 'integer', example: 50),
+                    new OA\Property(property: 'ubicacion', type: 'string', example: 'Playa de la Barceloneta'),
+                    new OA\Property(property: 'estado_publicacion', type: 'string', example: 'Publicada'),
+                    new OA\Property(property: 'tipo', type: 'string', example: 'Ambiental, Social'),
+                    new OA\Property(property: 'nombre_organizacion', type: 'string', example: 'ONG Mar Limpio'),
+                    new OA\Property(property: 'imagen_actividad', type: 'string', nullable: true, example: 'act_10_abc.jpg')
+                ],
+                type: 'object'
+            )
+        )
     )]
     public function index(Request $request, EntityManagerInterface $em): JsonResponse
     {
@@ -311,7 +329,7 @@ final class ActividadController extends AbstractController
                         property: 'imagen',
                         type: 'string',
                         format: 'binary',
-                        description: 'Archivo de imagen (jpg, jpeg, png, webp). Máximo 2MB.'
+                        description: 'Archivo de imagen (jpg, jpeg, png, webp). Máximo 5MB.'
                     )
                 ]
             )
@@ -349,10 +367,10 @@ final class ActividadController extends AbstractController
             ], Response::HTTP_BAD_REQUEST);
         }
 
-        // 4. Validar tamaño (máximo 2MB)
-        $maxSize = 2 * 1024 * 1024; // 2MB
+        // 4. Validar tamaño (máximo 5MB)
+        $maxSize = 5 * 1024 * 1024; // 5MB
         if ($file->getSize() > $maxSize) {
-            return $this->json(['error' => 'La imagen supera el tamaño máximo permitido (2MB)'], Response::HTTP_BAD_REQUEST);
+            return $this->json(['error' => 'La imagen supera el tamaño máximo permitido (5MB)'], Response::HTTP_BAD_REQUEST);
         }
 
         // 5. Preparar directorio de destino (/public/uploads/actividades)
@@ -395,6 +413,26 @@ final class ActividadController extends AbstractController
     // 7. LISTAR INSCRIPCIONES (GET) - Para coordinadores
     // ========================================================================
     #[Route('/actividades/{id}/participantes-detalle', name: 'listar_inscripciones_actividad_detalle', methods: ['GET'])]
+    #[OA\Response(
+        response: 200,
+        description: 'Lista detallada de voluntarios inscritos (Coordinador)',
+        content: new OA\JsonContent(
+            type: 'array',
+            items: new OA\Items(
+                properties: [
+                    new OA\Property(property: 'id_inscripcion', type: 'string', example: '5-10'),
+                    new OA\Property(property: 'fecha_solicitud', type: 'string', format: 'date-time', example: '2026-06-01 12:00:00'),
+                    new OA\Property(property: 'estado_solicitud', type: 'string', example: 'Pendiente'),
+                    new OA\Property(property: 'id_voluntario', type: 'integer', example: 5),
+                    new OA\Property(property: 'nombre', type: 'string', example: 'Ana'),
+                    new OA\Property(property: 'apellidos', type: 'string', example: 'García'),
+                    new OA\Property(property: 'email', type: 'string', example: 'ana@test.com'),
+                    new OA\Property(property: 'telefono', type: 'string', example: '+34 600 00 00 00')
+                ],
+                type: 'object'
+            )
+        )
+    )]
     public function obtenerInscripciones(
         int $id,
         ActividadRepository $actRepo,
@@ -442,6 +480,16 @@ final class ActividadController extends AbstractController
     // 8. GESTIONAR INSCRIPCIÓN (PATCH) - Aceptar/Rechazar
     // ========================================================================
     #[Route('/actividades/{idActividad}/inscripciones/{idVoluntario}', name: 'gestionar_inscripcion', methods: ['PATCH'])]
+    #[OA\RequestBody(
+        description: 'Nuevo estado para la inscripción',
+        required: true,
+        content: new OA\JsonContent(
+            ref: new Model(type: \App\Model\Inscripcion\InscripcionUpdateDTO::class)
+        )
+    )]
+    #[OA\Response(response: 200, description: 'Estado actualizado correctamente')]
+    #[OA\Response(response: 404, description: 'Inscripción no encontrada')]
+    #[OA\Response(response: 400, description: 'Datos inválidos')]
     public function gestionarEstadoInscripcion(
         int $idActividad,
         int $idVoluntario,
@@ -477,6 +525,8 @@ final class ActividadController extends AbstractController
     // 9. ELIMINAR INSCRIPCIÓN (DELETE) - "Quitar" voluntario
     // ========================================================================
     #[Route('/actividades/{idActividad}/inscripciones/{idVoluntario}', name: 'eliminar_inscripcion_admin', methods: ['DELETE'])]
+    #[OA\Response(response: 200, description: 'Inscripción eliminada correctamente')]
+    #[OA\Response(response: 404, description: 'Inscripción no encontrada')]
     public function eliminarInscripcion(
         int $idActividad,
         int $idVoluntario,

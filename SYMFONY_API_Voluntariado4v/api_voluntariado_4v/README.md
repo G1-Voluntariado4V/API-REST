@@ -19,8 +19,8 @@ Antes de descargar el código, asegúrate de que tu entorno de desarrollo cumpla
 
 ### 🗄️ Base de Datos (SQL Server)
 
--   **Microsoft SQL Server** (Express o Developer Edition 2019+).
--   **SQL Server Management Studio (SSMS)**: Para administrar la BD manualmente.
+- **Microsoft SQL Server** (Express o Developer Edition 2019+).
+- **SQL Server Management Studio (SSMS)**: Para administrar la BD manualmente.
 
 ### 🔌 Drivers PHP para SQL Server
 
@@ -208,9 +208,9 @@ php bin/phpunit --testdox tests/Controller
 
 ## 📚 Documentación
 
--   **OpenAPI/Swagger**: Archivo `openapi.yaml` en la raíz. Importable en Postman.
--   **Interfaz Visual (Swagger UI)**: Consulta y prueba los endpoints interactivamente en [http://127.0.0.1:8000/doc](http://127.0.0.1:8000/doc).
--   **Rutas**: Puedes ver todas las rutas registradas con `php bin/console debug:router`.
+- **OpenAPI/Swagger**: Archivo `openapi.yaml` en la raíz. Importable en Postman.
+- **Interfaz Visual (Swagger UI)**: Consulta y prueba los endpoints interactivamente en [http://127.0.0.1:8000/doc](http://127.0.0.1:8000/doc).
+- **Rutas**: Puedes ver todas las rutas registradas con `php bin/console debug:router`.
 
 ---
 
@@ -218,14 +218,14 @@ php bin/phpunit --testdox tests/Controller
 
 **Error: `SQLSTATE[HY000] [2002]`**
 
--   **Causa:** Symfony intenta conectar a MySQL por defecto o no detecta el driver `sqlsrv`.
--   **Solución:** Verifica `config/packages/doctrine.yaml` y asegura `driver: 'sqlsrv'`. Limpia caché: `php bin/console cache:clear`.
+- **Causa:** Symfony intenta conectar a MySQL por defecto o no detecta el driver `sqlsrv`.
+- **Solución:** Verifica `config/packages/doctrine.yaml` y asegura `driver: 'sqlsrv'`. Limpia caché: `php bin/console cache:clear`.
 
 **Error: `Login failed for user 'root'` o similar**
 
--   **Causa:** Configuración de `.env` incorrecta.
--   **Solución:** Revisa `.env.local` y asegura que usas el usuario `symfony_app` creado anteriormente.
+- **Causa:** Configuración de `.env` incorrecta.
+- **Solución:** Revisa `.env.local` y asegura que usas el usuario `symfony_app` creado anteriormente.
 
 **Error: `SSL Provider... certificate chain...`**
 
--   **Solución:** Falta confiar en el certificado autofirmado de SQL Server. Asegura `&trustServerCertificate=true` en tu `DATABASE_URL`.
+- **Solución:** Falta confiar en el certificado autofirmado de SQL Server. Asegura `&trustServerCertificate=true` en tu `DATABASE_URL`.

@@ -1,0 +1,1967 @@
+﻿openapi: 3.0.0
+info:
+  title: 'API Voluntariado 4V'
+  description: 'API REST para la gesti├│n de voluntariado escolar (Alumnos, Coordinadores y ONGs).'
+  version: 1.0.0
+paths:
+  '/_error/{code}':
+    get:
+      operationId: get__preview_error
+      parameters:
+        -
+          name: code
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: \d+
+      responses:
+        default:
+          description: ''
+    put:
+      operationId: put__preview_error
+      parameters:
+        -
+          name: code
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: \d+
+      responses:
+        default:
+          description: ''
+    post:
+      operationId: post__preview_error
+      parameters:
+        -
+          name: code
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: \d+
+      responses:
+        default:
+          description: ''
+    delete:
+      operationId: delete__preview_error
+      parameters:
+        -
+          name: code
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: \d+
+      responses:
+        default:
+          description: ''
+    options:
+      operationId: options__preview_error
+      parameters:
+        -
+          name: code
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: \d+
+      responses:
+        default:
+          description: ''
+    head:
+      operationId: head__preview_error
+      parameters:
+        -
+          name: code
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: \d+
+      responses:
+        default:
+          description: ''
+    patch:
+      operationId: patch__preview_error
+      parameters:
+        -
+          name: code
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: \d+
+      responses:
+        default:
+          description: ''
+    trace:
+      operationId: trace__preview_error
+      parameters:
+        -
+          name: code
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: \d+
+      responses:
+        default:
+          description: ''
+  /doc:
+    get:
+      operationId: get_app.swagger_ui
+      responses:
+        default:
+          description: ''
+  /actividades:
+    get:
+      tags:
+        - Actividades
+      operationId: get_api_listar_actividades
+      parameters:
+        -
+          name: ods_id
+          in: query
+          description: 'Filtrar por ID de ODS'
+          schema:
+            type: integer
+        -
+          name: tipo_id
+          in: query
+          description: 'Filtrar por ID de Tipo Voluntariado'
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 'Cat├ílogo de actividades publicadas (Vista SQL optimizada)'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  properties: { id_actividad: { type: integer, example: 10 }, titulo: { type: string, example: 'Limpieza de Playa' }, descripcion: { type: string, example: 'Recogida de pl├ísticos...' }, fecha_inicio: { type: string, format: date-time, example: '2026-06-15 09:00:00' }, duracion_horas: { type: integer, example: 4 }, cupo_maximo: { type: integer, example: 50 }, ubicacion: { type: string, example: 'Playa de la Barceloneta' }, estado_publicacion: { type: string, example: Publicada }, tipo: { type: string, example: 'Ambiental, Social' }, nombre_organizacion: { type: string, example: 'ONG Mar Limpio' }, imagen_actividad: { type: string, example: act_10_abc.jpg, nullable: true } }
+                  type: object
+    post:
+      tags:
+        - Actividades
+      operationId: post_api_crear_actividad
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActividadCreateDTO'
+      responses:
+        '201':
+          description: 'Actividad creada correctamente'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActividadResponseDTO'
+  '/actividades/{id}':
+    get:
+      tags:
+        - Actividades
+      operationId: get_api_detalle_actividad
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Detalle completo de la actividad'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActividadResponseDTO'
+    put:
+      tags:
+        - Actividades
+      operationId: put_api_actualizar_actividad
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActividadUpdateDTO'
+      responses:
+        '200':
+          description: 'Actividad actualizada'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActividadResponseDTO'
+    delete:
+      tags:
+        - Actividades
+      operationId: delete_api_eliminar_actividad
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Actividad marcada como cancelada/eliminada'
+  '/actividades/{id}/imagen':
+    post:
+      tags:
+        - Actividades
+      operationId: post_api_upload_imagen_actividad
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              properties:
+                imagen:
+                  description: 'Archivo de imagen (jpg, jpeg, png, webp). M├íximo 5MB.'
+                  type: string
+                  format: binary
+              type: object
+      responses:
+        '200':
+          description: 'Imagen de actividad actualizada correctamente'
+        '400':
+          description: 'Error en la validaci├│n del archivo'
+        '404':
+          description: 'Actividad no encontrada'
+        '500':
+          description: 'Error de escritura en disco'
+  '/actividades/{id}/participantes-detalle':
+    get:
+      tags:
+        - Actividades
+      operationId: get_api_listar_inscripciones_actividad_detalle
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Lista detallada de voluntarios inscritos (Coordinador)'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  properties: { id_inscripcion: { type: string, example: 5-10 }, fecha_solicitud: { type: string, format: date-time, example: '2026-06-01 12:00:00' }, estado_solicitud: { type: string, example: Pendiente }, id_voluntario: { type: integer, example: 5 }, nombre: { type: string, example: Ana }, apellidos: { type: string, example: Garc├¡a }, email: { type: string, example: ana@test.com }, telefono: { type: string, example: '+34 600 00 00 00' } }
+                  type: object
+  '/actividades/{idActividad}/inscripciones/{idVoluntario}':
+    delete:
+      tags:
+        - Actividades
+      operationId: delete_api_eliminar_inscripcion_admin
+      parameters:
+        -
+          name: idActividad
+          in: path
+          required: true
+          schema:
+            type: string
+        -
+          name: idVoluntario
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Inscripci├│n eliminada correctamente'
+        '404':
+          description: 'Inscripci├│n no encontrada'
+    patch:
+      tags:
+        - 'Inscripciones (Gesti├│n)'
+      operationId: patch_api_gestionar_inscripcion
+      parameters:
+        -
+          name: idActividad
+          in: path
+          required: true
+          schema:
+            type: string
+        -
+          name: idVoluntario
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InscripcionUpdateDTO'
+      responses:
+        '200':
+          description: 'Estado actualizado correctamente'
+        '409':
+          description: 'Error de cupo (Overbooking) controlado por Trigger'
+  /auth/login:
+    post:
+      tags:
+        - Autenticaci├│n
+      operationId: post_api_auth_login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              properties:
+                google_id:
+                  type: string
+                  example: '1122334455'
+                email:
+                  type: string
+                  example: usuario@gmail.com
+              type: object
+      responses:
+        '200':
+          description: 'Login exitoso'
+          content:
+            application/json:
+              schema:
+                properties:
+                  id_usuario: { type: integer }
+                  rol: { type: string }
+                  estado_cuenta: { type: string }
+                  nombre: { type: string }
+                  apellidos: { type: string }
+                type: object
+        '404':
+          description: 'Usuario no registrado'
+        '403':
+          description: 'Acceso denegado (Bloqueado/Pendiente)'
+  /catalogos/cursos:
+    get:
+      operationId: get_api_catalogos_cursos
+      responses:
+        default:
+          description: ''
+  /catalogos/idiomas:
+    get:
+      operationId: get_api_catalogos_idiomas
+      responses:
+        default:
+          description: ''
+  /catalogos/ods:
+    get:
+      operationId: get_api_catalogos_ods
+      responses:
+        default:
+          description: ''
+  /catalogos/tipos-voluntariado:
+    get:
+      operationId: get_api_catalogos_tipos
+      responses:
+        default:
+          description: ''
+  /coord/stats:
+    get:
+      tags:
+        - Coordinadores
+      operationId: get_api_coord_stats
+      parameters:
+        -
+          name: X-Admin-Id
+          in: header
+          description: 'ID de Coordinador'
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 'M├®tricas globales del sistema'
+          content:
+            application/json:
+              schema:
+                properties:
+                  titulo: { type: string }
+                  metricas: { type: object }
+                type: object
+  /coordinadores:
+    post:
+      tags:
+        - Coordinadores
+      operationId: post_api_registro_coordinador
+      parameters:
+        -
+          name: X-Admin-Id
+          in: header
+          description: 'ID de Coordinador (Solo otro coordinador puede crear)'
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CoordinadorCreateDTO'
+      responses:
+        '201':
+          description: 'Coordinador creado'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoordinadorResponseDTO'
+  '/coordinadores/{id}':
+    get:
+      tags:
+        - Coordinadores
+      operationId: get_api_get_coordinador
+      parameters:
+        -
+          name: X-Admin-Id
+          in: header
+          description: 'ID de Coordinador'
+          required: true
+          schema:
+            type: integer
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        default:
+          description: ''
+    put:
+      tags:
+        - Coordinadores
+      operationId: put_api_actualizar_coordinador
+      parameters:
+        -
+          name: X-Admin-Id
+          in: header
+          description: 'ID de Coordinador'
+          required: true
+          schema:
+            type: integer
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CoordinadorUpdateDTO'
+      responses:
+        '200':
+          description: 'Perfil actualizado'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoordinadorResponseDTO'
+    delete:
+      tags:
+        - Coordinadores
+      operationId: delete_api_borrar_usuario_coord
+      parameters:
+        -
+          name: X-Admin-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        default:
+          description: ''
+  '/coord/{rol}/{id}/estado':
+    patch:
+      tags:
+        - Coordinadores
+      operationId: patch_api_coord_cambiar_estado_usuario
+      parameters:
+        -
+          name: rol
+          in: path
+          description: 'Tipo de usuario (voluntarios o organizaciones)'
+          required: true
+          schema:
+            type: string
+            pattern: voluntarios|organizaciones
+            enum:
+              - voluntarios
+              - organizaciones
+        -
+          name: X-Admin-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              properties:
+                estado:
+                  description: 'Nuevo estado'
+                  type: string
+                  enum: [Activa, Rechazada, Bloqueada]
+              type: object
+      responses:
+        '200':
+          description: 'Estado de usuario actualizado.'
+        '400':
+          description: 'Estado o Rol inv├ílido.'
+  /coord/actividades:
+    get:
+      tags:
+        - Coordinadores
+      operationId: get_api_coord_listar_actividades
+      parameters:
+        -
+          name: X-Admin-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 'Cat├ílogo completo de actividades (inc. finalizadas/canceladas)'
+  '/coord/actividades/{id}/estado':
+    patch:
+      tags:
+        - Coordinadores
+      operationId: patch_api_coord_cambiar_estado_actividad
+      parameters:
+        -
+          name: X-Admin-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              properties:
+                estado:
+                  type: string
+                  enum: [Publicada, 'En revision', Cancelada]
+              type: object
+      responses:
+        '200':
+          description: 'Estado de publicaci├│n actualizado.'
+  '/coord/actividades/{id}':
+    put:
+      tags:
+        - Coordinadores
+      operationId: put_api_coord_editar_actividad
+      parameters:
+        -
+          name: X-Admin-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        description: 'Datos a forzar actualizaci├│n'
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        default:
+          description: ''
+    delete:
+      tags:
+        - Coordinadores
+      operationId: delete_api_coord_borrar_actividad
+      parameters:
+        -
+          name: X-Admin-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Actividad eliminada por coordinaci├│n (Soft Delete)'
+  '/actividades/{idActividad}/inscripciones':
+    get:
+      tags:
+        - 'Inscripciones (Gesti├│n)'
+      operationId: get_api_listar_inscripciones_actividad
+      parameters:
+        -
+          name: idActividad
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Lista de voluntarios inscritos en la actividad'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/InscripcionResponseDTO'
+  /organizaciones:
+    get:
+      tags:
+        - Organizaciones
+      operationId: get_api_listar_organizaciones
+      responses:
+        '200':
+          description: 'Cat├ílogo de ONGs activas'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  properties: { id_usuario: { type: integer, example: 5 }, correo_usuario: { type: string, example: contacto@ong-ejemplo.org }, nombre_organizacion: { type: string, example: 'ONG Ejemplo' }, descripcion: { type: string, example: 'Organizaci├│n dedicada a...' }, telefono: { type: string, example: '+34 91 123 45 67' }, direccion: { type: string, example: 'Calle Solidaridad 12' }, sitio_web: { type: string, example: 'https://ong-ejemplo.org' }, estado_cuenta: { type: string, example: Activa } }
+                  type: object
+    post:
+      tags:
+        - Organizaciones
+      operationId: post_api_api_crear_organizacion
+      requestBody:
+        description: 'Datos para registrar una nueva organizaci├│n y su usuario'
+        required: true
+        content:
+          application/json:
+            schema:
+              properties:
+                correo:
+                  type: string
+                  example: contacto@ong.org
+                nombre:
+                  type: string
+                  example: 'ONG Ejemplo'
+                cif:
+                  type: string
+                  example: G12345678
+                telefono:
+                  type: string
+                  example: '600123456'
+                direccion:
+                  type: string
+                  example: 'Calle Falsa 123'
+                descripcion:
+                  type: string
+                  example: 'Descripci├│n de la ONG'
+                sitio_web:
+                  type: string
+                  example: 'https://www.ong.org'
+                google_id:
+                  type: string
+                  example: token_google_123
+              type: object
+      responses:
+        '201':
+          description: 'Organizaci├│n creada correctamente'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string }
+                  id: { type: integer }
+                type: object
+  '/organizaciones/{id}':
+    get:
+      tags:
+        - Organizaciones
+      operationId: get_api_detalle_organizacion
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: \d+
+      responses:
+        '200':
+          description: 'Detalle p├║blico de la Organizaci├│n'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizacionResponseDTO'
+    put:
+      tags:
+        - Organizaciones
+      operationId: put_api_update_organizacion
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: \d+
+      requestBody:
+        description: 'Datos a actualizar'
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrganizacionUpdateDTO'
+      responses:
+        '200':
+          description: 'Organizaci├│n actualizada'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizacionResponseDTO'
+  '/organizaciones/{id}/actividades':
+    get:
+      tags:
+        - Organizaciones
+      operationId: get_api_listar_actividades_organizacion
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Lista de actividades de la organizaci├│n'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ActividadResponseDTO'
+    post:
+      tags:
+        - Organizaciones
+      operationId: post_api_crear_actividad_organizacion
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        description: 'Datos para crear una nueva actividad'
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActividadCreateDTO'
+      responses:
+        '201':
+          description: 'Actividad creada exitosamente'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActividadResponseDTO'
+  '/organizaciones/{id}/estadisticas':
+    get:
+      tags:
+        - Organizaciones
+      operationId: get_api_estadisticas_organizacion
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Estad├¡sticas de la organizaci├│n'
+          content:
+            application/json:
+              schema:
+                properties:
+                  total_actividades: { description: 'Total de actividades creadas', type: integer }
+                  actividades_publicadas: { description: 'Actividades publicadas', type: integer }
+                  actividades_en_revision: { description: 'Actividades en revisi├│n', type: integer }
+                  total_voluntarios: { description: 'Total de voluntarios ├║nicos', type: integer }
+                  total_inscripciones: { description: 'Total de inscripciones', type: integer }
+                  inscripciones_confirmadas: { description: 'Inscripciones confirmadas', type: integer }
+                  inscripciones_pendientes: { description: 'Inscripciones pendientes', type: integer }
+                type: object
+  '/organizaciones/{id}/actividades/{actividadId}/voluntarios':
+    get:
+      tags:
+        - Organizaciones
+      operationId: get_api_voluntarios_actividad_organizacion
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        -
+          name: actividadId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Lista de voluntarios inscritos en la actividad'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  properties: { id_voluntario: { type: integer }, nombre: { type: string }, apellidos: { type: string }, email: { type: string }, fecha_solicitud: { type: string, format: date-time }, estado_solicitud: { type: string, enum: [Pendiente, Confirmada, Rechazada] } }
+                  type: object
+  /organizaciones/top-voluntarios:
+    get:
+      tags:
+        - Organizaciones
+      operationId: get_api_top_organizaciones_voluntarios
+      responses:
+        '200':
+          description: 'Top 3 de organizaciones con m├ís voluntarios que han realizado actividades'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  properties: { posicion: { type: integer, example: 1 }, id_organizacion: { type: integer, example: 5 }, nombre: { type: string, example: 'Cruz Roja' }, cif: { type: string, example: G12345678 }, total_voluntarios: { description: 'Voluntarios ├║nicos con actividades Aceptadas o Finalizadas', type: integer, example: 156 }, total_actividades: { type: integer, example: 45 }, descripcion: { type: string, example: 'Ayuda humanitaria' } }
+                  type: object
+  /roles:
+    get:
+      tags:
+        - Roles
+      operationId: get_api_roles_index
+      responses:
+        '200':
+          description: 'Lista de roles disponibles'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  properties: { id: { type: integer }, nombreRol: { type: string } }
+                  type: object
+    post:
+      tags:
+        - Roles
+      operationId: post_api_roles_crear
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              properties:
+                nombre:
+                  type: string
+                  example: Coordinador
+              type: object
+      responses:
+        '201':
+          description: 'Rol creado'
+        '400':
+          description: 'Datos inv├ílidos'
+  /usuarios:
+    post:
+      tags:
+        - Usuarios
+      operationId: post_api_crear_usuario
+      requestBody:
+        description: 'Datos b├ísicos del usuario'
+        required: true
+        content:
+          application/json:
+            schema:
+              properties:
+                correo:
+                  type: string
+                  example: usuario@test.com
+                google_id:
+                  type: string
+                  example: goog_123abc
+                id_rol:
+                  type: integer
+                  example: 2
+              type: object
+      responses:
+        '201':
+          description: 'Usuario creado con ├®xito'
+        '409':
+          description: 'Conflicto: El correo o GoogleID ya existen'
+        '404':
+          description: 'Rol no encontrado'
+  '/usuarios/{id}':
+    delete:
+      tags:
+        - Usuarios
+      operationId: delete_api_borrar_usuario
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Usuario eliminado (Soft Delete aplicado)'
+        '404':
+          description: 'Usuario no encontrado'
+  '/usuarios/{id}/imagen':
+    post:
+      tags:
+        - Usuarios
+      operationId: post_api_upload_imagen_usuario
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              properties:
+                imagen:
+                  description: 'Archivo de imagen (jpg, jpeg, png, webp). M├íximo 5MB.'
+                  type: string
+                  format: binary
+              type: object
+      responses:
+        '200':
+          description: 'Imagen de perfil actualizada correctamente'
+        '400':
+          description: 'Error en la validaci├│n del archivo'
+        '404':
+          description: 'Usuario no encontrado'
+        '500':
+          description: 'Error de escritura en disco'
+  '/usuarios/{id}/rol':
+    put:
+      tags:
+        - Usuarios
+      operationId: put_api_cambiar_rol_usuario
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        description: 'Nuevo rol para el usuario'
+        required: true
+        content:
+          application/json:
+            schema:
+              properties:
+                id_rol:
+                  description: '1=Coordinador, 2=Organizaci├│n, 3=Voluntario'
+                  type: integer
+                  example: 2
+              type: object
+      responses:
+        '200':
+          description: 'Rol actualizado correctamente'
+          content:
+            application/json:
+              schema:
+                properties:
+                  mensaje: { type: string }
+                  usuario: { type: object }
+                  advertencia: { type: string, nullable: true }
+                type: object
+        '404':
+          description: 'Usuario o Rol no encontrado'
+        '400':
+          description: 'Datos inv├ílidos'
+  /voluntarios:
+    get:
+      tags:
+        - Voluntarios
+      operationId: get_api_listar_voluntarios
+      responses:
+        '200':
+          description: 'Listado completo de voluntarios activos'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  properties: { id_usuario: { type: integer, example: 10 }, nombre: { type: string, example: Ana }, apellidos: { type: string, example: Garc├¡a }, correo_usuario: { type: string, example: ana@test.com }, curso_actual: { type: string, example: '2┬║ DAW' }, telefono: { type: string, example: '+34 600 11 22 33' }, estado_cuenta: { type: string, example: Activa } }
+                  type: object
+    post:
+      tags:
+        - Voluntarios
+      operationId: post_api_registro_voluntario
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VoluntarioCreateDTO'
+      responses:
+        '201':
+          description: 'Voluntario registrado'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VoluntarioResponseDTO'
+  '/voluntarios/{id}':
+    get:
+      tags:
+        - Voluntarios
+      operationId: get_api_get_voluntario
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Detalle del voluntario'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VoluntarioResponseDTO'
+    put:
+      tags:
+        - Voluntarios
+      operationId: put_api_actualizar_voluntario
+      parameters:
+        -
+          name: X-User-Id
+          in: header
+          description: 'ID del usuario logueado'
+          required: true
+          schema:
+            type: integer
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VoluntarioUpdateDTO'
+      responses:
+        '200':
+          description: 'Perfil actualizado'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VoluntarioResponseDTO'
+  '/voluntarios/{id}/actividades/{idActividad}':
+    post:
+      tags:
+        - Voluntarios
+      operationId: post_api_inscribirse_actividad
+      parameters:
+        -
+          name: X-User-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        -
+          name: idActividad
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '201':
+          description: 'Inscripci├│n realizada'
+        '409':
+          description: 'Error de reglas de negocio (cupo, fechas, duplicado)'
+    delete:
+      tags:
+        - Voluntarios
+      operationId: delete_api_desapuntarse_actividad
+      parameters:
+        -
+          name: X-User-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        -
+          name: idActividad
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Te has desapuntado correctamente'
+        '404':
+          description: 'No estas inscrito en esta actividad'
+  '/voluntarios/{id}/historial':
+    get:
+      tags:
+        - Voluntarios
+      operationId: get_api_historial_voluntario
+      parameters:
+        -
+          name: X-User-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Historial detallado y resumen'
+          content:
+            application/json:
+              schema:
+                properties:
+                  resumen: { type: object }
+                  actividades: { type: array, items: { $ref: '#/components/schemas/InscripcionResponseDTO' } }
+                type: object
+  '/voluntarios/{id}/recomendaciones':
+    get:
+      tags:
+        - Voluntarios
+      operationId: get_api_recomendaciones_voluntario
+      parameters:
+        -
+          name: X-User-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Lista de actividades recomendadas'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  properties: { id_actividad: { type: integer, example: 12 }, titulo: { type: string, example: 'Actividad Recomendada' }, compatibilidad: { type: integer, example: 100 }, motivo: { type: string, example: 'Coincide con tus ODS y disponibilidad' } }
+                  type: object
+  '/voluntarios/{id}/horas-totales':
+    get:
+      tags:
+        - Voluntarios
+      operationId: get_api_horas_totales_voluntario
+      parameters:
+        -
+          name: X-User-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Total de horas de voluntariado realizadas (campo calculado)'
+          content:
+            application/json:
+              schema:
+                properties:
+                  horas_totales: { description: 'Suma total de horas de actividades Aceptadas o Finalizadas', type: integer, example: 45 }
+                type: object
+  '/voluntarios/{idVoluntario}/idiomas':
+    post:
+      tags:
+        - 'Idiomas Voluntario'
+      operationId: post_api_voluntario_idiomas_create
+      parameters:
+        -
+          name: idVoluntario
+          in: path
+          description: 'ID del Usuario Voluntario'
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              properties:
+                id_idioma:
+                  type: integer
+                  example: 1
+                nivel:
+                  type: string
+                  enum: [A1, A2, B1, B2, C1, C2, Nativo]
+                  example: B2
+              type: object
+      responses:
+        '201':
+          description: 'Idioma a├▒adido al perfil'
+        '409':
+          description: 'El idioma ya est├í asignado'
+  '/voluntarios/{idVoluntario}/idiomas/{idIdioma}':
+    put:
+      tags:
+        - 'Idiomas Voluntario'
+      operationId: put_api_voluntario_idiomas_update
+      parameters:
+        -
+          name: idVoluntario
+          in: path
+          required: true
+          schema:
+            type: string
+        -
+          name: idIdioma
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              properties:
+                nivel:
+                  type: string
+                  example: C1
+              type: object
+      responses:
+        '200':
+          description: 'Nivel actualizado'
+    delete:
+      tags:
+        - 'Idiomas Voluntario'
+      operationId: delete_api_voluntario_idiomas_delete
+      parameters:
+        -
+          name: idVoluntario
+          in: path
+          required: true
+          schema:
+            type: string
+        -
+          name: idIdioma
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Idioma desasignado'
+    patch:
+      tags:
+        - 'Idiomas Voluntario'
+      operationId: patch_api_voluntario_idiomas_update
+      parameters:
+        -
+          name: idVoluntario
+          in: path
+          required: true
+          schema:
+            type: string
+        -
+          name: idIdioma
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              properties:
+                nivel:
+                  type: string
+                  example: C1
+              type: object
+      responses:
+        '200':
+          description: 'Nivel actualizado'
+components:
+  schemas:
+    ActividadCreateDTO:
+      required:
+        - titulo
+        - fecha_inicio
+        - duracion_horas
+        - cupo_maximo
+        - ubicacion
+        - id_organizacion
+      properties:
+        titulo:
+          type: string
+          example: 'Limpieza de Playa'
+        descripcion:
+          type: string
+          example: 'Actividad de recogida de residuos en la playa para concienciar sobre el medio ambiente.'
+          nullable: true
+        fecha_inicio:
+          type: string
+          example: '2026-06-15 09:00:00'
+        duracion_horas:
+          type: integer
+          minimum: 0
+          exclusiveMinimum: true
+          example: 4
+        cupo_maximo:
+          type: integer
+          minimum: 0
+          exclusiveMinimum: true
+          example: 50
+        ubicacion:
+          type: string
+          example: 'Playa de la Barceloneta'
+        id_organizacion:
+          type: integer
+          example: 5
+        odsIds:
+          type: array
+          items:
+            type: integer
+          default: []
+          example:
+            - 13
+            - 14
+        tiposIds:
+          type: array
+          items:
+            type: integer
+          default: []
+          minItems: 1
+          example:
+            - 1
+      type: object
+    ActividadUpdateDTO:
+      required:
+        - titulo
+        - ubicacion
+        - fecha_inicio
+        - duracion_horas
+        - cupo_maximo
+      properties:
+        titulo:
+          type: string
+          maxLength: 150
+          minLength: 5
+          example: 'Limpieza de Playa Revisada'
+        descripcion:
+          type: string
+          example: 'Actualizaci├│n de la descripci├│n de la actividad.'
+          nullable: true
+        ubicacion:
+          type: string
+          example: 'Nueva Ubicaci├│n, 45'
+        fecha_inicio:
+          type: string
+          example: '2026-06-16 10:00:00'
+        duracion_horas:
+          type: integer
+          minimum: 0
+          exclusiveMinimum: true
+          example: 5
+        cupo_maximo:
+          type: integer
+          minimum: 0
+          exclusiveMinimum: true
+          example: 60
+        odsIds:
+          type: array
+          items:
+            type: integer
+          default: []
+          example:
+            - 13
+        tiposIds:
+          type: array
+          items:
+            type: integer
+          default: []
+          minItems: 1
+          example:
+            - 1
+            - 2
+      type: object
+    CoordinadorCreateDTO:
+      required:
+        - nombre
+        - correo
+        - google_id
+      properties:
+        nombre:
+          type: string
+          example: Juan
+        correo:
+          type: string
+          example: coordinador@escuela.org
+        google_id:
+          type: string
+          example: google_coord_123
+        apellidos:
+          type: string
+          default: null
+          example: P├®rez
+          nullable: true
+        telefono:
+          type: string
+          default: null
+          example: '+34 600 11 22 33'
+          nullable: true
+      type: object
+    CoordinadorUpdateDTO:
+      required:
+        - nombre
+      properties:
+        nombre:
+          type: string
+          maxLength: 50
+          minLength: 2
+          example: Juan
+        apellidos:
+          type: string
+          default: null
+          maxLength: 50
+          minLength: 2
+          example: P├®rez
+          nullable: true
+        telefono:
+          type: string
+          default: null
+          pattern: '[0-9\s\+]+'
+          example: '+34 600 11 22 33'
+          nullable: true
+      type: object
+    InscripcionUpdateDTO:
+      required:
+        - estado
+      properties:
+        estado:
+          type: string
+          enum:
+            - Aceptada
+            - Rechazada
+            - Pendiente
+          example: Aceptada
+      type: object
+    OrganizacionUpdateDTO:
+      required:
+        - nombre
+        - descripcion
+      properties:
+        nombre:
+          type: string
+          maxLength: 100
+          minLength: 2
+          example: 'ONG Ejemplo Actualizada'
+        descripcion:
+          type: string
+          example: 'Nueva descripci├│n de la organizaci├│n...'
+        sitioWeb:
+          type: string
+          default: null
+          example: 'https://ong-ejemplo.org'
+          nullable: true
+        direccion:
+          type: string
+          default: null
+          example: 'Avenida de la Paz 45'
+          nullable: true
+        telefono:
+          type: string
+          default: null
+          pattern: '[0-9\-\+\s]+'
+          example: '+34 91 987 65 43'
+          nullable: true
+      type: object
+    VoluntarioCreateDTO:
+      required:
+        - google_id
+        - correo
+        - nombre
+        - apellidos
+        - dni
+        - telefono
+        - fecha_nac
+        - carnet_conducir
+        - id_curso_actual
+      properties:
+        google_id:
+          type: string
+          example: google_usr_99
+        correo:
+          type: string
+          example: voluntario@test.com
+        nombre:
+          type: string
+          minLength: 2
+          example: Ana
+        apellidos:
+          type: string
+          example: Garc├¡a
+        dni:
+          type: string
+          example: 12345678Z
+        telefono:
+          type: string
+          example: '+34 655 44 33 22'
+        fecha_nac:
+          type: string
+          example: '1999-12-31'
+        carnet_conducir:
+          type: boolean
+          example: true
+        id_curso_actual:
+          type: integer
+          example: 2
+        descripcion:
+          type: string
+          default: null
+          maxLength: 500
+          example: 'Me gusta ayudar con temas de log├¡stica.'
+          nullable: true
+        preferencias_ids:
+          type: array
+          items:
+            type: integer
+          default: []
+          example:
+            - 1
+            - 3
+        idiomas:
+          type: array
+          items:
+            properties:
+              id_idioma:
+                type: integer
+              nivel:
+                type: string
+          default: []
+          example:
+            -
+              id_idioma: 1
+              nivel: B2
+      type: object
+    VoluntarioUpdateDTO:
+      required:
+        - nombre
+        - apellidos
+        - preferencias_ids
+      properties:
+        nombre:
+          type: string
+          maxLength: 50
+          minLength: 2
+          example: 'Ana Mar├¡a'
+        apellidos:
+          type: string
+          example: 'Garc├¡a P├®rez'
+        telefono:
+          type: string
+          pattern: '[0-9+ ]+'
+          example: '+34 655 44 33 22'
+          nullable: true
+        fechaNac:
+          type: string
+          example: '1999-12-31'
+          nullable: true
+        carnet_conducir:
+          type: boolean
+          example: true
+          nullable: true
+        descripcion:
+          type: string
+          maxLength: 500
+          example: 'Actualizaci├│n de mi descripci├│n...'
+          nullable: true
+        preferencias_ids:
+          type: array
+          items:
+            type: integer
+          example:
+            - 2
+            - 3
+        id_curso_actual:
+          type: integer
+          example: 3
+          nullable: true
+      type: object
+    ActividadResponseDTO:
+      required:
+        - id
+        - titulo
+        - fecha_inicio
+        - duracion_horas
+        - cupo_maximo
+        - inscritos_confirmados
+        - inscritos_pendientes
+        - ubicacion
+        - estado_publicacion
+        - id_organizacion
+        - nombre_organizacion
+      properties:
+        id:
+          type: integer
+        titulo:
+          type: string
+        descripcion:
+          type: string
+          nullable: true
+        fecha_inicio:
+          type: string
+        duracion_horas:
+          type: integer
+        cupo_maximo:
+          type: integer
+        inscritos_confirmados:
+          type: integer
+        inscritos_pendientes:
+          type: integer
+        ubicacion:
+          type: string
+        estado_publicacion:
+          type: string
+        id_organizacion:
+          type: integer
+        nombre_organizacion:
+          type: string
+        img_organizacion:
+          type: string
+          nullable: true
+        ods:
+          type: array
+          items: {  }
+          default: []
+        tipos:
+          type: array
+          items: {  }
+          default: []
+        imagen_actividad:
+          type: string
+          default: null
+          nullable: true
+      type: object
+    CoordinadorResponseDTO:
+      required:
+        - id
+        - nombre
+        - rol
+        - correo
+        - estado_cuenta
+      properties:
+        id:
+          type: integer
+        nombre:
+          type: string
+        rol:
+          type: string
+        correo:
+          type: string
+        estado_cuenta:
+          type: string
+      type: object
+    InscripcionResponseDTO:
+      required:
+        - id
+        - estado
+        - fecha_solicitud
+        - id_actividad
+        - titulo_actividad
+        - descripcion
+        - ubicacion
+        - duracion_horas
+        - fecha_actividad
+        - id_organizacion
+        - nombre_organizacion
+        - cupo_maximo
+        - inscritos_confirmados
+        - ods
+        - tipos
+        - id_voluntario
+        - nombre_voluntario
+      properties:
+        id:
+          type: string
+        estado:
+          type: string
+        fecha_solicitud:
+          type: string
+        id_actividad:
+          type: integer
+        titulo_actividad:
+          type: string
+        descripcion:
+          type: string
+        ubicacion:
+          type: string
+        duracion_horas:
+          type: integer
+        fecha_actividad:
+          type: string
+        id_organizacion:
+          type: integer
+        nombre_organizacion:
+          type: string
+        cupo_maximo:
+          type: integer
+        inscritos_confirmados:
+          type: integer
+        ods:
+          type: array
+          items: {  }
+        tipos:
+          type: array
+          items: {  }
+        id_voluntario:
+          type: integer
+        nombre_voluntario:
+          type: string
+        imagen_actividad:
+          type: string
+          default: null
+          nullable: true
+      type: object
+    OrganizacionResponseDTO:
+      required:
+        - id
+        - nombre
+        - descripcion
+        - email
+        - cif
+      properties:
+        id:
+          type: integer
+          example: 5
+        nombre:
+          type: string
+          example: 'ONG Ejemplo'
+        descripcion:
+          type: string
+          example: 'Organizaci├│n dedicada a la ayuda humanitaria.'
+        email:
+          type: string
+          example: contacto@ong-ejemplo.org
+        telefono:
+          type: string
+          example: '+34 91 123 45 67'
+          nullable: true
+        direccion:
+          type: string
+          example: 'Calle Solidaridad 12'
+          nullable: true
+        web:
+          type: string
+          example: 'https://ong-ejemplo.org'
+          nullable: true
+        cif:
+          type: string
+          example: G12345678
+      type: object
+    VoluntarioResponseDTO:
+      required:
+        - id_usuario
+        - nombre
+        - apellidos
+        - nombre_completo
+        - correo
+        - carnet_conducir
+        - curso
+        - estado_cuenta
+        - preferencias
+        - idiomas
+      properties:
+        id_usuario:
+          type: integer
+          example: 10
+        nombre:
+          type: string
+          example: Ana
+        apellidos:
+          type: string
+          example: Garc├¡a
+        nombre_completo:
+          type: string
+          example: 'Ana Garc├¡a'
+        correo:
+          type: string
+          example: ana@test.com
+        img_perfil:
+          type: string
+          example: usr_10_pic.jpg
+          nullable: true
+        dni:
+          type: string
+          example: 12345678Z
+          nullable: true
+        telefono:
+          type: string
+          example: '+34 600 00 00 00'
+          nullable: true
+        fecha_nac:
+          type: string
+          example: '1995-05-20'
+          nullable: true
+        carnet_conducir:
+          type: boolean
+          example: true
+        id_curso:
+          type: integer
+          example: 2
+          nullable: true
+        curso:
+          type: string
+          example: '2┬║ DAM'
+        estado_cuenta:
+          type: string
+          example: Activa
+        descripcion:
+          type: string
+          example: 'Me encanta participar en actvidades sociales.'
+          nullable: true
+        preferencias:
+          description: 'Tipos de voluntariado preferidos'
+          type: array
+          items:
+            type: string
+            example: Social
+        idiomas:
+          description: 'Idiomas del voluntario'
+          type: array
+          items:
+            properties:
+              id_idioma:
+                type: integer
+                example: 1
+              idioma:
+                type: string
+                example: Ingl├®s
+              nivel:
+                type: string
+                example: B2
+      type: object
+  securitySchemes:
+    Bearer:
+      type: http
+      bearerFormat: JWT
+      scheme: bearer
+tags:
+  -
+    name: Actividades
+    description: 'Gesti├│n de ofertas de voluntariado'
+  -
+    name: Autenticaci├│n
+    description: 'Login y recuperaci├│n de acceso'
+  -
+    name: Coordinadores
+    description: 'Gesti├│n interna, Dashboard y Moderaci├│n Global'
+  -
+    name: 'Inscripciones (Gesti├│n)'
+    description: 'Gesti├│n de solicitudes por parte de las Organizaciones'
+  -
+    name: Organizaciones
+    description: 'Gesti├│n de perfiles de ONGs'
+  -
+    name: Roles
+    description: 'Cat├ílogo de roles del sistema'
+  -
+    name: Usuarios
+    description: 'Gesti├│n administrativa de usuarios'
+  -
+    name: Voluntarios
+    description: 'Gesti├│n de perfiles, inscripciones y estad├¡sticas'
+  -
+    name: 'Idiomas Voluntario'
+    description: 'Gesti├│n de habilidades ling├╝├¡sticas del voluntario'
+

@@ -3,6 +3,7 @@
 namespace App\Model\Inscripcion;
 
 use Symfony\Component\Validator\Constraints as Assert;
+use OpenApi\Attributes as OA;
 
 class InscripcionUpdateDTO
 {
@@ -12,6 +13,7 @@ class InscripcionUpdateDTO
             choices: ['Aceptada', 'Rechazada', 'Pendiente'],
             message: "El estado debe ser 'Aceptada', 'Rechazada' o 'Pendiente'"
         )]
+        #[OA\Property(example: "Aceptada")]
         public string $estado
     ) {}
 }

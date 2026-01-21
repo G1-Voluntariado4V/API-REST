@@ -14,24 +14,24 @@ use Symfony\Component\HttpFoundation\Response; // Códigos HTTP (200, 201, 400..
 use Symfony\Component\Routing\Attribute\Route;
 use OpenApi\Attributes as OA; // Documentación
 
+use Symfony\Component\Security\Http\Attribute\IsGranted; // Seguridad
+
 #[Route('', name: 'api_')]
 #[OA\Tag(name: 'Usuarios', description: 'Gestión administrativa de usuarios')]
 final class UsuarioController extends AbstractController
 {
+
     // ========================================================================
-    // 1. LISTAR USUARIOS (GET) -> Usando Vista SQL
-    // ========================================================================
-    #[Route('/usuarios', name: 'usuarios_index', methods: ['GET'])]
     #[OA\Response(
         response: 200,
         description: 'Listado de usuarios activos (Desde Vista SQL)',
         content: new OA\JsonContent(
             type: 'array',
             items: new OA\Items(properties: [
-                new OA\Property(property: 'id_usuario', type: 'integer'),
-                new OA\Property(property: 'correo', type: 'string'),
-                new OA\Property(property: 'nombre_rol', type: 'string'),
-                new OA\Property(property: 'estado_cuenta', type: 'string')
+                new OA\Property(property: 'id_usuario', type: 'integer', example: 1),
+                new OA\Property(property: 'correo', type: 'string', example: 'usuario@test.com'),
+                new OA\Property(property: 'nombre_rol', type: 'string', example: 'Voluntario'),
+                new OA\Property(property: 'estado_cuenta', type: 'string', example: 'Activa')
             ])
         )
     )]
@@ -169,7 +169,7 @@ final class UsuarioController extends AbstractController
                         property: 'imagen',
                         type: 'string',
                         format: 'binary',
-                        description: 'Archivo de imagen (jpg, jpeg, png, webp). Máximo 2MB.'
+                        description: 'Archivo de imagen (jpg, jpeg, png, webp). Máximo 5MB.'
                     )
                 ]
             )
@@ -207,10 +207,10 @@ final class UsuarioController extends AbstractController
             ], Response::HTTP_BAD_REQUEST);
         }
 
-        // 4. Validar tamaño (máximo 2MB)
-        $maxSize = 2 * 1024 * 1024; // 2MB
+        // 4. Validar tamaño (máximo 5MB)
+        $maxSize = 5 * 1024 * 1024; // 5MB
         if ($file->getSize() > $maxSize) {
-            return $this->json(['error' => 'La imagen supera el tamaño máximo permitido (2MB)'], Response::HTTP_BAD_REQUEST);
+            return $this->json(['error' => 'La imagen supera el tamaño máximo permitido (5MB)'], Response::HTTP_BAD_REQUEST);
         }
 
         // 5. Preparar directorio de destino (/public/uploads/usuarios)
@@ -248,5 +248,100 @@ final class UsuarioController extends AbstractController
             'img_perfil' => $filename,
             'img_url' => '/uploads/usuarios/' . $filename
         ], Response::HTTP_OK);
+    }
+
+    // ========================================================================
+    // 5. CAMBIAR ROL DE USUARIO (PUT) - Solo para Coordinadores
+    // ========================================================================
+    #[Route('/usuarios/{id}/rol', name: 'cambiar_rol_usuario', methods: ['PUT'])]
+    #[IsGranted('ROLE_COORDINADOR', message: 'Solo los coordinadores pueden cambiar roles de usuario')]
+    #[OA\RequestBody(
+        description: 'Nuevo rol para el usuario',
+        required: true,
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'id_rol', type: 'integer', example: 2, description: '1=Coordinador, 2=Organización, 3=Voluntario')
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Rol actualizado correctamente',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'mensaje', type: 'string'),
+                new OA\Property(property: 'usuario', type: 'object'),
+                new OA\Property(property: 'advertencia', type: 'string', nullable: true)
+            ]
+        )
+    )]
+    #[OA\Response(response: 404, description: 'Usuario o Rol no encontrado')]
+    #[OA\Response(response: 400, description: 'Datos inválidos')]
+    public function cambiarRol(
+        int $id,
+        Request $request,
+        UsuarioRepository $usuarioRepo,
+        RolRepository $rolRepo,
+        EntityManagerInterface $em
+    ): JsonResponse {
+        // 1. Buscar al usuario
+        $usuario = $usuarioRepo->find($id);
+        if (!$usuario) {
+            return $this->json(['error' => 'Usuario no encontrado'], Response::HTTP_NOT_FOUND);
+        }
+
+        // 2. Obtener el nuevo id_rol del request
+        $data = json_decode($request->getContent(), true);
+        if (!isset($data['id_rol']) || !is_numeric($data['id_rol'])) {
+            return $this->json(['error' => 'El campo id_rol es obligatorio y debe ser numérico'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $nuevoIdRol = (int) $data['id_rol'];
+
+        // 3. Buscar el nuevo rol
+        $nuevoRol = $rolRepo->find($nuevoIdRol);
+        if (!$nuevoRol) {
+            return $this->json(['error' => 'Rol no encontrado'], Response::HTTP_NOT_FOUND);
+        }
+
+        // 4. Verificar si el rol destino requiere perfil complementario
+        $advertencia = null;
+        $nombreRol = strtolower($nuevoRol->getNombre());
+
+        if ($nombreRol === 'voluntario') {
+            // Verificar si existe el registro en VOLUNTARIO
+            $voluntario = $em->getRepository(\App\Entity\Voluntario::class)->find($id);
+            if (!$voluntario) {
+                $advertencia = 'El usuario no tiene perfil de Voluntario completado. Deberá completar sus datos personales.';
+            }
+        } elseif ($nombreRol === 'organización' || $nombreRol === 'organizacion') {
+            // Verificar si existe el registro en ORGANIZACION
+            $organizacion = $em->getRepository(\App\Entity\Organizacion::class)->find($id);
+            if (!$organizacion) {
+                $advertencia = 'El usuario no tiene perfil de Organización completado. Deberá completar los datos de su empresa/ONG.';
+            }
+        }
+
+        // 5. Actualizar el rol
+        $usuario->setRol($nuevoRol);
+        $em->persist($usuario);
+        $em->flush();
+
+        // 6. Preparar respuesta
+        $respuesta = [
+            'mensaje' => 'Rol actualizado correctamente',
+            'usuario' => [
+                'id' => $usuario->getId(),
+                'correo' => $usuario->getCorreo(),
+                'rol' => $nuevoRol->getNombre(),
+                'estado_cuenta' => $usuario->getEstadoCuenta()
+            ]
+        ];
+
+        if ($advertencia) {
+            $respuesta['advertencia'] = $advertencia;
+        }
+
+        return $this->json($respuesta, Response::HTTP_OK);
     }
 }

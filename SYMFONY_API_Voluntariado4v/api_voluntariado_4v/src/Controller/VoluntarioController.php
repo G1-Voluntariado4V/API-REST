@@ -58,7 +58,21 @@ final class VoluntarioController extends AbstractController
     #[OA\Response(
         response: 200,
         description: 'Listado completo de voluntarios activos',
-        content: new OA\JsonContent(type: 'array', items: new OA\Items(type: 'object'))
+        content: new OA\JsonContent(
+            type: 'array',
+            items: new OA\Items(
+                properties: [
+                    new OA\Property(property: 'id_usuario', type: 'integer', example: 10),
+                    new OA\Property(property: 'nombre', type: 'string', example: 'Ana'),
+                    new OA\Property(property: 'apellidos', type: 'string', example: 'García'),
+                    new OA\Property(property: 'correo_usuario', type: 'string', example: 'ana@test.com'),
+                    new OA\Property(property: 'curso_actual', type: 'string', example: '2º DAW'),
+                    new OA\Property(property: 'telefono', type: 'string', example: '+34 600 11 22 33'),
+                    new OA\Property(property: 'estado_cuenta', type: 'string', example: 'Activa')
+                ],
+                type: 'object'
+            )
+        )
     )]
     public function index(EntityManagerInterface $em): JsonResponse
     {
@@ -371,6 +385,8 @@ final class VoluntarioController extends AbstractController
     // ========================================================================
     #[Route('/voluntarios/{id}/actividades/{idActividad}', name: 'desapuntarse_actividad', methods: ['DELETE'])]
     #[OA\Parameter(name: 'X-User-Id', in: 'header', required: true, schema: new OA\Schema(type: 'integer'))]
+    #[OA\Response(response: 200, description: 'Te has desapuntado correctamente')]
+    #[OA\Response(response: 404, description: 'No estas inscrito en esta actividad')]
     public function desapuntarse(
         int $id,
         int $idActividad,
@@ -407,6 +423,21 @@ final class VoluntarioController extends AbstractController
     // ========================================================================
     #[Route('/voluntarios/{id}/recomendaciones', name: 'recomendaciones_voluntario', methods: ['GET'])]
     #[OA\Parameter(name: 'X-User-Id', in: 'header', required: true, schema: new OA\Schema(type: 'integer'))]
+    #[OA\Response(
+        response: 200,
+        description: 'Lista de actividades recomendadas',
+        content: new OA\JsonContent(
+            type: 'array',
+            items: new OA\Items(
+                properties: [
+                    new OA\Property(property: 'id_actividad', type: 'integer', example: 12),
+                    new OA\Property(property: 'titulo', type: 'string', example: 'Actividad Recomendada'),
+                    new OA\Property(property: 'compatibilidad', type: 'integer', example: 100),
+                    new OA\Property(property: 'motivo', type: 'string', example: 'Coincide con tus ODS y disponibilidad')
+                ]
+            )
+        )
+    )]
     public function recomendaciones(int $id, Request $request, EntityManagerInterface $em): JsonResponse
     {
         if (!$this->checkOwner($request, $id)) return $this->json(['error' => 'Acceso denegado'], 403);

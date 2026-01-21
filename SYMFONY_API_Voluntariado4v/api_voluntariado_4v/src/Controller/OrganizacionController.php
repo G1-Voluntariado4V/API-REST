@@ -39,7 +39,22 @@ final class OrganizacionController extends AbstractController
     #[OA\Response(
         response: 200,
         description: 'Catálogo de ONGs activas',
-        content: new OA\JsonContent(type: 'array', items: new OA\Items(type: 'object'))
+        content: new OA\JsonContent(
+            type: 'array',
+            items: new OA\Items(
+                properties: [
+                    new OA\Property(property: 'id_usuario', type: 'integer', example: 5),
+                    new OA\Property(property: 'correo_usuario', type: 'string', example: 'contacto@ong-ejemplo.org'),
+                    new OA\Property(property: 'nombre_organizacion', type: 'string', example: 'ONG Ejemplo'),
+                    new OA\Property(property: 'descripcion', type: 'string', example: 'Organización dedicada a...'),
+                    new OA\Property(property: 'telefono', type: 'string', example: '+34 91 123 45 67'),
+                    new OA\Property(property: 'direccion', type: 'string', example: 'Calle Solidaridad 12'),
+                    new OA\Property(property: 'sitio_web', type: 'string', example: 'https://ong-ejemplo.org'),
+                    new OA\Property(property: 'estado_cuenta', type: 'string', example: 'Activa')
+                ],
+                type: 'object'
+            )
+        )
     )]
     public function index(EntityManagerInterface $em): JsonResponse
     {
