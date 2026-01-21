@@ -156,81 +156,97 @@ final class UsuarioController extends AbstractController
         }
     }
     // ========================================================================
-    // 4. SUBIR FOTO PERFIL (POST)
+    // 4. SUBIR/ACTUALIZAR FOTO PERFIL (POST) - multipart/form-data
     // ========================================================================
     #[Route('/usuarios/{id}/imagen', name: 'upload_imagen_usuario', methods: ['POST'])]
     #[OA\RequestBody(
         required: true,
-        content: new OA\JsonContent(
-            properties: [
-                new OA\Property(property: 'url_imagen', type: 'string', description: 'Base64 image string')
-            ]
+        content: new OA\MediaType(
+            mediaType: 'multipart/form-data',
+            schema: new OA\Schema(
+                properties: [
+                    new OA\Property(
+                        property: 'imagen',
+                        type: 'string',
+                        format: 'binary',
+                        description: 'Archivo de imagen (jpg, jpeg, png, webp). Máximo 2MB.'
+                    )
+                ]
+            )
         )
     )]
-    #[OA\Response(response: 200, description: 'Imagen de perfil actualizada')]
+    #[OA\Response(response: 200, description: 'Imagen de perfil actualizada correctamente')]
+    #[OA\Response(response: 400, description: 'Error en la validación del archivo')]
+    #[OA\Response(response: 404, description: 'Usuario no encontrado')]
+    #[OA\Response(response: 500, description: 'Error de escritura en disco')]
     public function uploadImagen(
         int $id,
         Request $request,
         UsuarioRepository $usuarioRepo,
-        EntityManagerInterface $em
+        EntityManagerInterface $em,
+        #[\Symfony\Component\DependencyInjection\Attribute\Autowire('%uploads_directory%')] string $uploadsDirectory
     ): JsonResponse {
+        // 1. Buscar al usuario
         $usuario = $usuarioRepo->find($id);
         if (!$usuario) {
             return $this->json(['error' => 'Usuario no encontrado'], Response::HTTP_NOT_FOUND);
         }
 
-        $data = json_decode($request->getContent(), true);
-        $urlImagen = $data['url_imagen'] ?? null;
-
-        if (empty($urlImagen)) {
-            return $this->json(['error' => 'Falta la imagen (base64)'], Response::HTTP_BAD_REQUEST);
+        // 2. Recoger el archivo del campo 'imagen'
+        $file = $request->files->get('imagen');
+        if (!$file) {
+            return $this->json(['error' => 'No se ha enviado ningún archivo en el campo "imagen"'], Response::HTTP_BAD_REQUEST);
         }
 
-        // LOGICA BASE64
-        if (preg_match('/^data:image\/(\w+);base64,/', $urlImagen, $type)) {
-            $dataBase64 = substr($urlImagen, strpos($urlImagen, ',') + 1);
-            $extension = strtolower($type[1]); // jpg, png, etc.
+        // 3. Validar extensión
+        $extension = strtolower($file->getClientOriginalExtension());
+        $allowedExtensions = ['jpg', 'jpeg', 'png', 'webp'];
+        if (!in_array($extension, $allowedExtensions)) {
+            return $this->json([
+                'error' => 'Formato de imagen no soportado. Permitidos: ' . implode(', ', $allowedExtensions)
+            ], Response::HTTP_BAD_REQUEST);
+        }
 
-            if (!in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'webp'])) {
-                return $this->json(['error' => 'Formato de imagen no soportado (solo jpg, png, gif, webp)'], Response::HTTP_BAD_REQUEST);
-            }
+        // 4. Validar tamaño (máximo 2MB)
+        $maxSize = 2 * 1024 * 1024; // 2MB
+        if ($file->getSize() > $maxSize) {
+            return $this->json(['error' => 'La imagen supera el tamaño máximo permitido (2MB)'], Response::HTTP_BAD_REQUEST);
+        }
 
-            $decodedData = base64_decode($dataBase64);
-            if ($decodedData === false) {
-                return $this->json(['error' => 'Error al decodificar Base64'], Response::HTTP_BAD_REQUEST);
-            }
+        // 5. Preparar directorio de destino (/public/uploads/usuarios)
+        $targetDirectory = $uploadsDirectory . '/usuarios';
+        if (!is_dir($targetDirectory)) {
+            mkdir($targetDirectory, 0777, true);
+        }
 
-            // Validar Tamaño (Max 2MB)
-            if (strlen($decodedData) > 2 * 1024 * 1024) {
-                return $this->json(['error' => 'La imagen supera el tamaño máximo permitido (2MB)'], Response::HTTP_BAD_REQUEST);
-            }
+        // 6. Generar nombre único y mover el archivo
+        $filename = uniqid('usr_' . $id . '_') . '.' . $extension;
+        try {
+            $file->move($targetDirectory, $filename);
+        } catch (\Symfony\Component\HttpFoundation\File\Exception\FileException $e) {
+            return $this->json([
+                'error' => 'Error al guardar la imagen en el servidor: ' . $e->getMessage()
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
 
-            // Crear directorio si no existe (Usuarios/Perfiles)
-            $uploadDir = $this->getParameter('kernel.project_dir') . '/public/uploads/perfiles';
-            if (!file_exists($uploadDir)) {
-                mkdir($uploadDir, 0777, true);
-            }
-
-            // Guardar archivo
-            $filename = uniqid('usr_' . $id . '_') . '.' . $extension;
-            try {
-                file_put_contents($uploadDir . '/' . $filename, $decodedData);
-
-                $relativePath = '/uploads/perfiles/' . $filename;
-
-                // Guardar en ENTIDAD USUARIO
-                $usuario->setImgPerfil($relativePath);
-                $em->flush();
-
-                return $this->json([
-                    'mensaje' => 'Foto de perfil actualizada correctamente',
-                    'url' => $relativePath
-                ], Response::HTTP_OK);
-            } catch (\Exception $e) {
-                return $this->json(['error' => 'No se pudo guardar la imagen en el servidor'], Response::HTTP_INTERNAL_SERVER_ERROR);
+        // 7. Eliminar imagen anterior si existía
+        $oldImage = $usuario->getImgPerfil();
+        if ($oldImage) {
+            $oldPath = $uploadsDirectory . '/usuarios/' . $oldImage;
+            if (file_exists($oldPath)) {
+                @unlink($oldPath);
             }
         }
 
-        return $this->json(['error' => 'Formato de imagen inválido (debe ser base64)'], Response::HTTP_BAD_REQUEST);
+        // 8. Actualizar la entidad con el nuevo nombre de archivo
+        $usuario->setImgPerfil($filename);
+        $em->persist($usuario);
+        $em->flush();
+
+        return $this->json([
+            'mensaje' => 'Foto de perfil actualizada correctamente',
+            'img_perfil' => $filename,
+            'img_url' => '/uploads/usuarios/' . $filename
+        ], Response::HTTP_OK);
     }
 }

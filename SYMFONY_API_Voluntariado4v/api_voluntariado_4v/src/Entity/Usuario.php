@@ -117,6 +117,16 @@ class Usuario implements UserInterface
         return $this;
     }
 
+    /**
+     * Getter virtual (NO mapeado a BBDD) que devuelve la URL pública de la imagen de perfil.
+     * Se incluye en la serialización JSON con el grupo 'usuario:read'.
+     */
+    #[Groups(['usuario:read'])]
+    public function getImgPerfilUrl(): ?string
+    {
+        return $this->imgPerfil ? '/uploads/usuarios/' . $this->imgPerfil : null;
+    }
+
     public function getRol(): ?Rol
     {
         return $this->rol;

@@ -137,6 +137,16 @@ class Actividad
         return $this;
     }
 
+    /**
+     * Getter virtual (NO mapeado a BBDD) que devuelve la URL pública de la imagen.
+     * Se incluye en la serialización JSON con el grupo 'actividad:read'.
+     */
+    #[Groups(['actividad:read'])]
+    public function getImgUrl(): ?string
+    {
+        return $this->imgActividad ? '/uploads/actividades/' . $this->imgActividad : null;
+    }
+
     public function getFechaInicio(): ?\DateTimeInterface
     {
         return $this->fechaInicio;
