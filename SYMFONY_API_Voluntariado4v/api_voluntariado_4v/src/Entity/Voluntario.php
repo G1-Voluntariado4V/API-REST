@@ -6,6 +6,7 @@ use App\Repository\VoluntarioRepository;
 use Doctrine\ORM\Mapping as ORM;
 use Doctrine\DBAL\Types\Types;
 use Symfony\Component\Serializer\Annotation\Groups;
+use Symfony\Component\Validator\Constraints as Assert;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 
@@ -47,6 +48,10 @@ class Voluntario
 
     #[ORM\Column(type: Types::TEXT, nullable: true)]
     #[Groups(['usuario:read'])]
+    #[Assert\Length(
+        max: 1000,
+        maxMessage: 'La descripción no puede superar los {{ limit }} caracteres.'
+    )]
     private ?string $descripcion = null;
 
     #[ORM\Column(type: Types::DATE_MUTABLE, nullable: true, name: 'fecha_nac')]

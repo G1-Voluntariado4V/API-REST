@@ -38,11 +38,19 @@ class Organizacion
     private ?string $nombre = null;
 
     #[ORM\Column(type: Types::TEXT, nullable: true)]
-    #[Groups(['usuario:read', 'actividad:read'])] // <--- También la descripción si quieres
+    #[Groups(['usuario:read', 'actividad:read'])]
+    #[Assert\Length(
+        max: 2000,
+        maxMessage: 'La descripción no puede superar los {{ limit }} caracteres.'
+    )]
     private ?string $descripcion = null;
 
-    #[ORM\Column(type: Types::TEXT, nullable: true)]
+    #[ORM\Column(length: 255, nullable: true)]
     #[Groups(['usuario:read'])]
+    #[Assert\Length(
+        max: 255,
+        maxMessage: 'La dirección es demasiado larga (máx. {{ limit }} caracteres).'
+    )]
     private ?string $direccion = null;
 
     #[ORM\Column(length: 200, nullable: true, name: 'sitio_web')]

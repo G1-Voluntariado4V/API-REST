@@ -8,6 +8,7 @@ use Doctrine\Common\Collections\Collection;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Annotation\Groups;
+use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity(repositoryClass: ActividadRepository::class)]
 #[ORM\Table(name: 'ACTIVIDAD')]
@@ -25,6 +26,10 @@ class Actividad
 
     #[ORM\Column(type: Types::TEXT, nullable: true)]
     #[Groups(['actividad:read'])]
+    #[Assert\Length(
+        max: 2000,
+        maxMessage: 'La descripción no puede superar los {{ limit }} caracteres.'
+    )]
     private ?string $descripcion = null;
 
     #[ORM\Column(length: 255, nullable: true, name: 'img_actividad')]
@@ -43,8 +48,12 @@ class Actividad
     #[Groups(['actividad:read'])]
     private ?int $cupoMaximo = null;
 
-    #[ORM\Column(type: Types::TEXT, nullable: true)]
+    #[ORM\Column(length: 255, nullable: true)]
     #[Groups(['actividad:read'])]
+    #[Assert\Length(
+        max: 255,
+        maxMessage: 'La ubicación es demasiado larga (máx. {{ limit }} caracteres).'
+    )]
     private ?string $ubicacion = null;
 
     // Default según SQL: 'En revision'

@@ -6,23 +6,28 @@ use App\Repository\ODSRepository;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Annotation\Groups;
+use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity(repositoryClass: ODSRepository::class)]
 class ODS
 {
-   #[ORM\Id]
+    #[ORM\Id]
     #[ORM\Column(name: 'id_ods')]
     // 👇 AQUÍ ESTÁ EL TRUCO: Ponemos los dos grupos
-    #[Groups(['actividad:read', 'curso:read'])] 
+    #[Groups(['actividad:read', 'curso:read'])]
     private ?int $id = null;
 
     #[ORM\Column(length: 150)]
     // 👇 AQUÍ TAMBIÉN
-    #[Groups(['actividad:read', 'curso:read'])] 
+    #[Groups(['actividad:read', 'curso:read'])]
     private ?string $nombre = null;
 
     #[ORM\Column(type: 'text', nullable: true)]
     #[Groups(['actividad:read', 'curso:read'])]
+    #[Assert\Length(
+        max: 500,
+        maxMessage: 'La descripción del ODS no puede superar los {{ limit }} caracteres.'
+    )]
     private ?string $descripcion = null;
 
     // --- CONSTRUCTOR OPCIONAL (Recomendado para IDs obligatorios) ---
