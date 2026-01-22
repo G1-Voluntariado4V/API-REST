@@ -46,21 +46,18 @@ final class VoluntarioIdiomaController extends AbstractController
             return $this->json(['error' => 'Faltan datos (id_idioma, nivel)'], Response::HTTP_BAD_REQUEST);
         }
 
-        // 1. Buscar Voluntario (por usuario_id)
         $voluntario = $voluntarioRepo->findOneBy(['usuario' => $idVoluntario]);
         if (!$voluntario) {
             return $this->json(['error' => 'Voluntario no encontrado'], Response::HTTP_NOT_FOUND);
         }
 
-        // 2. Buscar Idioma
         $idioma = $idiomaRepo->find($data['id_idioma']);
         if (!$idioma) {
             return $this->json(['error' => 'Idioma no encontrado'], Response::HTTP_NOT_FOUND);
         }
 
-        // 3. Verificar duplicados
         $existe = $entityManager->getRepository(VoluntarioIdioma::class)->findOneBy([
-            'voluntario' => $voluntario, // Usamos la entidad, no el ID
+            'voluntario' => $voluntario,
             'idioma' => $idioma
         ]);
 
@@ -68,7 +65,6 @@ final class VoluntarioIdiomaController extends AbstractController
             return $this->json(['error' => 'El voluntario ya tiene asignado este idioma. Usa PUT para modificar el nivel.'], Response::HTTP_CONFLICT);
         }
 
-        // 4. Crear relación
         $voluntarioIdioma = new VoluntarioIdioma();
         $voluntarioIdioma->setVoluntario($voluntario);
         $voluntarioIdioma->setIdioma($idioma);
@@ -98,10 +94,9 @@ final class VoluntarioIdiomaController extends AbstractController
         int $idIdioma,
         Request $request,
         EntityManagerInterface $entityManager,
-        VoluntarioRepository $voluntarioRepo, // Necesitamos buscar primero al voluntario
+        VoluntarioRepository $voluntarioRepo,
         IdiomaRepository $idiomaRepo
     ): JsonResponse {
-        // Buscar entidades para asegurar que existen
         $voluntario = $voluntarioRepo->findOneBy(['usuario' => $idVoluntario]);
         $idioma = $idiomaRepo->find($idIdioma);
 
@@ -109,7 +104,6 @@ final class VoluntarioIdiomaController extends AbstractController
             return $this->json(['error' => 'Voluntario o Idioma no encontrados'], Response::HTTP_NOT_FOUND);
         }
 
-        // Buscar la relación exacta
         $relacion = $entityManager->getRepository(VoluntarioIdioma::class)->findOneBy([
             'voluntario' => $voluntario,
             'idioma' => $idioma

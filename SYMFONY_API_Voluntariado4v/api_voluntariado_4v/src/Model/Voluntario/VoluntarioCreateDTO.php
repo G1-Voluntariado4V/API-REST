@@ -1,5 +1,5 @@
 <?php
-// DTO para la creación de un voluntario: Lo que te manda el frontend
+
 namespace App\Model\Voluntario;
 
 use Symfony\Component\Validator\Constraints as Assert;
@@ -27,7 +27,6 @@ class VoluntarioCreateDTO
         public string $apellidos,
 
         #[Assert\NotBlank]
-        // Aquí podrías meter una Regex para DNI/NIE si quisieras ser estricto
         #[OA\Property(example: "12345678Z")]
         public string $dni,
 
@@ -47,16 +46,13 @@ class VoluntarioCreateDTO
         #[OA\Property(example: 2)]
         public int $id_curso_actual,
 
-        // Descripción personal del voluntario (opcional)
         #[Assert\Length(max: 500, maxMessage: "La descripción no puede tener más de 500 caracteres")]
         #[OA\Property(example: "Me gusta ayudar con temas de logística.")]
         public ?string $descripcion = null,
 
-        // Arrays de IDs para relaciones (más simple que pasar objetos enteros)
         #[OA\Property(example: [1, 3], type: 'array', items: new OA\Items(type: 'integer'))]
         public array $preferencias_ids = [],
 
-        // Array de objetos simples para idiomas: [['id' => 1, 'nivel' => 'B2'], ...]
         #[OA\Property(
             example: [['id_idioma' => 1, 'nivel' => 'B2']],
             type: 'array',

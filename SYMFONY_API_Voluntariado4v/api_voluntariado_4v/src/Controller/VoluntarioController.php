@@ -10,17 +10,13 @@ use App\Entity\Actividad;
 use App\Entity\Curso;
 use App\Entity\TipoVoluntariado;
 use App\Entity\Idioma;
-
-// DTOs
 use App\Model\Voluntario\VoluntarioCreateDTO;
 use App\Model\Voluntario\VoluntarioResponseDTO;
 use App\Model\Voluntario\VoluntarioUpdateDTO;
 use App\Model\Inscripcion\InscripcionResponseDTO;
-// Repositorios
 use App\Repository\RolRepository;
 use App\Repository\UsuarioRepository;
 use App\Repository\ActividadRepository;
-// Core
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -28,7 +24,6 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
-// Documentación
 use OpenApi\Attributes as OA;
 use Nelmio\ApiDocBundle\Attribute\Model;
 
@@ -36,23 +31,18 @@ use Nelmio\ApiDocBundle\Attribute\Model;
 #[OA\Tag(name: 'Voluntarios', description: 'Gestión de perfiles, inscripciones y estadísticas')]
 final class VoluntarioController extends AbstractController
 {
-    // ========================================================================
-    // HELPER: Seguridad Básica
-    // ========================================================================
     private function checkOwner(Request $request, int $resourceId): bool
     {
-        // Permitir si es Admin/Coordinador
         if ($request->headers->has('X-Admin-Id')) {
             return true;
         }
 
         $headerId = $request->headers->get('X-User-Id');
-        // Si no hay header o no coincide, denegamos
         return $headerId && (int)$headerId === $resourceId;
     }
 
     // ========================================================================
-    // 1. LISTADO (Vista SQL) - Público/Admin
+    // 1. LISTADO (GET)
     // ========================================================================
     #[Route('/voluntarios', name: 'listar_voluntarios', methods: ['GET'])]
     #[OA\Response(
@@ -87,7 +77,7 @@ final class VoluntarioController extends AbstractController
     }
 
     // ========================================================================
-    // 2. REGISTRAR VOLUNTARIO (DTO)
+    // 2. REGISTRAR VOLUNTARIO (POST)
     // ========================================================================
     #[Route('/voluntarios', name: 'registro_voluntario', methods: ['POST'])]
     #[OA\RequestBody(required: true, content: new OA\JsonContent(ref: new Model(type: VoluntarioCreateDTO::class)))]
@@ -99,7 +89,6 @@ final class VoluntarioController extends AbstractController
     ): JsonResponse {
 
         try {
-            // A. USUARIO BASE
             $usuario = new Usuario();
             $usuario->setCorreo($dto->correo);
             $usuario->setGoogleId($dto->google_id);
@@ -110,10 +99,8 @@ final class VoluntarioController extends AbstractController
             $usuario->setRol($rolVoluntario);
 
             $em->persist($usuario);
-            $em->flush(); // Necesario para obtener el ID del usuario
+            $em->flush();
 
-
-            // B. PERFIL VOLUNTARIO
             $voluntario = new Voluntario();
             $voluntario->setUsuario($usuario);
             $voluntario->setNombre($dto->nombre);
@@ -123,29 +110,22 @@ final class VoluntarioController extends AbstractController
             $voluntario->setCarnetConducir($dto->carnet_conducir);
             $voluntario->setDescripcion($dto->descripcion);
 
-            // Manejo seguro de fecha
             try {
                 $voluntario->setFechaNac(new \DateTime($dto->fecha_nac));
             } catch (\Exception $e) {
-                // El DTO ya valida el formato, esto es por seguridad extra
             }
 
-            // IMPORTANTE: Asignar el curso ANTES del persist
             $curso = $em->getRepository(Curso::class)->find($dto->id_curso_actual);
             if ($curso) $voluntario->setCursoActual($curso);
 
-            // PERSISTIR primero para generar el ID
             $em->persist($voluntario);
 
-            // Ahora sí, añadir las relaciones Many-to-Many e Idiomas
-            // Preferencias (Tipos)
             $tipoRepo = $em->getRepository(TipoVoluntariado::class);
             foreach ($dto->preferencias_ids as $tipoId) {
                 $tipo = $tipoRepo->find($tipoId);
                 if ($tipo) $voluntario->addPreferencia($tipo);
             }
 
-            // Idiomas
             $idiomaRepo = $em->getRepository(Idioma::class);
             foreach ($dto->idiomas as $idiomaData) {
                 $entidadIdioma = $idiomaRepo->find($idiomaData['id_idioma']);
@@ -158,10 +138,7 @@ final class VoluntarioController extends AbstractController
                 }
             }
 
-            // FLUSH FINAL: Guarda voluntario + relaciones
             $em->flush();
-
-            // Refrescamos para traer las relaciones cargadas
             $em->refresh($voluntario);
 
             return $this->json(VoluntarioResponseDTO::fromEntity($voluntario), Response::HTTP_CREATED);
@@ -170,13 +147,12 @@ final class VoluntarioController extends AbstractController
                 return $this->json(['error' => 'El usuario (correo/DNI) ya existe'], 409);
             }
 
-            // Otros errores
             return $this->json(['error' => 'Error al registrar el voluntario. Por favor, revisa los datos e inténtalo de nuevo.'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
     // ========================================================================
-    // 3. GET ONE (Detalle)
+    // 3. GET ONE (GET)
     // ========================================================================
     #[Route('/voluntarios/{id}', name: 'get_voluntario', methods: ['GET'])]
     #[OA\Response(response: 200, description: 'Detalle del voluntario', content: new OA\JsonContent(ref: new Model(type: VoluntarioResponseDTO::class)))]
@@ -206,44 +182,35 @@ final class VoluntarioController extends AbstractController
         EntityManagerInterface $em
     ): JsonResponse {
 
-        // 1. Seguridad: Solo el usuario propietario puede editar su perfil
         if (!$this->checkOwner($request, $id)) {
             return $this->json(['error' => 'No tienes permiso para editar este perfil'], Response::HTTP_FORBIDDEN);
         }
 
-        // 2. Buscamos al Voluntario (Tuplas de BBDD)
-        // Buscamos primero el Usuario padre para llegar al Voluntario
         $usuario = $usuarioRepo->find($id);
         if (!$usuario) return $this->json(['error' => 'Usuario no encontrado'], 404);
 
         $voluntario = $em->getRepository(Voluntario::class)->findOneBy(['usuario' => $usuario]);
         if (!$voluntario) return $this->json(['error' => 'Perfil de voluntario no encontrado'], 404);
 
-        // 3. Actualización de datos (SOLO TABLA VOLUNTARIO)
         $voluntario->setNombre($dto->nombre);
         $voluntario->setApellidos($dto->apellidos);
         $voluntario->setTelefono($dto->telefono);
 
-        // Actualizar descripción si se proporciona
         if ($dto->descripcion !== null) {
             $voluntario->setDescripcion($dto->descripcion);
         }
 
-        // Convertir el string fecha a DateTime
         if ($dto->fechaNac) {
             try {
                 $voluntario->setFechaNac(new \DateTime($dto->fechaNac));
             } catch (\Exception $e) {
-                // Si falla el formato, aunque el DTO valida, por seguridad no rompemos
             }
         }
 
-        // Actualizar carnet de conducir si se proporciona
         if ($dto->carnet_conducir !== null) {
             $voluntario->setCarnetConducir($dto->carnet_conducir);
         }
 
-        // Actualizar curso si se proporciona
         if ($dto->id_curso_actual) {
             $curso = $em->getRepository(Curso::class)->find($dto->id_curso_actual);
             if ($curso) {
@@ -251,16 +218,11 @@ final class VoluntarioController extends AbstractController
             }
         }
 
-        // NOTA: Aquí NO tocamos $usuario->setImgPerfil(). La foto es inmutable (Google).
-
-        // 4. Sincronización de Preferencias (Many-to-Many)
-        if ($dto->preferencias_ids !== null) { // Solo si envían el array (aunque sea vacío)
-            // A. Limpiamos las actuales
+        if ($dto->preferencias_ids !== null) {
             foreach ($voluntario->getPreferencias() as $pref) {
                 $voluntario->removePreferencia($pref);
             }
 
-            // B. Añadimos las nuevas
             if (!empty($dto->preferencias_ids)) {
                 $tipoRepo = $em->getRepository(TipoVoluntariado::class);
                 foreach ($dto->preferencias_ids as $idTipo) {
@@ -270,7 +232,6 @@ final class VoluntarioController extends AbstractController
             }
         }
 
-        // 5. Persistir cambios
         $em->flush();
 
         return $this->json(VoluntarioResponseDTO::fromEntity($voluntario), 200);
@@ -309,14 +270,11 @@ final class VoluntarioController extends AbstractController
 
         try {
             $em->persist($inscripcion);
-            $em->flush(); // Aquí saltará el TRIGGER de Cupo/Fechas si no cumple
+            $em->flush();
             return $this->json(['mensaje' => 'Inscripción solicitada correctamente'], 201);
         } catch (\Exception $e) {
-            // Capturamos el error del Trigger SQL para dar un mensaje útil
             $msg = $e->getMessage();
             if (str_contains($msg, 'ERROR')) {
-                // Intentamos limpiar el mensaje técnico de SQL Server
-                // Ej: "SQLSTATE[...]: ... ERROR: La actividad ya está completa."
                 $parts = explode('ERROR', $msg);
                 $cleanMsg = isset($parts[1]) ? 'ERROR' . $parts[1] : 'No se pudo realizar la inscripción por reglas de negocio.';
                 return $this->json(['error' => trim($cleanMsg)], 409);
@@ -353,7 +311,6 @@ final class VoluntarioController extends AbstractController
 
         $inscripciones = $em->getRepository(Inscripcion::class)->findBy(['voluntario' => $voluntario], ['fechaSolicitud' => 'DESC']);
 
-        // A. Calcular Estadísticas
         $horasTotales = 0;
         $participacionesConfirmadas = 0;
         foreach ($inscripciones as $insc) {
@@ -363,7 +320,6 @@ final class VoluntarioController extends AbstractController
             }
         }
 
-        // B. Mapear a DTO (La imagen ya se inyecta en el DTO fromEntity)
         $actividadesDTOs = [];
 
         foreach ($inscripciones as $ins) {
@@ -396,8 +352,6 @@ final class VoluntarioController extends AbstractController
 
         if (!$this->checkOwner($request, $id)) return $this->json(['error' => 'Acceso denegado'], 403);
 
-        // Buscamos la inscripción (PK Compuesta: voluntario + actividad)
-        // Usamos referencia para evitar query extra al obtener el voluntario
         $voluntarioRef = $em->getReference(Voluntario::class, $id);
 
         $inscripcion = $em->getRepository(Inscripcion::class)->findOneBy([
@@ -409,9 +363,6 @@ final class VoluntarioController extends AbstractController
             return $this->json(['error' => 'No estás inscrito en esta actividad'], 404);
         }
 
-        // Opcional: Validar si se puede desapuntar (ej: si falta menos de 24h)
-        // if ($inscripcion->getActividad()->getFechaInicio() < new \DateTime('+1 day')) ...
-
         $em->remove($inscripcion);
         $em->flush();
 
@@ -419,7 +370,7 @@ final class VoluntarioController extends AbstractController
     }
 
     // ========================================================================
-    // 8. RECOMENDACIONES (SP)
+    // 8. RECOMENDACIONES (GET)
     // ========================================================================
     #[Route('/voluntarios/{id}/recomendaciones', name: 'recomendaciones_voluntario', methods: ['GET'])]
     #[OA\Parameter(name: 'X-User-Id', in: 'header', required: true, schema: new OA\Schema(type: 'integer'))]
@@ -453,7 +404,7 @@ final class VoluntarioController extends AbstractController
     }
 
     // ========================================================================
-    // 9. HORAS TOTALES DE VOLUNTARIADO (GET) - Campo calculado
+    // 9. HORAS TOTALES DE VOLUNTARIADO (GET)
     // ========================================================================
     #[Route('/voluntarios/{id}/horas-totales', name: 'horas_totales_voluntario', methods: ['GET'])]
     #[OA\Parameter(name: 'X-User-Id', in: 'header', required: true, schema: new OA\Schema(type: 'integer'))]
@@ -468,12 +419,10 @@ final class VoluntarioController extends AbstractController
     )]
     public function horasTotales(int $id, Request $request, UsuarioRepository $userRepo, EntityManagerInterface $em): JsonResponse
     {
-        // 1. Seguridad: Solo el propio voluntario puede ver sus horas
         if (!$this->checkOwner($request, $id)) {
             return $this->json(['error' => 'Acceso denegado'], Response::HTTP_FORBIDDEN);
         }
 
-        // 2. Buscar al voluntario
         $usuario = $userRepo->find($id);
         if (!$usuario || $usuario->getDeletedAt()) {
             return $this->json(['error' => 'Usuario no encontrado'], Response::HTTP_NOT_FOUND);
@@ -484,7 +433,6 @@ final class VoluntarioController extends AbstractController
             return $this->json(['error' => 'Perfil de voluntario no encontrado'], Response::HTTP_NOT_FOUND);
         }
 
-        // 3. Calcular horas totales usando solo SQL para mejor rendimiento
         $conn = $em->getConnection();
 
         $sql = "

@@ -4,16 +4,13 @@ namespace App\Controller;
 
 use App\Entity\Actividad;
 use App\Entity\Organizacion;
-// Modelos / DTOs
 use App\Model\Actividad\ActividadCreateDTO;
 use App\Model\Actividad\ActividadUpdateDTO;
 use App\Model\Actividad\ActividadResponseDTO;
-// Repositorios
 use App\Repository\ActividadRepository;
 use App\Repository\ODSRepository;
 use App\Repository\TipoVoluntariadoRepository;
 use App\Repository\UsuarioRepository;
-// Core Symfony & Doctrine
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -21,7 +18,6 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
-// Documentación
 use OpenApi\Attributes as OA;
 use Nelmio\ApiDocBundle\Attribute\Model;
 
@@ -30,7 +26,7 @@ use Nelmio\ApiDocBundle\Attribute\Model;
 final class ActividadController extends AbstractController
 {
     // ========================================================================
-    // 1. LISTAR ACTIVIDADES (GET) - VISTA SQL
+    // 1. LISTAR ACTIVIDADES (GET)
     // ========================================================================
     #[Route('/actividades', name: 'listar_actividades', methods: ['GET'])]
     #[OA\Parameter(name: 'ods_id', description: 'Filtrar por ID de ODS', in: 'query', schema: new OA\Schema(type: 'integer'))]
@@ -65,8 +61,6 @@ final class ActividadController extends AbstractController
 
         $conn = $em->getConnection();
         $qb = $conn->createQueryBuilder();
-
-        // Usamos la VISTA SQL por rendimiento (devuelve array asociativo, no Entidades)
         $qb->select('*')->from('VW_Actividades_Publicadas');
 
         if ($odsId) {
@@ -84,8 +78,6 @@ final class ActividadController extends AbstractController
 
             foreach ($actividades as &$actividad) {
                 $id = $actividad['id_actividad'];
-
-                // 1. TIPOS DE VOLUNTARIADO (Desde Entidad Actividad)
                 $entity = $em->getRepository(Actividad::class)->find($id);
                 if ($entity) {
                     $nombresTipos = [];
@@ -103,7 +95,6 @@ final class ActividadController extends AbstractController
                         $actividad['nombre_organizacion'] = $entity->getOrganizacion()->getNombre() ?? $actividad['nombre_organizacion'];
                     }
 
-                    // 2. IMAGEN (Directamente de la entidad)
                     $actividad['imagen_actividad'] = $entity->getImgActividad();
                 } else {
                     $actividad['imagen_actividad'] = null;
@@ -121,7 +112,7 @@ final class ActividadController extends AbstractController
     }
 
     // ========================================================================
-    // 2. CREAR ACTIVIDAD (POST) - Usando ActividadCreateDTO
+    // 2. CREAR ACTIVIDAD (POST)
     // ========================================================================
     #[Route('/actividades', name: 'crear_actividad', methods: ['POST'])]
     #[OA\RequestBody(
@@ -145,20 +136,16 @@ final class ActividadController extends AbstractController
         TipoVoluntariadoRepository $tipoRepo
     ): JsonResponse {
 
-        // 1. Buscar la Organización dueña (Necesario porque viene en el DTO de creación)
-        // Buscamos el Usuario primero
         $usuarioOrg = $userRepo->find($dto->id_organizacion);
         if (!$usuarioOrg) {
             return $this->json(['error' => 'Organización no encontrada'], Response::HTTP_NOT_FOUND);
         }
 
-        // Buscamos el perfil de Organización asociado
         $organizacion = $entityManager->getRepository(Organizacion::class)->findOneBy(['usuario' => $usuarioOrg]);
         if (!$organizacion) {
             return $this->json(['error' => 'Perfil de organización no encontrado'], Response::HTTP_NOT_FOUND);
         }
 
-        // 2. Crear la Entidad y setear datos básicos
         $actividad = new Actividad();
         $actividad->setOrganizacion($organizacion);
         $actividad->setTitulo($dto->titulo);
@@ -168,14 +155,12 @@ final class ActividadController extends AbstractController
         $actividad->setCupoMaximo($dto->cupo_maximo);
         $actividad->setEstadoPublicacion('En revision');
 
-        // El DTO garantiza formato fecha, pero DateTime puede fallar si la fecha es lógica pero rara (ej: mes 13)
         try {
             $actividad->setFechaInicio(new \DateTime($dto->fecha_inicio));
         } catch (\Exception $e) {
             return $this->json(['error' => 'Fecha inválida'], Response::HTTP_BAD_REQUEST);
         }
 
-        // 3. Asignar Relaciones (ODS y Tipos)
         foreach ($dto->odsIds as $idOds) {
             $ods = $odsRepo->find($idOds);
             if ($ods) $actividad->addOd($ods);
@@ -186,7 +171,6 @@ final class ActividadController extends AbstractController
             if ($tipo) $actividad->addTiposVoluntariado($tipo);
         }
 
-        // 4. Guardar
         try {
             $entityManager->persist($actividad);
             $entityManager->flush();
@@ -198,7 +182,7 @@ final class ActividadController extends AbstractController
     }
 
     // ========================================================================
-    // 3. ACTUALIZAR ACTIVIDAD (PUT) - Usando ActividadUpdateDTO
+    // 3. ACTUALIZAR ACTIVIDAD (PUT)
     // ========================================================================
     #[Route('/actividades/{id}', name: 'actualizar_actividad', methods: ['PUT'])]
     #[OA\RequestBody(
@@ -228,7 +212,6 @@ final class ActividadController extends AbstractController
             return $this->json(['error' => 'Actividad no encontrada'], Response::HTTP_NOT_FOUND);
         }
 
-        // 1. Actualizar campos (Seguro: No tocamos id_organizacion)
         $actividad->setTitulo($dto->titulo);
         $actividad->setDescripcion($dto->descripcion);
         $actividad->setUbicacion($dto->ubicacion);
@@ -240,7 +223,6 @@ final class ActividadController extends AbstractController
             return $this->json(['error' => 'Fecha inválida'], 400);
         }
 
-        // 2. Sincronizar ODS (Borrar antiguos y poner nuevos)
         foreach ($actividad->getOds() as $odExisting) {
             $actividad->removeOd($odExisting);
         }
@@ -249,7 +231,6 @@ final class ActividadController extends AbstractController
             if ($ods) $actividad->addOd($ods);
         }
 
-        // 3. Sincronizar Tipos
         foreach ($actividad->getTiposVoluntariado() as $tipoExisting) {
             $actividad->removeTiposVoluntariado($tipoExisting);
         }
@@ -264,7 +245,7 @@ final class ActividadController extends AbstractController
     }
 
     // ========================================================================
-    // 4. ELIMINAR ACTIVIDAD (DELETE) - USANDO SP (Soft Delete)
+    // 4. ELIMINAR ACTIVIDAD (DELETE)
     // ========================================================================
     #[Route('/actividades/{id}', name: 'eliminar_actividad', methods: ['DELETE'])]
     #[OA\Response(response: 200, description: 'Actividad marcada como cancelada/eliminada')]
@@ -282,7 +263,6 @@ final class ActividadController extends AbstractController
             return $this->json(['mensaje' => 'La actividad ya estaba eliminada previamente'], Response::HTTP_OK);
         }
 
-        // Llamada al Stored Procedure
         $conn = $entityManager->getConnection();
         try {
             $conn->executeStatement('EXEC SP_SoftDelete_Actividad @id_actividad = :id', ['id' => $id]);
@@ -293,7 +273,7 @@ final class ActividadController extends AbstractController
     }
 
     // ========================================================================
-    // 5. DETALLE (GET ONE)
+    // 5. DETALLE ACTIVIDAD (GET)
     // ========================================================================
     #[Route('/actividades/{id}', name: 'detalle_actividad', methods: ['GET'])]
     #[OA\Response(
@@ -310,13 +290,11 @@ final class ActividadController extends AbstractController
         }
 
         $dto = ActividadResponseDTO::fromEntity($actividad);
-        // Imagen ya se incluye en el DTO fromEntity
-
         return $this->json($dto, Response::HTTP_OK);
     }
 
     // ========================================================================
-    // 6. SUBIR/ACTUALIZAR IMAGEN DE ACTIVIDAD (POST) - multipart/form-data
+    // 6. SUBIR/ACTUALIZAR IMAGEN DE ACTIVIDAD (POST)
     // ========================================================================
     #[Route('/actividades/{id}/imagen', name: 'upload_imagen_actividad', methods: ['POST'])]
     #[OA\RequestBody(
@@ -346,19 +324,16 @@ final class ActividadController extends AbstractController
         EntityManagerInterface $em,
         #[\Symfony\Component\DependencyInjection\Attribute\Autowire('%uploads_directory%')] string $uploadsDirectory
     ): JsonResponse {
-        // 1. Buscar la actividad
         $actividad = $actividadRepo->find($id);
         if (!$actividad) {
             return $this->json(['error' => 'Actividad no encontrada'], Response::HTTP_NOT_FOUND);
         }
 
-        // 2. Recoger el archivo del campo 'imagen'
         $file = $request->files->get('imagen');
         if (!$file) {
             return $this->json(['error' => 'No se ha enviado ningún archivo en el campo "imagen"'], Response::HTTP_BAD_REQUEST);
         }
 
-        // 3. Validar extensión
         $extension = strtolower($file->getClientOriginalExtension());
         $allowedExtensions = ['jpg', 'jpeg', 'png', 'webp'];
         if (!in_array($extension, $allowedExtensions)) {
@@ -367,19 +342,16 @@ final class ActividadController extends AbstractController
             ], Response::HTTP_BAD_REQUEST);
         }
 
-        // 4. Validar tamaño (máximo 5MB)
-        $maxSize = 5 * 1024 * 1024; // 5MB
+        $maxSize = 5 * 1024 * 1024;
         if ($file->getSize() > $maxSize) {
             return $this->json(['error' => 'La imagen supera el tamaño máximo permitido (5MB)'], Response::HTTP_BAD_REQUEST);
         }
 
-        // 5. Preparar directorio de destino (/public/uploads/actividades)
         $targetDirectory = $uploadsDirectory . '/actividades';
         if (!is_dir($targetDirectory)) {
             mkdir($targetDirectory, 0777, true);
         }
 
-        // 6. Generar nombre único y mover el archivo
         $filename = uniqid('act_' . $id . '_') . '.' . $extension;
         try {
             $file->move($targetDirectory, $filename);
@@ -389,7 +361,6 @@ final class ActividadController extends AbstractController
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
 
-        // 7. Eliminar imagen anterior si existía
         $oldImage = $actividad->getImgActividad();
         if ($oldImage) {
             $oldPath = $uploadsDirectory . '/actividades/' . $oldImage;
@@ -398,7 +369,6 @@ final class ActividadController extends AbstractController
             }
         }
 
-        // 8. Actualizar la entidad con el nuevo nombre de archivo
         $actividad->setImgActividad($filename);
         $em->persist($actividad);
         $em->flush();
@@ -409,8 +379,9 @@ final class ActividadController extends AbstractController
             'img_url' => '/uploads/actividades/' . $filename
         ], Response::HTTP_OK);
     }
+
     // ========================================================================
-    // 7. LISTAR INSCRIPCIONES (GET) - Para coordinadores
+    // 7. LISTAR INSCRIPCIONES DE ACTIVIDAD (GET)
     // ========================================================================
     #[Route('/actividades/{id}/participantes-detalle', name: 'listar_inscripciones_actividad_detalle', methods: ['GET'])]
     #[OA\Response(
@@ -442,8 +413,6 @@ final class ActividadController extends AbstractController
         if (!$actividad) return $this->json(['error' => 'No encontrada'], 404);
 
         $conn = $em->getConnection();
-        // SQL directo para obtener datos de voluntarios rápidamente
-        // SQL corregido: INSCRIPCION tiene PK compuesta, no id_inscripcion
         $sql = "
             SELECT 
                 CONCAT(i.id_voluntario, '-', i.id_actividad) as id_inscripcion,
@@ -463,8 +432,6 @@ final class ActividadController extends AbstractController
 
         try {
             $rawInscritos = $conn->executeQuery($sql, ['id' => $id])->fetchAllAssociative();
-
-            // GARANTIZAR MINÚSCULAS: Normalizamos las claves del array
             $inscritos = array_map(function ($row) {
                 return array_change_key_case($row, CASE_LOWER);
             }, $rawInscritos);
@@ -475,9 +442,8 @@ final class ActividadController extends AbstractController
         }
     }
 
-
     // ========================================================================
-    // 8. GESTIONAR INSCRIPCIÓN (PATCH) - Aceptar/Rechazar
+    // 8. GESTIONAR INSCRIPCIÓN (PATCH)
     // ========================================================================
     #[Route('/actividades/{idActividad}/inscripciones/{idVoluntario}', name: 'gestionar_inscripcion', methods: ['PATCH'])]
     #[OA\RequestBody(
@@ -509,7 +475,7 @@ final class ActividadController extends AbstractController
             $count = $conn->executeStatement($sql, [
                 'estado' => $nuevoEstado,
                 'idAct' => $idActividad,
-                'idVol' => $idVoluntario // id_voluntario == id_usuario en BBDD
+                'idVol' => $idVoluntario
             ]);
 
             if ($count === 0) {
@@ -522,7 +488,7 @@ final class ActividadController extends AbstractController
     }
 
     // ========================================================================
-    // 9. ELIMINAR INSCRIPCIÓN (DELETE) - "Quitar" voluntario
+    // 9. ELIMINAR INSCRIPCIÓN (DELETE)
     // ========================================================================
     #[Route('/actividades/{idActividad}/inscripciones/{idVoluntario}', name: 'eliminar_inscripcion_admin', methods: ['DELETE'])]
     #[OA\Response(response: 200, description: 'Inscripción eliminada correctamente')]

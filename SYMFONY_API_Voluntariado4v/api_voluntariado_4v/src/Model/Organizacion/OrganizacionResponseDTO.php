@@ -18,7 +18,7 @@ class OrganizacionResponseDTO
         public string $descripcion,
 
         #[OA\Property(example: "contacto@ong-ejemplo.org")]
-        public string $email,       // Viene de Usuario
+        public string $email,
 
         #[OA\Property(example: "+34 91 123 45 67")]
         public ?string $telefono,
@@ -30,16 +30,15 @@ class OrganizacionResponseDTO
         public ?string $web,
 
         #[OA\Property(example: "G12345678")]
-        public string $cif          // Dato sensible
+        public string $cif
     ) {}
 
     public static function fromEntity(Organizacion $org): self
     {
-        // Recuerda: Organizacion tiene relacion 1a1 con Usuario
         $usuario = $org->getUsuario();
 
         return new self(
-            $org->getUsuario()->getId(), // El ID es compartido (PK compartida)
+            $org->getUsuario()->getId(),
             $org->getNombre(),
             $org->getDescripcion() ?? '',
             $usuario->getCorreo(),

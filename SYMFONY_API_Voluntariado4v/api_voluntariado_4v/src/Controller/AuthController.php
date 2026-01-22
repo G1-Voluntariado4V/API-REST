@@ -17,6 +17,9 @@ use OpenApi\Attributes as OA;
 #[OA\Tag(name: 'Autenticación', description: 'Login y recuperación de acceso')]
 final class AuthController extends AbstractController
 {
+    // ========================================================================
+    // 1. LOGIN (POST)
+    // ========================================================================
     #[Route('/login', name: 'login', methods: ['POST'])]
     #[OA\RequestBody(
         required: true,
@@ -43,15 +46,13 @@ final class AuthController extends AbstractController
     #[OA\Response(response: 404, description: 'Usuario no registrado')]
     #[OA\Response(response: 403, description: 'Acceso denegado (Bloqueado/Pendiente)')]
     public function login(
-        Request $request, 
+        Request $request,
         UsuarioRepository $usuarioRepository,
         VoluntarioRepository $voluntarioRepository,
         OrganizacionRepository $organizacionRepository,
         CoordinadorRepository $coordinadorRepository
-    ): JsonResponse
-    {
+    ): JsonResponse {
         try {
-            // 1. Recibir datos
             $data = json_decode($request->getContent(), true);
             $googleId = $data['google_id'] ?? null;
             $email = $data['email'] ?? null;
@@ -60,31 +61,27 @@ final class AuthController extends AbstractController
                 return $this->json(['mensaje' => 'Falta el google_id o email'], Response::HTTP_BAD_REQUEST);
             }
 
-            // 2. Buscar Usuario (Prioridad ID > Email)
             $usuario = null;
-            
+
             if ($googleId) {
                 $usuario = $usuarioRepository->findOneBy(['googleId' => $googleId]);
             }
-            
+
             if (!$usuario && $email) {
                 $usuario = $usuarioRepository->findOneBy(['correo' => $email]);
             }
 
-            // 3. Si no existe, 404
             if (!$usuario) {
                 return $this->json(['mensaje' => 'Usuario no registrado.'], Response::HTTP_NOT_FOUND);
             }
 
-            // 4. Verificar si está eliminado (soft delete)
             $deletedAt = $usuario->getDeletedAt();
             if ($deletedAt !== null) {
                 return $this->json(['mensaje' => 'Esta cuenta ha sido eliminada.'], Response::HTTP_FORBIDDEN);
             }
 
-            // 5. Verificar estado de cuenta
             $estadoCuenta = $usuario->getEstadoCuenta();
-            
+
             if ($estadoCuenta === 'Bloqueada') {
                 return $this->json(['mensaje' => 'Tu cuenta ha sido bloqueada. Contacta con el administrador.'], Response::HTTP_FORBIDDEN);
             }
@@ -100,20 +97,18 @@ final class AuthController extends AbstractController
                 ], Response::HTTP_FORBIDDEN);
             }
 
-            // 6. Actualizar google_id si no lo tenía
             if (!$usuario->getGoogleId() && $googleId) {
                 $usuario->setGoogleId($googleId);
                 $usuarioRepository->getEntityManager()->flush();
             }
 
-            // 7. Obtener datos del perfil según el rol
             $rol = $usuario->getRol() ? $usuario->getRol()->getNombre() : 'Usuario';
             $nombre = null;
             $apellidos = null;
             $telefono = null;
             $datosExtra = [];
 
-            $rolNormalizado = strtolower(str_replace(['á','é','í','ó','ú'], ['a','e','i','o','u'], $rol));
+            $rolNormalizado = strtolower(str_replace(['á', 'é', 'í', 'ó', 'ú'], ['a', 'e', 'i', 'o', 'u'], $rol));
 
             if (strpos($rolNormalizado, 'voluntar') !== false) {
                 $voluntario = $voluntarioRepository->findOneBy(['usuario' => $usuario]);
@@ -142,7 +137,6 @@ final class AuthController extends AbstractController
                 }
             }
 
-            // 8. Construir respuesta
             $response = [
                 'id_usuario' => $usuario->getId(),
                 'google_id'  => $usuario->getGoogleId(),
@@ -154,15 +148,12 @@ final class AuthController extends AbstractController
                 'telefono'   => $telefono
             ];
 
-            // Agregar datos extra
             foreach ($datosExtra as $key => $value) {
                 $response[$key] = $value;
             }
 
             return $this->json($response, Response::HTTP_OK);
-            
         } catch (\Exception $e) {
-            // Capturar cualquier error y devolver mensaje útil para debugging
             return $this->json([
                 'mensaje' => 'Error interno del servidor',
                 'error' => $e->getMessage(),

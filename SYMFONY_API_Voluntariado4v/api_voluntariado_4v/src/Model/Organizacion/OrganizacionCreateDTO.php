@@ -5,10 +5,6 @@ namespace App\Model\Organizacion;
 use Symfony\Component\Validator\Constraints as Assert;
 use OpenApi\Attributes as OA;
 
-/**
- * DTO para la creación completa de una organización
- * Incluye datos de Usuario + Organización
- */
 class OrganizacionCreateDTO
 {
     public function __construct(

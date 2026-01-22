@@ -8,15 +8,17 @@ use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\HttpFoundation\Response; // <--- Importante
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
-use OpenApi\Attributes as OA; // <--- Importante para Swagger
+use OpenApi\Attributes as OA;
 
 #[Route('/roles', name: 'api_roles_')]
 #[OA\Tag(name: 'Roles', description: 'Catálogo de roles del sistema')]
 final class RolController extends AbstractController
 {
-    // GET: Listar todos los roles
+    // ========================================================================
+    // 1. LISTAR ROLES (GET)
+    // ========================================================================
     #[Route('', name: 'index', methods: ['GET'])]
     #[OA\Response(
         response: 200,
@@ -25,7 +27,7 @@ final class RolController extends AbstractController
             type: 'array',
             items: new OA\Items(properties: [
                 new OA\Property(property: 'id', type: 'integer'),
-                new OA\Property(property: 'nombreRol', type: 'string') // Coincide con tu entidad
+                new OA\Property(property: 'nombreRol', type: 'string')
             ])
         )
     )]
@@ -34,7 +36,9 @@ final class RolController extends AbstractController
         return $this->json($rolRepo->findAll(), Response::HTTP_OK);
     }
 
-    // POST: Crear nuevo rol
+    // ========================================================================
+    // 2. CREAR ROL (POST)
+    // ========================================================================
     #[Route('', name: 'crear', methods: ['POST'])]
     #[OA\RequestBody(
         required: true,
@@ -50,17 +54,14 @@ final class RolController extends AbstractController
     {
         $data = json_decode($request->getContent(), true);
 
-        // Validación simple
         if (empty($data['nombre'])) {
             return $this->json(
                 ['error' => 'Falta el nombre del rol'],
-                Response::HTTP_BAD_REQUEST // 400
+                Response::HTTP_BAD_REQUEST
             );
         }
 
         $rol = new Rol();
-        // Asumiendo que tu entidad mapea 'nombre_rol' a 'nombreRol' o 'nombre'
-        // Asegúrate de usar el setter correcto.
         $rol->setNombre($data['nombre']);
 
         try {
@@ -69,10 +70,10 @@ final class RolController extends AbstractController
         } catch (\Exception $e) {
             return $this->json(
                 ['error' => 'Error al guardar en la base de datos'],
-                Response::HTTP_INTERNAL_SERVER_ERROR // 500
+                Response::HTTP_INTERNAL_SERVER_ERROR
             );
         }
 
-        return $this->json($rol, Response::HTTP_CREATED); // 201
+        return $this->json($rol, Response::HTTP_CREATED);
     }
 }

@@ -9,7 +9,7 @@ class IdiomaDTO
     public function __construct(
         public int $id,
         public string $nombre,
-        public string $codigo_iso // ES, EN, FR... Útil para banderitas en el front
+        public string $codigo_iso 
     ) {}
 
     public static function fromEntity(Idioma $idioma): self

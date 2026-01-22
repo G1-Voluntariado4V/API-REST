@@ -20,14 +20,26 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 final class UsuarioController extends AbstractController
 {
     // ========================================================================
-    // 1. LISTAR USUARIOS (GET) - JSON KEY FIX
+    // 1. LISTAR USUARIOS (GET)
     // ========================================================================
     #[Route('/usuarios', name: 'listar_usuarios', methods: ['GET'])]
+    #[OA\Response(
+        response: 200,
+        description: 'Listado de usuarios registrados (Admin)',
+        content: new OA\JsonContent(
+            type: 'array',
+            items: new OA\Items(properties: [
+                new OA\Property(property: 'id_usuario', type: 'integer', example: 10),
+                new OA\Property(property: 'correo', type: 'string', example: 'usuario@test.com'),
+                new OA\Property(property: 'nombre_rol', type: 'string', example: 'Voluntario'),
+                new OA\Property(property: 'estado_cuenta', type: 'string', example: 'Activa'),
+                new OA\Property(property: 'img_perfil', type: 'string', nullable: true)
+            ])
+        )
+    )]
     public function index(EntityManagerInterface $em): JsonResponse
     {
         $conn = $em->getConnection();
-        // Usamos alias explícitos para que coincidan con UserResponse.java
-        // Aunque la vista cambie nombres de columnas, el alias 'nombre_rol' asegura compatibilidad
         $sql = "
             SELECT 
                 id_usuario, 
@@ -42,7 +54,6 @@ final class UsuarioController extends AbstractController
             $usuarios = $conn->executeQuery($sql)->fetchAllAssociative();
             return $this->json($usuarios, Response::HTTP_OK);
         } catch (\Exception $e) {
-            // Fallback si la vista no tiene img_perfil o falla algo
             try {
                 $sqlFallback = "SELECT id_usuario, correo, 'Voluntario' as nombre_rol, estado_cuenta, NULL as img_perfil FROM USUARIO WHERE deleted_at IS NULL";
                 $usuarios = $conn->executeQuery($sqlFallback)->fetchAllAssociative();
@@ -53,11 +64,22 @@ final class UsuarioController extends AbstractController
         }
     }
 
-    // ... (El resto de métodos CREAR, BORRAR, IMAGEN, ROL se mantienen igual) ...
-    // Incluyo la clase completa para copiar y pegar:
-
+    // ========================================================================
+    // 2. CREAR USUARIO (POST)
+    // ========================================================================
     #[Route('/usuarios', name: 'crear_usuario', methods: ['POST'])]
-    public function crear(Request $request, EntityManagerInterface $entityManager, RolRepository $rolRepository): JsonResponse {
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(properties: [
+            new OA\Property(property: 'correo', type: 'string', example: 'nuevo@test.com'),
+            new OA\Property(property: 'google_id', type: 'string', example: 'g_12345'),
+            new OA\Property(property: 'id_rol', type: 'integer', example: 2)
+        ])
+    )]
+    #[OA\Response(response: 201, description: 'Usuario creado (pendiente de completar perfil)')]
+    #[OA\Response(response: 409, description: 'Correo/GoogleID duplicado')]
+    public function crear(Request $request, EntityManagerInterface $entityManager, RolRepository $rolRepository): JsonResponse
+    {
         $data = json_decode($request->getContent(), true);
         if (empty($data['correo']) || empty($data['google_id']) || empty($data['id_rol'])) {
             return $this->json(['error' => 'Faltan datos'], 400);
@@ -82,8 +104,13 @@ final class UsuarioController extends AbstractController
         return $this->json($usuario, 201, [], ['groups' => 'usuario:read']);
     }
 
+    // ========================================================================
+    // 3. ELIMINAR USUARIO (DELETE)
+    // ========================================================================
     #[Route('/usuarios/{id}', name: 'borrar_usuario', methods: ['DELETE'])]
-    public function delete(int $id, UsuarioRepository $repo, EntityManagerInterface $em): JsonResponse {
+    #[OA\Response(response: 200, description: 'Usuario eliminado (Soft Delete)')]
+    public function delete(int $id, UsuarioRepository $repo, EntityManagerInterface $em): JsonResponse
+    {
         $usuario = $repo->find($id);
         if (!$usuario) return $this->json(['error' => 'No encontrado'], 404);
 
@@ -96,8 +123,21 @@ final class UsuarioController extends AbstractController
         }
     }
 
+    // ========================================================================
+    // 4. SUBIR IMAGEN DE PERFIL (POST)
+    // ========================================================================
     #[Route('/usuarios/{id}/imagen', name: 'upload_imagen_usuario', methods: ['POST'])]
-    public function uploadImagen(int $id, Request $request, UsuarioRepository $usuarioRepo, EntityManagerInterface $em, #[\Symfony\Component\DependencyInjection\Attribute\Autowire('%uploads_directory%')] string $uploadsDirectory): JsonResponse {
+    #[OA\RequestBody(
+        content: new OA\MediaType(
+            mediaType: 'multipart/form-data',
+            schema: new OA\Schema(properties: [
+                new OA\Property(property: 'imagen', type: 'string', format: 'binary')
+            ])
+        )
+    )]
+    #[OA\Response(response: 200, description: 'Imagen de perfil actualizada')]
+    public function uploadImagen(int $id, Request $request, UsuarioRepository $usuarioRepo, EntityManagerInterface $em, #[\Symfony\Component\DependencyInjection\Attribute\Autowire('%uploads_directory%')] string $uploadsDirectory): JsonResponse
+    {
         $usuario = $usuarioRepo->find($id);
         if (!$usuario) return $this->json(['error' => 'Usuario no encontrado'], 404);
 
@@ -122,9 +162,20 @@ final class UsuarioController extends AbstractController
         return $this->json(['mensaje' => 'Foto actualizada', 'img_perfil' => $filename], 200);
     }
 
+    // ========================================================================
+    // 5. CAMBIAR ROL DE USUARIO (PUT)
+    // ========================================================================
     #[Route('/usuarios/{id}/rol', name: 'cambiar_rol_usuario', methods: ['PUT'])]
     #[IsGranted('ROLE_COORDINADOR')]
-    public function cambiarRol(int $id, Request $request, UsuarioRepository $usuarioRepo, RolRepository $rolRepo, EntityManagerInterface $em): JsonResponse {
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(properties: [
+            new OA\Property(property: 'id_rol', type: 'integer', example: 3)
+        ])
+    )]
+    #[OA\Response(response: 200, description: 'Rol actualizado')]
+    public function cambiarRol(int $id, Request $request, UsuarioRepository $usuarioRepo, RolRepository $rolRepo, EntityManagerInterface $em): JsonResponse
+    {
         $usuario = $usuarioRepo->find($id);
         if (!$usuario) return $this->json(['error' => 'Usuario no encontrado'], 404);
 

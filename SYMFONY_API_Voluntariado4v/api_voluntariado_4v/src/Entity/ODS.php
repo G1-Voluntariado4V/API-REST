@@ -13,12 +13,10 @@ class ODS
 {
     #[ORM\Id]
     #[ORM\Column(name: 'id_ods')]
-    // 👇 AQUÍ ESTÁ EL TRUCO: Ponemos los dos grupos
     #[Groups(['actividad:read', 'curso:read'])]
     private ?int $id = null;
 
     #[ORM\Column(length: 150)]
-    // 👇 AQUÍ TAMBIÉN
     #[Groups(['actividad:read', 'curso:read'])]
     private ?string $nombre = null;
 
@@ -30,7 +28,10 @@ class ODS
     )]
     private ?string $descripcion = null;
 
-    // --- CONSTRUCTOR OPCIONAL (Recomendado para IDs obligatorios) ---
+    #[ORM\Column(length: 255, nullable: true, name: 'img_ods')]
+    #[Groups(['actividad:read', 'curso:read'])]
+    private ?string $imgOds = null;
+
     public function __construct(int $id, string $nombre)
     {
         $this->id = $id;
@@ -42,7 +43,6 @@ class ODS
         return $this->id;
     }
 
-    // --- IMPORTANTE: Añadir este Setter si no usas el constructor ---
     public function setId(int $id): static
     {
         $this->id = $id;
@@ -69,5 +69,22 @@ class ODS
     {
         $this->descripcion = $descripcion;
         return $this;
+    }
+
+    public function getImgOds(): ?string
+    {
+        return $this->imgOds;
+    }
+
+    public function setImgOds(?string $imgOds): static
+    {
+        $this->imgOds = $imgOds;
+        return $this;
+    }
+
+    #[Groups(['actividad:read', 'curso:read'])]
+    public function getImgUrl(): ?string
+    {
+        return $this->imgOds ? '/uploads/ods/' . $this->imgOds : null;
     }
 }

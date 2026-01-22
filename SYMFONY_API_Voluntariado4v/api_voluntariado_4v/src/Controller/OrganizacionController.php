@@ -33,7 +33,7 @@ use Nelmio\ApiDocBundle\Attribute\Model;
 final class OrganizacionController extends AbstractController
 {
     // ========================================================================
-    // 1. LISTAR ORGANIZACIONES (GET) - VISTA SQL
+    // 1. LISTAR ORGANIZACIONES (GET)
     // ========================================================================
     #[Route('/organizaciones', name: 'listar_organizaciones', methods: ['GET'])]
     #[OA\Response(
@@ -58,7 +58,6 @@ final class OrganizacionController extends AbstractController
     )]
     public function index(EntityManagerInterface $em): JsonResponse
     {
-        // Usamos la Vista SQL para máximo rendimiento y consistencia con VoluntarioController
         $conn = $em->getConnection();
         $sql = 'SELECT * FROM VW_Organizaciones_Activas';
 
@@ -74,7 +73,7 @@ final class OrganizacionController extends AbstractController
     }
 
     // ========================================================================
-    // 2. DETALLE ORGANIZACION (GET) - CON DTO
+    // 2. DETALLE ORGANIZACION (GET)
     // ========================================================================
     #[Route('/organizaciones/{id}', name: 'detalle_organizacion', methods: ['GET'], requirements: ['id' => '\d+'])]
     #[OA\Response(
@@ -86,24 +85,21 @@ final class OrganizacionController extends AbstractController
     )]
     public function show(int $id, UsuarioRepository $userRepo, OrganizacionRepository $orgRepo): JsonResponse
     {
-        // 1. Buscar Usuario base (para verificar soft delete)
         $usuario = $userRepo->find($id);
         if (!$usuario || $usuario->getDeletedAt()) {
             return $this->json(['error' => 'Organización no encontrada o inactiva'], Response::HTTP_NOT_FOUND);
         }
 
-        // 2. Buscar Perfil Organización
         $organizacion = $orgRepo->findOneBy(['usuario' => $usuario]);
         if (!$organizacion) {
             return $this->json(['error' => 'Perfil de organización no configurado'], Response::HTTP_NOT_FOUND);
         }
 
-        // 3. Devolver DTO
         return $this->json(OrganizacionResponseDTO::fromEntity($organizacion), Response::HTTP_OK);
     }
 
     // ========================================================================
-    // 3. ACTUALIZAR PERFIL (PUT) - CON VALIDACIÓN DTO
+    // 3. ACTUALIZAR PERFIL (PUT)
     // ========================================================================
     #[Route('/organizaciones/{id}', name: 'update_organizacion', methods: ['PUT'], requirements: ['id' => '\d+'])]
     #[OA\RequestBody(
@@ -122,7 +118,7 @@ final class OrganizacionController extends AbstractController
     )]
     public function update(
         int $id,
-        #[MapRequestPayload] OrganizacionUpdateDTO $dto, // Valida automáticamente
+        #[MapRequestPayload] OrganizacionUpdateDTO $dto,
         UsuarioRepository $userRepo,
         OrganizacionRepository $orgRepo,
         EntityManagerInterface $em
@@ -137,7 +133,6 @@ final class OrganizacionController extends AbstractController
             return $this->json(['error' => 'Perfil no encontrado'], Response::HTTP_NOT_FOUND);
         }
 
-        // Actualizamos campos permitidos
         $organizacion->setNombre($dto->nombre);
         $organizacion->setDescripcion($dto->descripcion);
         $organizacion->setSitioWeb($dto->sitioWeb);
@@ -145,7 +140,7 @@ final class OrganizacionController extends AbstractController
         $organizacion->setTelefono($dto->telefono);
 
         try {
-            $em->flush(); // El trigger actualizará updated_at
+            $em->flush();
 
             return $this->json(
                 OrganizacionResponseDTO::fromEntity($organizacion),
@@ -160,7 +155,7 @@ final class OrganizacionController extends AbstractController
     }
 
     // ========================================================================
-    // 4. CREAR ACTIVIDAD (POST) - Una organización puede añadir actividades
+    // 4. CREAR ACTIVIDAD (POST)
     // ========================================================================
     #[Route('/organizaciones/{id}/actividades', name: 'crear_actividad_organizacion', methods: ['POST'])]
     #[OA\RequestBody(
@@ -186,7 +181,6 @@ final class OrganizacionController extends AbstractController
         TipoVoluntariadoRepository $tipoRepo,
         EntityManagerInterface $em
     ): JsonResponse {
-        // 1. Verificar que la organización existe
         $usuario = $userRepo->find($id);
         if (!$usuario || $usuario->getDeletedAt()) {
             return $this->json(['error' => 'Organización no encontrada'], Response::HTTP_NOT_FOUND);
@@ -197,7 +191,6 @@ final class OrganizacionController extends AbstractController
             return $this->json(['error' => 'Perfil de organización no encontrado'], Response::HTTP_NOT_FOUND);
         }
 
-        // 2. Crear la actividad
         $actividad = new Actividad();
         $actividad->setOrganizacion($organizacion);
         $actividad->setTitulo($dto->titulo);
@@ -205,7 +198,7 @@ final class OrganizacionController extends AbstractController
         $actividad->setUbicacion($dto->ubicacion);
         $actividad->setDuracionHoras($dto->duracion_horas);
         $actividad->setCupoMaximo($dto->cupo_maximo);
-        $actividad->setEstadoPublicacion('En revision'); // Por defecto en revisión
+        $actividad->setEstadoPublicacion('En revision');
 
         try {
             $actividad->setFechaInicio(new \DateTime($dto->fecha_inicio));
@@ -213,7 +206,6 @@ final class OrganizacionController extends AbstractController
             return $this->json(['error' => 'Fecha inválida'], Response::HTTP_BAD_REQUEST);
         }
 
-        // 3. Asignar ODS
         foreach ($dto->odsIds as $idOds) {
             $ods = $odsRepo->find($idOds);
             if ($ods) {
@@ -221,7 +213,6 @@ final class OrganizacionController extends AbstractController
             }
         }
 
-        // 4. Asignar Tipos de Voluntariado
         foreach ($dto->tiposIds as $idTipo) {
             $tipo = $tipoRepo->find($idTipo);
             if ($tipo) {
@@ -229,7 +220,6 @@ final class OrganizacionController extends AbstractController
             }
         }
 
-        // 5. Guardar
         try {
             $em->persist($actividad);
             $em->flush();
@@ -275,7 +265,6 @@ final class OrganizacionController extends AbstractController
             return $this->json(['error' => 'Perfil no encontrado'], Response::HTTP_NOT_FOUND);
         }
 
-        // Obtener actividades de esta organización (solo las no eliminadas)
         $actividades = $actividadRepo->createQueryBuilder('a')
             ->where('a.organizacion = :org')
             ->andWhere('a.deletedAt IS NULL')
@@ -288,12 +277,7 @@ final class OrganizacionController extends AbstractController
 
         foreach ($actividades as $actividad) {
             $dto = ActividadResponseDTO::fromEntity($actividad);
-
-            // Inyectar imagen manualmente (desde la entidad, aunque el DTO ya lo hace si se actualizó)
-            // Si el DTO ya tiene $dto->imagen_actividad = $act->getImgActividad(), esto es redundante pero seguro.
             $dto->imagen_actividad = $actividad->getImgActividad();
-
-            // Asegurar ID Organizacion
             $dto->id_organizacion = $id;
 
             $respuesta[] = $dto;
@@ -340,7 +324,6 @@ final class OrganizacionController extends AbstractController
         $conn = $em->getConnection();
 
         try {
-            // Estadísticas de actividades
             $totalActividades = $conn->executeQuery(
                 'SELECT COUNT(*) as total FROM ACTIVIDAD WHERE id_organizacion = :org AND deleted_at IS NULL',
                 ['org' => $id]
@@ -356,7 +339,6 @@ final class OrganizacionController extends AbstractController
                 ['org' => $id, 'estado' => 'En revision']
             )->fetchAssociative()['total'];
 
-            // Estadísticas de inscripciones
             $totalInscripciones = $conn->executeQuery(
                 'SELECT COUNT(*) as total FROM INSCRIPCION i 
                  INNER JOIN ACTIVIDAD a ON i.id_actividad = a.id_actividad 
@@ -378,7 +360,6 @@ final class OrganizacionController extends AbstractController
                 ['org' => $id, 'estado' => 'Pendiente']
             )->fetchAssociative()['total'];
 
-            // Total de voluntarios únicos que han participado
             $totalVoluntarios = $conn->executeQuery(
                 'SELECT COUNT(DISTINCT i.id_voluntario) as total FROM INSCRIPCION i 
                  INNER JOIN ACTIVIDAD a ON i.id_actividad = a.id_actividad 
@@ -432,7 +413,6 @@ final class OrganizacionController extends AbstractController
         ActividadRepository $actividadRepo,
         EntityManagerInterface $em
     ): JsonResponse {
-        // 1. Verificar organización
         $usuario = $userRepo->find($id);
         if (!$usuario || $usuario->getDeletedAt()) {
             return $this->json(['error' => 'Organización no encontrada'], Response::HTTP_NOT_FOUND);
@@ -443,7 +423,6 @@ final class OrganizacionController extends AbstractController
             return $this->json(['error' => 'Perfil no encontrado'], Response::HTTP_NOT_FOUND);
         }
 
-        // 2. Verificar que la actividad pertenece a esta organización
         $actividad = $actividadRepo->find($actividadId);
         if (!$actividad || $actividad->getDeletedAt()) {
             return $this->json(['error' => 'Actividad no encontrada'], Response::HTTP_NOT_FOUND);
@@ -456,7 +435,6 @@ final class OrganizacionController extends AbstractController
             );
         }
 
-        // 3. Obtener voluntarios inscritos usando SQL directo para mejor rendimiento
         $conn = $em->getConnection();
         try {
             $voluntarios = $conn->executeQuery(
@@ -490,7 +468,7 @@ final class OrganizacionController extends AbstractController
     }
 
     // ========================================================================
-    // 8. CREAR ORGANIZACIÓN (POST) - Registro completo
+    // 8. CREAR ORGANIZACIÓN (POST)
     // ========================================================================
     #[Route('/organizaciones', name: 'api_crear_organizacion', methods: ['POST'])]
     #[OA\RequestBody(
@@ -521,43 +499,33 @@ final class OrganizacionController extends AbstractController
     )]
     public function crear(Request $request, EntityManagerInterface $em, RolRepository $rolRepo): JsonResponse
     {
-        // 1. Decodificar el JSON
         $data = json_decode($request->getContent(), true);
 
-        // 🛡️ VALIDACIÓN DE SEGURIDAD (Para evitar errores 500 si faltan campos)
-        // Usamos 'correo' para coincidir con la BBDD y el Test
         if (!isset($data['correo']) || !isset($data['nombre']) || !isset($data['cif'])) {
             return $this->json([
                 'error' => 'Faltan datos obligatorios. Se requiere: correo, nombre, cif...'
             ], Response::HTTP_BAD_REQUEST);
         }
 
-        // 2. Buscar el rol de Organización
         $rolOrganizacion = $rolRepo->findOneBy(['nombre' => 'Organizacion']);
         if (!$rolOrganizacion) {
             return $this->json(['error' => 'Rol de Organización no encontrado en la base de datos'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
 
-        // ========================================================================
-        // 🔒 TRANSACCIÓN: Garantiza atomicidad (Usuario + Organización juntos)
-        // ========================================================================
         $em->beginTransaction();
         try {
-            // 3. Crear primero el USUARIO (Padre)
             $usuario = new Usuario();
-            $usuario->setCorreo($data['correo']); // Coherencia con BBDD
+            $usuario->setCorreo($data['correo']);
             $usuario->setGoogleId($data['google_id'] ?? 'generado_' . uniqid());
             $usuario->setRol($rolOrganizacion);
-            $usuario->setEstadoCuenta('Pendiente'); // Valor por defecto seguro
+            $usuario->setEstadoCuenta('Pendiente');
 
             $em->persist($usuario);
-            $em->flush(); // Generar ID dentro de la transacción
+            $em->flush();
 
-            // 4. Crear la ORGANIZACION (Hija) vinculada a ese ID
             $organizacion = new Organizacion();
             $organizacion->setUsuario($usuario);
 
-            // Asignar datos específicos
             $organizacion->setNombre($data['nombre']);
             $organizacion->setCif($data['cif']);
             $organizacion->setTelefono($data['telefono'] ?? null);
@@ -568,29 +536,24 @@ final class OrganizacionController extends AbstractController
             $em->persist($organizacion);
             $em->flush();
 
-            // 5. COMMIT: Si llegamos aquí, todo fue bien
             $em->commit();
 
-            // 6. Responder
             return $this->json([
                 'message' => 'Organización creada con éxito',
                 'id' => $usuario->getId()
             ], Response::HTTP_CREATED);
         } catch (\Exception $e) {
-            // 7. ROLLBACK: Deshace USUARIO + ORGANIZACIÓN si algo falla
             $em->rollback();
 
             $errorMsg = $e->getMessage();
 
-            // Detectar errores de duplicados (SQL Server usa "duplicada" o "UNIQUE")
             if (
                 str_contains($errorMsg, 'duplicada') ||
                 str_contains($errorMsg, 'Duplicate') ||
                 str_contains($errorMsg, 'UNIQUE') ||
                 str_contains($errorMsg, '2601')
-            ) { // Código de error SQL Server para clave duplicada
+            ) {
 
-                // Determinar si es el correo o el CIF
                 if (str_contains($errorMsg, 'UNIQ_1D204E4777040BC9') || str_contains($errorMsg, 'correo')) {
                     return $this->json([
                         'error' => 'Ese correo electrónico ya está registrado en nuestra base de datos'
@@ -606,7 +569,6 @@ final class OrganizacionController extends AbstractController
                 }
             }
 
-            // Otros errores
             return $this->json([
                 'error' => 'Error al registrar la organización. Por favor, revisa los datos e inténtalo de nuevo.'
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
@@ -640,7 +602,6 @@ final class OrganizacionController extends AbstractController
         $conn = $em->getConnection();
 
         try {
-            // Query SQL optimizada: solo cuenta voluntarios con actividades REALIZADAS (Aceptada o Finalizada)
             $sql = "
                 SELECT TOP 3
                     o.id_usuario as id_organizacion,
@@ -672,7 +633,6 @@ final class OrganizacionController extends AbstractController
 
             $resultados = $conn->executeQuery($sql)->fetchAllAssociative();
 
-            // Añadir posición al ranking
             $respuesta = [];
             $posicion = 1;
             foreach ($resultados as $org) {

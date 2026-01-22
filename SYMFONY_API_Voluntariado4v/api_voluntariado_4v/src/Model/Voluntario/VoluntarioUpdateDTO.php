@@ -24,20 +24,16 @@ class VoluntarioUpdateDTO
     #[OA\Property(example: "1999-12-31")]
     public ?string $fechaNac = null;
 
-    // Carnet de conducir
     #[OA\Property(example: true)]
     public ?bool $carnet_conducir = null;
 
-    // Descripción personal del voluntario
     #[Assert\Length(max: 500, maxMessage: "La descripción no puede tener más de 500 caracteres")]
     #[OA\Property(example: "Actualización de mi descripción...")]
     public ?string $descripcion = null;
 
-    // Preferencias opcionales
     #[OA\Property(example: [2, 3], type: 'array', items: new OA\Items(type: 'integer'))]
     public ?array $preferencias_ids = null;
 
-    // Curso actual
     #[OA\Property(example: 3)]
     public ?int $id_curso_actual = null;
 }

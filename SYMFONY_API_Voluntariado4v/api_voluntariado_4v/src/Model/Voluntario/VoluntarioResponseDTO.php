@@ -1,5 +1,4 @@
 <?php
-// <!-- DTO para la respuesta de un voluntario: Lo que manda el backend -->
 
 namespace App\Model\Voluntario;
 
@@ -72,18 +71,13 @@ class VoluntarioResponseDTO
         public array $idiomas
     ) {}
 
-    /**
-     * Mapeador: Convierte la Entidad compleja en este DTO simple
-     */
     public static function fromEntity(Voluntario $voluntario): self
     {
-        // 1. Aplanar Preferencias (TIPOS DE VOLUNTARIADO)
         $prefs = [];
         foreach ($voluntario->getPreferencias() as $tipoVoluntariado) {
             $prefs[] = $tipoVoluntariado->getNombreTipo();
         }
 
-        // 2. Aplanar Idiomas
         $idiomasList = [];
         foreach ($voluntario->getVoluntarioIdiomas() as $vi) {
             $idiomasList[] = [
@@ -93,7 +87,6 @@ class VoluntarioResponseDTO
             ];
         }
 
-        // 3. Obtener datos del Usuario padre
         $usuario = $voluntario->getUsuario();
 
         return new self(

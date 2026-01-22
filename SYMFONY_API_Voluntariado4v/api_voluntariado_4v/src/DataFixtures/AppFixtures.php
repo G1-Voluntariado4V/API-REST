@@ -344,7 +344,7 @@ class AppFixtures extends Fixture
         $usuario->setDeletedAt(null);
         $usuario->setEstadoCuenta('Activa');
 
-        // 🔥 NUEVO: Inicializamos imgPerfil a null explícitamente (para pruebas Postman después)
+       
         $usuario->setImgPerfil(null);
 
         if (isset($this->cache['Rol'][$rolName])) {
@@ -426,7 +426,7 @@ class AppFixtures extends Fixture
         $act->setDeletedAt(null);
         $act->setEstadoPublicacion($estado);
 
-        // 🔥 NUEVO: Inicializamos imgActividad a null explícitamente
+        
         $act->setImgActividad(null);
 
         $this->manager->persist($act);

@@ -10,7 +10,7 @@ class CursoDTO
         public int $id,
         public string $nombre,
         public string $abreviacion,
-        public string $grado, // Superior, Medio...
+        public string $grado, 
         public int $nivel
     ) {}
 

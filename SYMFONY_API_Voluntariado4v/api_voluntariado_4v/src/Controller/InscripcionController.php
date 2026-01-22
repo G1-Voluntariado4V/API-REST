@@ -5,13 +5,10 @@ namespace App\Controller;
 use App\Entity\Inscripcion;
 use App\Entity\Actividad;
 use App\Entity\Usuario;
-// DTOs
 use App\Model\Inscripcion\InscripcionResponseDTO;
 use App\Model\Inscripcion\InscripcionUpdateDTO;
-// Repositorios
 use App\Repository\InscripcionRepository;
 use App\Repository\ActividadRepository;
-// Core
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -19,7 +16,6 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
-// Documentación
 use OpenApi\Attributes as OA;
 use Nelmio\ApiDocBundle\Attribute\Model;
 
@@ -50,13 +46,11 @@ final class InscripcionController extends AbstractController
             return $this->json(['error' => 'Actividad no encontrada'], Response::HTTP_NOT_FOUND);
         }
 
-        // Obtener todas las inscripciones de la actividad
         $inscripciones = $em->getRepository(Inscripcion::class)->findBy(
             ['actividad' => $actividad],
             ['fechaSolicitud' => 'DESC']
         );
 
-        // Mapear a DTOs
         $dtos = array_map(
             fn(Inscripcion $ins) => InscripcionResponseDTO::fromEntity($ins),
             $inscripciones
@@ -66,7 +60,7 @@ final class InscripcionController extends AbstractController
     }
 
     // ========================================================================
-    // 2. GESTIONAR ESTADO (Aceptar/Rechazar) (PATCH)
+    // 2. GESTIONAR ESTADO (PATCH)
     // ========================================================================
     #[Route('/actividades/{idActividad}/inscripciones/{idVoluntario}', name: 'gestionar_inscripcion', methods: ['PATCH'])]
     #[OA\RequestBody(
@@ -84,7 +78,6 @@ final class InscripcionController extends AbstractController
         EntityManagerInterface $em
     ): JsonResponse {
 
-        // 1. Obtener Inscripción (PK Compuesta)
         $inscripcion = $em->getRepository(Inscripcion::class)->findOneBy([
             'actividad' => $idActividad,
             'voluntario' => $idVoluntario
@@ -94,11 +87,9 @@ final class InscripcionController extends AbstractController
             return $this->json(['error' => 'Inscripción no encontrada'], Response::HTTP_NOT_FOUND);
         }
 
-        // 2. Aplicar cambio desde el DTO (ya validado automáticamente)
         $inscripcion->setEstadoSolicitud($dto->estado);
 
         try {
-            // El Trigger TR_Check_Cupo_Update saltará aquí si intentamos aceptar y no hay cupo
             $em->flush();
 
             return $this->json([
@@ -107,7 +98,6 @@ final class InscripcionController extends AbstractController
                 'actividad' => $idActividad
             ], Response::HTTP_OK);
         } catch (\Exception $e) {
-            // Capturamos el error del Trigger de SQL Server
             if (str_contains($e->getMessage(), 'ERROR DE NEGOCIO') || str_contains($e->getMessage(), 'cupo')) {
                 return $this->json([
                     'error' => 'No se puede aceptar: El cupo de la actividad está lleno.'
