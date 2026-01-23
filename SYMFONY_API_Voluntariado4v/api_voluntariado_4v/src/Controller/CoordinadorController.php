@@ -77,19 +77,19 @@ final class CoordinadorController extends AbstractController
                 $rawStats = $conn->executeQuery('EXEC SP_Dashboard_Stats')->fetchAssociative();
             } catch (\Exception $e) {
                 $rawStats = [
-                    'voluntarios_activos' => $conn->fetchOne("SELECT COUNT(*) FROM USUARIO u JOIN ROL r ON u.id_rol = r.id_rol WHERE r.nombre = 'Voluntario' AND u.deleted_at IS NULL"),
-                    'organizaciones_activas' => $conn->fetchOne("SELECT COUNT(*) FROM USUARIO u JOIN ROL r ON u.id_rol = r.id_rol WHERE r.nombre = 'Organizacion' AND u.deleted_at IS NULL"),
-                    'coordinadores_activos' => $conn->fetchOne("SELECT COUNT(*) FROM USUARIO u JOIN ROL r ON u.id_rol = r.id_rol WHERE r.nombre = 'Coordinador' AND u.deleted_at IS NULL"),
-                    'actividades_publicadas' => $conn->fetchOne("SELECT COUNT(*) FROM ACTIVIDAD WHERE estado_publicacion = 'Publicada' AND deleted_at IS NULL"),
-                    'voluntarios_pendientes' => $conn->fetchOne("SELECT COUNT(*) FROM USUARIO WHERE estado_cuenta = 'Pendiente' AND deleted_at IS NULL"),
-                    'actividades_pendientes' => $conn->fetchOne("SELECT COUNT(*) FROM ACTIVIDAD WHERE estado_publicacion = 'En revision' AND deleted_at IS NULL")
+                    'voluntarios_activos' => $conn->fetchOne("SELECT COUNT(*) FROM USUARIO u JOIN ROL r ON u.id_rol = r.id_rol WHERE UPPER(r.nombre_rol) = 'VOLUNTARIO' AND u.deleted_at IS NULL"),
+                    'organizaciones_activas' => $conn->fetchOne("SELECT COUNT(*) FROM USUARIO u JOIN ROL r ON u.id_rol = r.id_rol WHERE UPPER(r.nombre_rol) = 'ORGANIZACION' AND u.deleted_at IS NULL"),
+                    'coordinadores_activos' => $conn->fetchOne("SELECT COUNT(*) FROM USUARIO u JOIN ROL r ON u.id_rol = r.id_rol WHERE UPPER(r.nombre_rol) = 'COORDINADOR' AND u.deleted_at IS NULL"),
+                    'actividades_publicadas' => $conn->fetchOne("SELECT COUNT(*) FROM ACTIVIDAD WHERE UPPER(estado_publicacion) = 'PUBLICADA' AND deleted_at IS NULL"),
+                    'voluntarios_pendientes' => $conn->fetchOne("SELECT COUNT(*) FROM USUARIO WHERE UPPER(estado_cuenta) = 'PENDIENTE' AND deleted_at IS NULL"),
+                    'actividades_pendientes' => $conn->fetchOne("SELECT COUNT(*) FROM ACTIVIDAD WHERE UPPER(estado_publicacion) IN ('EN REVISION', 'PENDIENTE') AND deleted_at IS NULL")
                 ];
             }
 
             $safeStats = [
                 'voluntarios_activos'    => (int)($rawStats['voluntarios_activos'] ?? $rawStats['total_usuarios'] ?? 0),
                 'organizaciones_activas' => (int)($rawStats['organizaciones_activas'] ?? $rawStats['total_organizaciones'] ?? 0),
-                'coordinadores_activos'  => (int)($rawStats['coordinadores_activos'] ?? $conn->fetchOne("SELECT COUNT(*) FROM USUARIO u JOIN ROL r ON u.id_rol = r.id_rol WHERE r.nombre = 'Coordinador' AND u.deleted_at IS NULL")),
+                'coordinadores_activos'  => (int)($rawStats['coordinadores_activos'] ?? $conn->fetchOne("SELECT COUNT(*) FROM USUARIO u JOIN ROL r ON u.id_rol = r.id_rol WHERE r.nombre_rol = 'Coordinador' AND u.deleted_at IS NULL")),
                 'actividades_publicadas' => (int)($rawStats['actividades_publicadas'] ?? 0),
                 'voluntarios_pendientes' => (int)($rawStats['voluntarios_pendientes'] ?? $rawStats['inscripciones_pendientes'] ?? 0),
                 'actividades_pendientes' => (int)($rawStats['actividades_pendientes'] ?? $rawStats['actividades_revision'] ?? 0),
@@ -239,7 +239,8 @@ final class CoordinadorController extends AbstractController
         $sql = "
             SELECT 
                 a.id_actividad, a.titulo, a.descripcion, a.fecha_inicio, a.duracion_horas, 
-                a.cupo_maximo, a.ubicacion, a.estado_publicacion,
+                a.cupo_maximo, a.ubicacion, a.estado_publicacion, a.img_actividad as imagen_actividad,
+                (SELECT COUNT(*) FROM INSCRIPCION i WHERE i.id_actividad = a.id_actividad AND i.estado_solicitud = 'Aceptada') as inscritos_confirmados,
                 COALESCE(o.nombre, 'Organización Desconocida') as nombre_organizacion,
                 COALESCE(u.id_usuario, 0) as id_organizacion
             FROM ACTIVIDAD a
