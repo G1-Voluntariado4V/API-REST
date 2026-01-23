@@ -295,6 +295,43 @@ final class CoordinadorController extends AbstractController
     // ========================================================================
     // 9. EDITAR ACTIVIDAD (PUT)
     // ========================================================================
+    // ========================================================================
+    // 10. LISTAR INSCRIPCIONES PENDIENTES (GET)
+    // ========================================================================
+    #[Route('/coord/inscripciones/pendientes', name: 'coord_listar_inscripciones', methods: ['GET'])]
+    #[OA\Parameter(name: 'X-Admin-Id', in: 'header', required: true, schema: new OA\Schema(type: 'integer'))]
+    public function listarInscripcionesPendientes(Request $request, UsuarioRepository $userRepo, EntityManagerInterface $em): JsonResponse
+    {
+        if (!$this->checkCoordinador($request, $userRepo)) return $this->json(['error' => 'Acceso denegado'], Response::HTTP_FORBIDDEN);
+
+        $conn = $em->getConnection();
+        $sql = "
+            SELECT 
+                i.id_actividad, 
+                i.id_voluntario, 
+                i.fecha_solicitud, 
+                i.estado_solicitud,
+                v.nombre as nombre_voluntario, 
+                v.apellidos as apellidos_voluntario, 
+                u.correo as email_voluntario,
+                a.titulo as titulo_actividad,
+                a.img_actividad as imagen_actividad
+            FROM INSCRIPCION i
+            JOIN USUARIO u ON i.id_voluntario = u.id_usuario
+            JOIN VOLUNTARIO v ON i.id_voluntario = v.id_usuario
+            JOIN ACTIVIDAD a ON i.id_actividad = a.id_actividad
+            WHERE UPPER(i.estado_solicitud) = 'PENDIENTE'
+            ORDER BY i.fecha_solicitud ASC
+        ";
+
+        try {
+            $inscripciones = $conn->fetchAllAssociative($sql);
+            return $this->json($inscripciones, Response::HTTP_OK);
+        } catch (\Exception $e) {
+            return $this->json(['error' => 'Error: ' . $e->getMessage()], 500);
+        }
+    }
+
     #[Route('/coord/actividades/{id}', name: 'coord_editar_actividad', methods: ['PUT'])]
     #[OA\Parameter(name: 'X-Admin-Id', in: 'header', required: true, schema: new OA\Schema(type: 'integer'))]
     public function editarActividadCoord(int $id, Request $request, ActividadRepository $repo, UsuarioRepository $userRepo, EntityManagerInterface $em): JsonResponse
@@ -325,5 +362,36 @@ final class CoordinadorController extends AbstractController
         $sql = 'EXEC SP_SoftDelete_Usuario @id_usuario = :id';
         $em->getConnection()->executeStatement($sql, ['id' => $id]);
         return $this->json(['mensaje' => 'Cuenta cerrada'], Response::HTTP_OK);
+    }
+    // ========================================================================
+    // 11. CAMBIAR ESTADO USUARIO (PATCH)
+    // ========================================================================
+    #[Route('/coord/usuarios/{id}/estado', name: 'coord_update_user_status', methods: ['PATCH'])]
+    #[OA\Parameter(name: 'X-Admin-Id', in: 'header', required: true, schema: new OA\Schema(type: 'integer'))]
+    #[OA\RequestBody(required: true, content: new OA\JsonContent(properties: [new OA\Property(property: 'estado', type: 'string', example: 'Bloqueada')]))]
+    public function updateEstadoUsuario(
+        int $id, 
+        Request $request, 
+        UsuarioRepository $repo, 
+        EntityManagerInterface $em
+    ): JsonResponse {
+        if (!$this->checkCoordinador($request, $repo)) {
+            return $this->json(['error' => 'Acceso denegado'], Response::HTTP_FORBIDDEN);
+        }
+
+        $usuario = $repo->find($id);
+        if (!$usuario) return $this->json(['error' => 'Usuario no encontrado'], 404);
+
+        $data = json_decode($request->getContent(), true);
+        $nuevoEstado = $data['estado'] ?? null;
+
+        if (!in_array($nuevoEstado, ['Activa', 'Bloqueada', 'Pendiente', 'Rechazada'])) {
+            return $this->json(['error' => 'Estado inválido'], 400);
+        }
+
+        $usuario->setEstadoCuenta($nuevoEstado);
+        $em->flush();
+
+        return $this->json(['mensaje' => "Estado actualizado a $nuevoEstado"], 200);
     }
 }
