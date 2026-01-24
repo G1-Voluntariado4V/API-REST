@@ -3,29 +3,46 @@
 namespace App\Model\Actividad;
 
 use App\Entity\Actividad;
+use OpenApi\Attributes as OA;
 use App\Model\Ods\OdsDTO;
 use App\Model\TipoVoluntariado\TipoVoluntariadoDTO;
 
 class ActividadResponseDTO
 {
     public function __construct(
+        #[OA\Property(example: 10)]
         public int $id,
+        #[OA\Property(example: "Limpieza de Playa")]
         public string $titulo,
+        #[OA\Property(example: "Recogida de plásticos en la costa")]
         public ?string $descripcion,
+        #[OA\Property(example: "2026-06-15 09:00:00")]
         public string $fecha_inicio,
+        #[OA\Property(example: 4)]
         public int $duracion_horas,
+        #[OA\Property(example: 50)]
         public int $cupo_maximo,
+        #[OA\Property(example: 12)]
         public int $inscritos_confirmados,
+        #[OA\Property(example: 5)]
         public int $inscritos_pendientes,
+        #[OA\Property(example: "Playa de la Barceloneta")]
         public string $ubicacion,
+        #[OA\Property(example: "Publicada")]
         public string $estado_publicacion,
+        #[OA\Property(example: 5)]
         public int $id_organizacion,
+        #[OA\Property(example: "ONG Mar Limpio")]
         public string $nombre_organizacion,
+        #[OA\Property(example: "logo_ong_5.jpg", nullable: true)]
         public ?string $img_organizacion,
         /** @var OdsDTO[] */
+        #[OA\Property(type: 'array', items: new OA\Items(properties: [new OA\Property(property: 'id', example: 1), new OA\Property(property: 'nombre', example: 'Fin de la pobreza')]))]
         public array $ods = [],
         /** @var TipoVoluntariadoDTO[] */
+        #[OA\Property(type: 'array', items: new OA\Items(properties: [new OA\Property(property: 'id', example: 1), new OA\Property(property: 'nombre', example: 'Social')]))]
         public array $tipos = [],
+        #[OA\Property(example: "act_10_img.jpg", nullable: true)]
         public ?string $imagen_actividad = null
     ) {}
 

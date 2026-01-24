@@ -82,10 +82,13 @@ class VoluntarioControllerTest extends WebTestCase
         );
 
         $statusCode = $client->getResponse()->getStatusCode();
-        $this->assertContains($statusCode, [
-            Response::HTTP_UNPROCESSABLE_ENTITY,
-            Response::HTTP_BAD_REQUEST
-        ]);
+        $this->assertTrue(
+            in_array($statusCode, [
+                Response::HTTP_UNPROCESSABLE_ENTITY,
+                Response::HTTP_BAD_REQUEST
+            ]),
+            "El código debería ser 422 o 400, pero fue: $statusCode"
+        );
     }
 
     public function testRegistrarVoluntarioConDatosIncompletos(): void
@@ -194,10 +197,13 @@ class VoluntarioControllerTest extends WebTestCase
         );
 
         $statusCode = $client->getResponse()->getStatusCode();
-        $this->assertContains($statusCode, [
-            Response::HTTP_NOT_FOUND,
-            Response::HTTP_FORBIDDEN
-        ]);
+        $this->assertTrue(
+            in_array($statusCode, [
+                Response::HTTP_NOT_FOUND,
+                Response::HTTP_FORBIDDEN
+            ]),
+            "El código debería ser 404 o 403, pero fue: $statusCode"
+        );
     }
 
     // ========================================================================

@@ -3,27 +3,46 @@
 namespace App\Model\Inscripcion;
 
 use App\Entity\Inscripcion;
+use OpenApi\Attributes as OA;
 
 class InscripcionResponseDTO
 {
     public function __construct(
+        #[OA\Property(example: "10-5")]
         public string $id,
+        #[OA\Property(example: "Confirmada")]
         public string $estado,
+        #[OA\Property(example: "2026-06-01 10:00:00")]
         public string $fecha_solicitud,
+        #[OA\Property(example: 5)]
         public int $id_actividad,
+        #[OA\Property(example: "Taller de Reciclaje")]
         public string $titulo_actividad,
+        #[OA\Property(example: "Aprende a reciclar correctamente...")]
         public string $descripcion,
+        #[OA\Property(example: "Centro Cívico")]
         public string $ubicacion,
+        #[OA\Property(example: 3)]
         public int $duracion_horas,
+        #[OA\Property(example: "2026-06-10 16:00:00")]
         public string $fecha_actividad,
+        #[OA\Property(example: 2)]
         public int $id_organizacion,
+        #[OA\Property(example: "Asociación Verde")]
         public string $nombre_organizacion,
+        #[OA\Property(example: 20)]
         public int $cupo_maximo,
+        #[OA\Property(example: 15)]
         public int $inscritos_confirmados,
+        #[OA\Property(type: 'array', items: new OA\Items(properties: [new OA\Property(property: 'id', example: 12), new OA\Property(property: 'nombre', example: 'Consumo Responsable')]))]
         public array $ods,
+        #[OA\Property(type: 'array', items: new OA\Items(type: 'string', example: 'Ambiental'))]
         public array $tipos,
+        #[OA\Property(example: 10)]
         public int $id_voluntario,
+        #[OA\Property(example: "Juan Pérez")]
         public string $nombre_voluntario,
+        #[OA\Property(example: "act_5.jpg", nullable: true)]
         public ?string $imagen_actividad = null
     ) {}
 

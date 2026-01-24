@@ -62,14 +62,12 @@ mkdir migrations
 Este proyecto utiliza variables de entorno.
 
 1. Busca un archivo llamado `.env` en la raíz del proyecto.
-2. Define tu conexión a base de datos. Ejemplo para **SQL Express** mira que la conexión esté escrita correctamente:
+2. Define tu conexión a base de datos. Asegúrate de ajustar la instancia (`SQLEXPRESS`) si tu instalación tiene otro nombre:
 
 ```bash
 # .env
 DATABASE_URL="sqlsrv://symfony_app:Symfony2025!@127.0.0.1/VoluntariadoDB?instance=SQLEXPRESS&trustServerCertificate=true&charset=UTF-8"
 ```
-
-_Asegúrate de ajustar la instancia (`SQLEXPRESS`) si tu instalación tiene otro nombre._
 
 ### Paso 3: Configuración de SQL Server
 
@@ -152,7 +150,7 @@ La lógica avanzada de SQL Server se añade en una migración separada.
     php bin/console make:migration
     ```
 2.  Abre el nuevo archivo generado en la carpeta `migrations/`.
-3.  Copia el contenido del archivo `migracionTriggers.txt` (ubicado en la raíz del proyecto) y úsalo para reemplazar el contenido de la migración generada.
+3.  Copia el contenido del archivo `bbdd/migracionTriggers.txt` y úsalo para reemplazar el contenido de la migración generada.
 4.  Ejecuta esta migración:
     ```bash
     php bin/console doctrine:migrations:migrate
@@ -198,19 +196,27 @@ El proyecto tiene una suite de tests automatizados (Unitarios, Integración y E2
 
 ```bash
 # Ejecutar todos los tests
-php bin/phpunit --testdox
+php bin/phpunit
 
-# Ejecutar solo tests de Controladores (API)
-php bin/phpunit --testdox tests/Controller
+# Tests por categoría
+php bin/phpunit tests/Controller
+php bin/phpunit tests/Entity
 ```
+
+> 📘 **Ver Informe Completo**: Consulta `docs/tests/INFORME_COMPLETO.md` para ver el detalle de cobertura y estado de los tests.
 
 ---
 
 ## 📚 Documentación
 
-- **OpenAPI/Swagger**: Archivo `openapi.yaml` en la raíz. Importable en Postman.
-- **Interfaz Visual (Swagger UI)**: Consulta y prueba los endpoints interactivamente en [http://127.0.0.1:8000/doc](http://127.0.0.1:8000/doc).
-- **Rutas**: Puedes ver todas las rutas registradas con `php bin/console debug:router`.
+La documentación del proyecto se encuentra organizada en la carpeta `docs/`.
+
+- **OpenAPI/Swagger**: Archivos de especificación en `docs/api/`.
+    - `docs/api/openapi.yaml` (Documento principal)
+    - Puedes importarlo directamente en Postman.
+- **Informe de Tests**: Reportes de calidad y cobertura en `docs/tests/`.
+- **Interfaz Visual (Swagger UI)**: Consulta y prueba los endpoints interactivamente en [http://127.0.0.1:8000/doc](http://127.0.0.1:8000/doc) (solo con servidor corriendo).
+- **Rutas**: Ver todas las rutas registradas con `php bin/console debug:router`.
 
 ---
 

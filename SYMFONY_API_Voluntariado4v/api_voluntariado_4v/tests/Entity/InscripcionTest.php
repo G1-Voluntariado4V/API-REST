@@ -3,13 +3,12 @@
 namespace App\Tests\Entity;
 
 use App\Entity\Inscripcion;
-use App\Entity\Actividad;
 use App\Entity\Voluntario;
+use App\Entity\Actividad;
 use PHPUnit\Framework\TestCase;
 
 /**
  * Tests unitarios para la entidad Inscripcion
- * NOTA: Esta entidad usa clave compuesta (voluntario + actividad), no tiene getId()
  */
 class InscripcionTest extends TestCase
 {
@@ -24,39 +23,74 @@ class InscripcionTest extends TestCase
     // TESTS DE PROPIEDADES BÁSICAS
     // ========================================================================
 
-    public function testSetGetEstadoSolicitud(): void
+    public function testInscripcionInstanciacionCorrecta(): void
     {
-        $estado = 'Aceptado';
-        $this->inscripcion->setEstadoSolicitud($estado);
-        $this->assertEquals($estado, $this->inscripcion->getEstadoSolicitud());
+        $this->assertInstanceOf(Inscripcion::class, $this->inscripcion);
+        $this->assertInstanceOf(\DateTimeInterface::class, $this->inscripcion->getFechaSolicitud());
     }
 
-    public function testEstadoSolicitudPendientePorDefecto(): void
+    public function testEstadoSolicitudPorDefecto(): void
     {
-        // Verificar que el estado por defecto es "Pendiente"
         $this->assertEquals('Pendiente', $this->inscripcion->getEstadoSolicitud());
     }
 
-    // ========================================================================
-    // TESTS DE ESTADOS VÁLIDOS
-    // ========================================================================
-
-    public function testEstadoAceptado(): void
+    public function testSetYGetEstadoSolicitud(): void
     {
-        $this->inscripcion->setEstadoSolicitud('Aceptado');
-        $this->assertEquals('Aceptado', $this->inscripcion->getEstadoSolicitud());
+        $this->inscripcion->setEstadoSolicitud('Aceptada');
+        $this->assertEquals('Aceptada', $this->inscripcion->getEstadoSolicitud());
+
+        $this->inscripcion->setEstadoSolicitud('Rechazada');
+        $this->assertEquals('Rechazada', $this->inscripcion->getEstadoSolicitud());
+
+        $this->inscripcion->setEstadoSolicitud('Confirmada');
+        $this->assertEquals('Confirmada', $this->inscripcion->getEstadoSolicitud());
     }
 
-    public function testEstadoRechazado(): void
+    // ========================================================================
+    // TESTS DE FECHA SOLICITUD
+    // ========================================================================
+
+    public function testFechaSolicitudAutomatica(): void
     {
-        $this->inscripcion->setEstadoSolicitud('Rechazado');
-        $this->assertEquals('Rechazado', $this->inscripcion->getEstadoSolicitud());
+        $fechaAntes = new \DateTime();
+        $inscripcion = new Inscripcion();
+        $fechaDespues = new \DateTime();
+
+        $this->assertGreaterThanOrEqual($fechaAntes->getTimestamp(), $inscripcion->getFechaSolicitud()->getTimestamp());
+        $this->assertLessThanOrEqual($fechaDespues->getTimestamp(), $inscripcion->getFechaSolicitud()->getTimestamp());
     }
 
-    public function testEstadoPendiente(): void
+    public function testSetYGetFechaSolicitud(): void
     {
-        $this->inscripcion->setEstadoSolicitud('Pendiente');
-        $this->assertEquals('Pendiente', $this->inscripcion->getEstadoSolicitud());
+        $fecha = new \DateTime('2024-06-01 10:00:00');
+        $this->inscripcion->setFechaSolicitud($fecha);
+        $this->assertEquals($fecha, $this->inscripcion->getFechaSolicitud());
+    }
+
+    // ========================================================================
+    // TESTS DE RELACIÓN VOLUNTARIO
+    // ========================================================================
+
+    public function testVoluntarioInicialmenteNulo(): void
+    {
+        $this->assertNull($this->inscripcion->getVoluntario());
+    }
+
+    public function testSetYGetVoluntario(): void
+    {
+        $voluntario = $this->createMock(Voluntario::class);
+
+        $this->inscripcion->setVoluntario($voluntario);
+        $this->assertSame($voluntario, $this->inscripcion->getVoluntario());
+    }
+
+    public function testVoluntarioPuedeSerNulo(): void
+    {
+        $voluntario = $this->createMock(Voluntario::class);
+        $this->inscripcion->setVoluntario($voluntario);
+        $this->inscripcion->setVoluntario(null);
+
+        $this->assertNull($this->inscripcion->getVoluntario());
     }
 
     // ========================================================================
@@ -68,7 +102,7 @@ class InscripcionTest extends TestCase
         $this->assertNull($this->inscripcion->getActividad());
     }
 
-    public function testSetGetActividad(): void
+    public function testSetYGetActividad(): void
     {
         $actividad = $this->createMock(Actividad::class);
 
@@ -86,39 +120,6 @@ class InscripcionTest extends TestCase
     }
 
     // ========================================================================
-    // TESTS DE RELACIÓN VOLUNTARIO
-    // ========================================================================
-
-    public function testVoluntarioInicialmenteNulo(): void
-    {
-        $this->assertNull($this->inscripcion->getVoluntario());
-    }
-
-    public function testSetGetVoluntario(): void
-    {
-        $voluntario = $this->createMock(Voluntario::class);
-
-        $this->inscripcion->setVoluntario($voluntario);
-        $this->assertSame($voluntario, $this->inscripcion->getVoluntario());
-    }
-
-    // ========================================================================
-    // TESTS DE FECHA SOLICITUD
-    // ========================================================================
-
-    public function testFechaSolicitudSeInicializaEnConstructor(): void
-    {
-        $this->assertInstanceOf(\DateTimeInterface::class, $this->inscripcion->getFechaSolicitud());
-    }
-
-    public function testSetGetFechaSolicitud(): void
-    {
-        $fecha = new \DateTime('2025-06-15');
-        $this->inscripcion->setFechaSolicitud($fecha);
-        $this->assertEquals($fecha, $this->inscripcion->getFechaSolicitud());
-    }
-
-    // ========================================================================
     // TESTS DE TIMESTAMPS
     // ========================================================================
 
@@ -127,7 +128,7 @@ class InscripcionTest extends TestCase
         $this->assertNull($this->inscripcion->getUpdatedAt());
     }
 
-    public function testSetGetUpdatedAt(): void
+    public function testSetYGetUpdatedAt(): void
     {
         $fecha = new \DateTime();
         $this->inscripcion->setUpdatedAt($fecha);
@@ -140,37 +141,28 @@ class InscripcionTest extends TestCase
 
     public function testFluentInterface(): void
     {
-        $actividad = $this->createMock(Actividad::class);
         $voluntario = $this->createMock(Voluntario::class);
+        $actividad = $this->createMock(Actividad::class);
 
         $result = $this->inscripcion
-            ->setActividad($actividad)
             ->setVoluntario($voluntario)
-            ->setEstadoSolicitud('Aceptado')
-            ->setFechaSolicitud(new \DateTime());
+            ->setActividad($actividad)
+            ->setEstadoSolicitud('Confirmada');
 
         $this->assertSame($this->inscripcion, $result);
     }
 
     // ========================================================================
-    // TESTS DE INTEGRIDAD
+    // TESTS DE ESTADOS VÁLIDOS
     // ========================================================================
 
-    public function testInscripcionCompleta(): void
+    public function testEstadosSolicitudValidos(): void
     {
-        $actividad = $this->createMock(Actividad::class);
-        $voluntario = $this->createMock(Voluntario::class);
-        $fecha = new \DateTime('2025-06-01');
+        $estadosValidos = ['Pendiente', 'Aceptada', 'Rechazada', 'Confirmada', 'Finalizada'];
 
-        $this->inscripcion
-            ->setActividad($actividad)
-            ->setVoluntario($voluntario)
-            ->setEstadoSolicitud('Aceptado')
-            ->setFechaSolicitud($fecha);
-
-        $this->assertSame($actividad, $this->inscripcion->getActividad());
-        $this->assertSame($voluntario, $this->inscripcion->getVoluntario());
-        $this->assertEquals('Aceptado', $this->inscripcion->getEstadoSolicitud());
-        $this->assertEquals($fecha, $this->inscripcion->getFechaSolicitud());
+        foreach ($estadosValidos as $estado) {
+            $this->inscripcion->setEstadoSolicitud($estado);
+            $this->assertEquals($estado, $this->inscripcion->getEstadoSolicitud());
+        }
     }
 }

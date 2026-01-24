@@ -7,6 +7,11 @@ use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Tests funcionales para CatalogoController
+ * 
+ * RUTAS REALES:
+ * - GET /catalogos/cursos
+ * - GET /catalogos/idiomas
+ * - GET /catalogos/tipos-voluntariado
  */
 class CatalogoControllerTest extends WebTestCase
 {
@@ -18,7 +23,7 @@ class CatalogoControllerTest extends WebTestCase
     {
         $client = static::createClient();
 
-        $client->request('GET', '/catalogo/cursos');
+        $client->request('GET', '/catalogos/cursos');
 
         $this->assertEquals(Response::HTTP_OK, $client->getResponse()->getStatusCode());
     }
@@ -27,7 +32,7 @@ class CatalogoControllerTest extends WebTestCase
     {
         $client = static::createClient();
 
-        $client->request('GET', '/catalogo/cursos');
+        $client->request('GET', '/catalogos/cursos');
 
         $this->assertJson($client->getResponse()->getContent());
     }
@@ -36,7 +41,7 @@ class CatalogoControllerTest extends WebTestCase
     {
         $client = static::createClient();
 
-        $client->request('GET', '/catalogo/cursos');
+        $client->request('GET', '/catalogos/cursos');
 
         $content = json_decode($client->getResponse()->getContent(), true);
         $this->assertIsArray($content);
@@ -50,7 +55,7 @@ class CatalogoControllerTest extends WebTestCase
     {
         $client = static::createClient();
 
-        $client->request('GET', '/catalogo/idiomas');
+        $client->request('GET', '/catalogos/idiomas');
 
         $this->assertEquals(Response::HTTP_OK, $client->getResponse()->getStatusCode());
     }
@@ -59,7 +64,7 @@ class CatalogoControllerTest extends WebTestCase
     {
         $client = static::createClient();
 
-        $client->request('GET', '/catalogo/idiomas');
+        $client->request('GET', '/catalogos/idiomas');
 
         $this->assertJson($client->getResponse()->getContent());
     }
@@ -68,39 +73,39 @@ class CatalogoControllerTest extends WebTestCase
     {
         $client = static::createClient();
 
-        $client->request('GET', '/catalogo/idiomas');
+        $client->request('GET', '/catalogos/idiomas');
 
         $content = json_decode($client->getResponse()->getContent(), true);
         $this->assertIsArray($content);
     }
 
     // ========================================================================
-    // TESTS DE PREFERENCIAS (TIPOS DE VOLUNTARIADO)
+    // TESTS DE TIPOS DE VOLUNTARIADO
     // ========================================================================
 
-    public function testListarPreferenciasDevuelve200(): void
+    public function testListarTiposDevuelve200(): void
     {
         $client = static::createClient();
 
-        $client->request('GET', '/catalogo/preferencias');
+        $client->request('GET', '/catalogos/tipos-voluntariado');
 
         $this->assertEquals(Response::HTTP_OK, $client->getResponse()->getStatusCode());
     }
 
-    public function testListarPreferenciasDevuelveJSON(): void
+    public function testListarTiposDevuelveJSON(): void
     {
         $client = static::createClient();
 
-        $client->request('GET', '/catalogo/preferencias');
+        $client->request('GET', '/catalogos/tipos-voluntariado');
 
         $this->assertJson($client->getResponse()->getContent());
     }
 
-    public function testListarPreferenciasDevuelveArray(): void
+    public function testListarTiposDevuelveArray(): void
     {
         $client = static::createClient();
 
-        $client->request('GET', '/catalogo/preferencias');
+        $client->request('GET', '/catalogos/tipos-voluntariado');
 
         $content = json_decode($client->getResponse()->getContent(), true);
         $this->assertIsArray($content);
@@ -110,20 +115,20 @@ class CatalogoControllerTest extends WebTestCase
     // TESTS DE MÉTODOS HTTP
     // ========================================================================
 
-    public function testCatalogoSoloAceptaGET(): void
+    public function testCatalogosSoloAceptaGET(): void
     {
         $client = static::createClient();
 
         // POST no permitido
-        $client->request('POST', '/catalogo/cursos');
+        $client->request('POST', '/catalogos/cursos');
         $this->assertEquals(Response::HTTP_METHOD_NOT_ALLOWED, $client->getResponse()->getStatusCode());
 
         // PUT no permitido
-        $client->request('PUT', '/catalogo/idiomas');
+        $client->request('PUT', '/catalogos/idiomas');
         $this->assertEquals(Response::HTTP_METHOD_NOT_ALLOWED, $client->getResponse()->getStatusCode());
 
         // DELETE no permitido
-        $client->request('DELETE', '/catalogo/preferencias');
+        $client->request('DELETE', '/catalogos/tipos-voluntariado');
         $this->assertEquals(Response::HTTP_METHOD_NOT_ALLOWED, $client->getResponse()->getStatusCode());
     }
 
@@ -135,9 +140,12 @@ class CatalogoControllerTest extends WebTestCase
     {
         $client = static::createClient();
 
-        $client->request('GET', '/catalogo/cursos');
+        $client->request('GET', '/catalogos/cursos');
 
         $content = json_decode($client->getResponse()->getContent(), true);
+
+        // Verificar que es un array
+        $this->assertIsArray($content);
 
         if (count($content) > 0) {
             $curso = $content[0];
@@ -152,9 +160,12 @@ class CatalogoControllerTest extends WebTestCase
     {
         $client = static::createClient();
 
-        $client->request('GET', '/catalogo/idiomas');
+        $client->request('GET', '/catalogos/idiomas');
 
         $content = json_decode($client->getResponse()->getContent(), true);
+
+        // Verificar que es un array
+        $this->assertIsArray($content);
 
         if (count($content) > 0) {
             $idioma = $content[0];
@@ -165,18 +176,21 @@ class CatalogoControllerTest extends WebTestCase
         $this->assertTrue(true);
     }
 
-    public function testPreferenciasContieneEstructuraCorrecta(): void
+    public function testTiposContieneEstructuraCorrecta(): void
     {
         $client = static::createClient();
 
-        $client->request('GET', '/catalogo/preferencias');
+        $client->request('GET', '/catalogos/tipos-voluntariado');
 
         $content = json_decode($client->getResponse()->getContent(), true);
 
+        // Verificar que es un array
+        $this->assertIsArray($content);
+
         if (count($content) > 0) {
-            $preferencia = $content[0];
-            $this->assertArrayHasKey('id', $preferencia);
-            $this->assertArrayHasKey('nombre', $preferencia);
+            $tipo = $content[0];
+            $this->assertArrayHasKey('id', $tipo);
+            $this->assertArrayHasKey('nombreTipo', $tipo);
         }
 
         $this->assertTrue(true);

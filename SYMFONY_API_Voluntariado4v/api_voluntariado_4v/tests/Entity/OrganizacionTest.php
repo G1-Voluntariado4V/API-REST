@@ -22,14 +22,15 @@ class OrganizacionTest extends TestCase
     // TESTS DE PROPIEDADES BÁSICAS
     // ========================================================================
 
-    public function testIdInicialmenteNulo(): void
+    public function testOrganizacionInstanciacionCorrecta(): void
     {
+        $this->assertInstanceOf(Organizacion::class, $this->organizacion);
         $this->assertNull($this->organizacion->getId());
     }
 
-    public function testSetGetCif(): void
+    public function testSetYGetCif(): void
     {
-        $cif = 'B12345678';
+        $cif = 'G12345678';
         $this->organizacion->setCif($cif);
         $this->assertEquals($cif, $this->organizacion->getCif());
     }
@@ -40,9 +41,9 @@ class OrganizacionTest extends TestCase
         $this->assertNull($this->organizacion->getCif());
     }
 
-    public function testSetGetNombre(): void
+    public function testSetYGetNombre(): void
     {
-        $nombre = 'ONG Solidaria';
+        $nombre = 'ONG Ejemplo';
         $this->organizacion->setNombre($nombre);
         $this->assertEquals($nombre, $this->organizacion->getNombre());
     }
@@ -53,9 +54,9 @@ class OrganizacionTest extends TestCase
         $this->assertNull($this->organizacion->getNombre());
     }
 
-    public function testSetGetDescripcion(): void
+    public function testSetYGetDescripcion(): void
     {
-        $descripcion = 'Somos una organización dedicada a ayudar';
+        $descripcion = 'Organización dedicada a ayudar';
         $this->organizacion->setDescripcion($descripcion);
         $this->assertEquals($descripcion, $this->organizacion->getDescripcion());
     }
@@ -66,9 +67,9 @@ class OrganizacionTest extends TestCase
         $this->assertNull($this->organizacion->getDescripcion());
     }
 
-    public function testSetGetDireccion(): void
+    public function testSetYGetDireccion(): void
     {
-        $direccion = 'Calle Mayor 123, Madrid';
+        $direccion = 'Calle Falsa 123';
         $this->organizacion->setDireccion($direccion);
         $this->assertEquals($direccion, $this->organizacion->getDireccion());
     }
@@ -79,11 +80,11 @@ class OrganizacionTest extends TestCase
         $this->assertNull($this->organizacion->getDireccion());
     }
 
-    public function testSetGetSitioWeb(): void
+    public function testSetYGetSitioWeb(): void
     {
-        $sitioWeb = 'https://www.ejemplo.org';
-        $this->organizacion->setSitioWeb($sitioWeb);
-        $this->assertEquals($sitioWeb, $this->organizacion->getSitioWeb());
+        $sitio = 'https://ejemplo.org';
+        $this->organizacion->setSitioWeb($sitio);
+        $this->assertEquals($sitio, $this->organizacion->getSitioWeb());
     }
 
     public function testSitioWebPuedeSerNulo(): void
@@ -92,9 +93,9 @@ class OrganizacionTest extends TestCase
         $this->assertNull($this->organizacion->getSitioWeb());
     }
 
-    public function testSetGetTelefono(): void
+    public function testSetYGetTelefono(): void
     {
-        $telefono = '912345678';
+        $telefono = '612345678';
         $this->organizacion->setTelefono($telefono);
         $this->assertEquals($telefono, $this->organizacion->getTelefono());
     }
@@ -114,22 +115,14 @@ class OrganizacionTest extends TestCase
         $this->assertNull($this->organizacion->getUsuario());
     }
 
-    public function testSetGetUsuario(): void
+    public function testSetYGetUsuario(): void
     {
         $usuario = $this->createMock(Usuario::class);
         $usuario->method('getId')->willReturn(5);
 
         $this->organizacion->setUsuario($usuario);
         $this->assertSame($usuario, $this->organizacion->getUsuario());
-    }
-
-    public function testSetUsuarioEstableceIdDesdeUsuario(): void
-    {
-        $usuario = $this->createMock(Usuario::class);
-        $usuario->method('getId')->willReturn(10);
-
-        $this->organizacion->setUsuario($usuario);
-        $this->assertEquals(10, $this->organizacion->getId());
+        $this->assertEquals(5, $this->organizacion->getId());
     }
 
     // ========================================================================
@@ -141,17 +134,11 @@ class OrganizacionTest extends TestCase
         $this->assertNull($this->organizacion->getUpdatedAt());
     }
 
-    public function testSetGetUpdatedAt(): void
+    public function testSetYGetUpdatedAt(): void
     {
         $fecha = new \DateTime();
         $this->organizacion->setUpdatedAt($fecha);
         $this->assertEquals($fecha, $this->organizacion->getUpdatedAt());
-    }
-
-    public function testUpdatedAtPuedeSerNulo(): void
-    {
-        $this->organizacion->setUpdatedAt(null);
-        $this->assertNull($this->organizacion->getUpdatedAt());
     }
 
     // ========================================================================
@@ -162,27 +149,10 @@ class OrganizacionTest extends TestCase
     {
         $result = $this->organizacion
             ->setNombre('Test')
-            ->setCif('B12345678')
+            ->setCif('G12345678')
             ->setDescripcion('Descripción')
-            ->setDireccion('Calle Test')
-            ->setSitioWeb('https://test.com')
-            ->setTelefono('123456789');
+            ->setTelefono('612345678');
 
         $this->assertSame($this->organizacion, $result);
-    }
-
-    // ========================================================================
-    // TESTS DE VALIDACIÓN DE FORMATO CIF
-    // ========================================================================
-
-    public function testCifFormatoValido(): void
-    {
-        // Este test verifica que se pueden establecer diferentes formatos de CIF
-        $cifs = ['B12345678', 'A87654321', 'G00000001'];
-
-        foreach ($cifs as $cif) {
-            $this->organizacion->setCif($cif);
-            $this->assertEquals($cif, $this->organizacion->getCif());
-        }
     }
 }

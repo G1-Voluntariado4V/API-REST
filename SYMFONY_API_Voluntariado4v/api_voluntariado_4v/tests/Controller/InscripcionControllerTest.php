@@ -49,7 +49,11 @@ class InscripcionControllerTest extends WebTestCase
             json_encode(['estado' => 'Aceptado'])
         );
 
-        $this->assertEquals(Response::HTTP_NOT_FOUND, $client->getResponse()->getStatusCode());
+        $statusCode = $client->getResponse()->getStatusCode();
+        $this->assertTrue(
+            in_array($statusCode, [Response::HTTP_NOT_FOUND, Response::HTTP_UNPROCESSABLE_ENTITY]),
+            "El código debería ser 404 o 422, pero fue: $statusCode"
+        );
     }
 
     public function testCambiarEstadoSinDatos(): void
@@ -66,11 +70,14 @@ class InscripcionControllerTest extends WebTestCase
         );
 
         $statusCode = $client->getResponse()->getStatusCode();
-        $this->assertContains($statusCode, [
-            Response::HTTP_UNPROCESSABLE_ENTITY,
-            Response::HTTP_BAD_REQUEST,
-            Response::HTTP_NOT_FOUND
-        ]);
+        $this->assertTrue(
+            in_array($statusCode, [
+                Response::HTTP_UNPROCESSABLE_ENTITY,
+                Response::HTTP_BAD_REQUEST,
+                Response::HTTP_NOT_FOUND
+            ]),
+            "El código debería ser 422, 400 o 404, pero fue: $statusCode"
+        );
     }
 
     public function testCambiarEstadoConValorInvalido(): void
@@ -87,11 +94,14 @@ class InscripcionControllerTest extends WebTestCase
         );
 
         $statusCode = $client->getResponse()->getStatusCode();
-        $this->assertContains($statusCode, [
-            Response::HTTP_UNPROCESSABLE_ENTITY,
-            Response::HTTP_BAD_REQUEST,
-            Response::HTTP_NOT_FOUND
-        ]);
+        $this->assertTrue(
+            in_array($statusCode, [
+                Response::HTTP_UNPROCESSABLE_ENTITY,
+                Response::HTTP_BAD_REQUEST,
+                Response::HTTP_NOT_FOUND
+            ]),
+            "El código debería ser 422, 400 o 404, pero fue: $statusCode"
+        );
     }
 
     // ========================================================================

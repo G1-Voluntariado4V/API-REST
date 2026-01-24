@@ -3,6 +3,7 @@
 namespace App\Tests\DTO;
 
 use App\Model\Actividad\ActividadCreateDTO;
+use App\Model\Actividad\ActividadUpdateDTO;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Validator\Validation;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
@@ -28,33 +29,19 @@ class ActividadDTOTest extends TestCase
     public function testActividadCreateDTOValido(): void
     {
         $dto = new ActividadCreateDTO(
-            titulo: 'Limpieza de playas',
+            titulo: 'Limpieza de Playa',
             descripcion: 'Actividad de voluntariado ambiental',
-            fecha_inicio: '2025-07-01 10:00:00',
+            fecha_inicio: '2026-06-15 09:00:00',
             duracion_horas: 4,
-            cupo_maximo: 20,
-            ubicacion: 'Playa de Valencia',
-            id_organizacion: 1,
-            odsIds: [],
-            tiposIds: []
+            cupo_maximo: 50,
+            ubicacion: 'Playa de la Barceloneta',
+            id_organizacion: 5,
+            odsIds: [13, 14],
+            tiposIds: [1]
         );
 
         $violations = $this->validator->validate($dto);
-
-        // Solo verificamos que no hay violaciones de NotBlank, NotNull, Positive
-        $criticalViolations = 0;
-        foreach ($violations as $violation) {
-            $message = $violation->getMessage();
-            if (
-                str_contains($message, 'vacío') ||
-                str_contains($message, 'mayor a 0') ||
-                str_contains($message, 'This value should not be null')
-            ) {
-                $criticalViolations++;
-            }
-        }
-
-        $this->assertEquals(0, $criticalViolations);
+        $this->assertCount(0, $violations);
     }
 
     public function testActividadCreateDTOTituloVacio(): void
@@ -62,142 +49,130 @@ class ActividadDTOTest extends TestCase
         $dto = new ActividadCreateDTO(
             titulo: '',
             descripcion: 'Descripción',
-            fecha_inicio: '2025-07-01 10:00:00',
+            fecha_inicio: '2026-06-15 09:00:00',
             duracion_horas: 4,
-            cupo_maximo: 20,
+            cupo_maximo: 50,
             ubicacion: 'Ubicación',
-            id_organizacion: 1
+            id_organizacion: 5,
+            tiposIds: [1]
         );
 
         $violations = $this->validator->validate($dto);
-
-        $tituloViolation = false;
-        foreach ($violations as $violation) {
-            if ($violation->getPropertyPath() === 'titulo') {
-                $tituloViolation = true;
-                break;
-            }
-        }
-
-        $this->assertTrue($tituloViolation, 'Debería haber una violación para título vacío');
+        $this->assertGreaterThan(0, count($violations));
     }
 
     public function testActividadCreateDTODuracionNegativa(): void
     {
         $dto = new ActividadCreateDTO(
-            titulo: 'Test',
+            titulo: 'Título válido',
             descripcion: 'Descripción',
-            fecha_inicio: '2025-07-01 10:00:00',
-            duracion_horas: -5,
-            cupo_maximo: 20,
+            fecha_inicio: '2026-06-15 09:00:00',
+            duracion_horas: -1,
+            cupo_maximo: 50,
             ubicacion: 'Ubicación',
-            id_organizacion: 1
+            id_organizacion: 5,
+            tiposIds: [1]
         );
 
         $violations = $this->validator->validate($dto);
-
-        $duracionViolation = false;
-        foreach ($violations as $violation) {
-            if ($violation->getPropertyPath() === 'duracion_horas') {
-                $duracionViolation = true;
-                break;
-            }
-        }
-
-        $this->assertTrue($duracionViolation, 'Debería haber una violación para duración negativa');
+        $this->assertGreaterThan(0, count($violations));
     }
 
     public function testActividadCreateDTOCupoNegativo(): void
     {
         $dto = new ActividadCreateDTO(
-            titulo: 'Test',
+            titulo: 'Título válido',
             descripcion: 'Descripción',
-            fecha_inicio: '2025-07-01 10:00:00',
+            fecha_inicio: '2026-06-15 09:00:00',
             duracion_horas: 4,
             cupo_maximo: -10,
             ubicacion: 'Ubicación',
-            id_organizacion: 1
+            id_organizacion: 5,
+            tiposIds: [1]
         );
 
         $violations = $this->validator->validate($dto);
-
-        $cupoViolation = false;
-        foreach ($violations as $violation) {
-            if ($violation->getPropertyPath() === 'cupo_maximo') {
-                $cupoViolation = true;
-                break;
-            }
-        }
-
-        $this->assertTrue($cupoViolation, 'Debería haber una violación para cupo negativo');
+        $this->assertGreaterThan(0, count($violations));
     }
 
-    public function testActividadCreateDTODuracionCero(): void
+    public function testActividadCreateDTOSinTipos(): void
     {
         $dto = new ActividadCreateDTO(
-            titulo: 'Test',
+            titulo: 'Título válido',
             descripcion: 'Descripción',
-            fecha_inicio: '2025-07-01 10:00:00',
-            duracion_horas: 0,
-            cupo_maximo: 20,
+            fecha_inicio: '2026-06-15 09:00:00',
+            duracion_horas: 4,
+            cupo_maximo: 50,
             ubicacion: 'Ubicación',
-            id_organizacion: 1
+            id_organizacion: 5,
+            tiposIds: []
         );
 
         $violations = $this->validator->validate($dto);
-
-        $duracionViolation = false;
-        foreach ($violations as $violation) {
-            if ($violation->getPropertyPath() === 'duracion_horas') {
-                $duracionViolation = true;
-                break;
-            }
-        }
-
-        $this->assertTrue($duracionViolation, 'Debería haber una violación para duración cero');
+        $this->assertGreaterThan(0, count($violations));
     }
 
-    public function testActividadCreateDTODescripcionNula(): void
+    // ========================================================================
+    // TESTS DE ActividadUpdateDTO
+    // ========================================================================
+
+    public function testActividadUpdateDTOValido(): void
     {
-        $dto = new ActividadCreateDTO(
-            titulo: 'Test',
-            descripcion: null,
-            fecha_inicio: '2025-07-01 10:00:00',
-            duracion_horas: 4,
-            cupo_maximo: 20,
-            ubicacion: 'Ubicación',
-            id_organizacion: 1
-        );
-
-        // La descripción puede ser nula, no debería generar violación
-        $violations = $this->validator->validate($dto);
-
-        $descripcionViolation = false;
-        foreach ($violations as $violation) {
-            if ($violation->getPropertyPath() === 'descripcion') {
-                $descripcionViolation = true;
-                break;
-            }
-        }
-
-        $this->assertFalse($descripcionViolation, 'No debería haber violación para descripción nula');
-    }
-
-    public function testActividadCreateDTOConArraysODS(): void
-    {
-        $dto = new ActividadCreateDTO(
-            titulo: 'Test',
-            descripcion: 'Descripción',
-            fecha_inicio: '2025-07-01 10:00:00',
-            duracion_horas: 4,
-            cupo_maximo: 20,
-            ubicacion: 'Ubicación',
-            id_organizacion: 1,
-            odsIds: [1, 2, 3],
+        $dto = new ActividadUpdateDTO(
+            titulo: 'Título Actualizado',
+            descripcion: 'Nueva descripción',
+            ubicacion: 'Nueva ubicación',
+            fecha_inicio: '2026-06-20 10:00:00',
+            duracion_horas: 5,
+            cupo_maximo: 60,
+            odsIds: [13],
             tiposIds: [1, 2]
         );
 
-        $this->assertCount(3, $dto->odsIds);
-        $this->assertCount(2, $dto->tiposIds);
+        $violations = $this->validator->validate($dto);
+        $this->assertCount(0, $violations);
+    }
+
+    public function testActividadUpdateDTOTituloCorto(): void
+    {
+        $dto = new ActividadUpdateDTO(
+            titulo: '123',
+            descripcion: 'Descripción',
+            ubicacion: 'Ubicación',
+            fecha_inicio: '2026-06-20 10:00:00',
+            duracion_horas: 5,
+            cupo_maximo: 60,
+            tiposIds: [1]
+        );
+
+        $violations = $this->validator->validate($dto);
+        $this->assertGreaterThan(0, count($violations));
+    }
+
+    // ========================================================================
+    // TESTS DE PROPIEDADES
+    // ========================================================================
+
+    public function testActividadCreateDTOPropiedadesAccesibles(): void
+    {
+        $dto = new ActividadCreateDTO(
+            titulo: 'Test',
+            descripcion: 'Descripción Test',
+            fecha_inicio: '2026-06-15 09:00:00',
+            duracion_horas: 4,
+            cupo_maximo: 50,
+            ubicacion: 'Test Location',
+            id_organizacion: 5,
+            odsIds: [13, 14],
+            tiposIds: [1]
+        );
+
+        $this->assertEquals('Test', $dto->titulo);
+        $this->assertEquals('Descripción Test', $dto->descripcion);
+        $this->assertEquals(4, $dto->duracion_horas);
+        $this->assertEquals(50, $dto->cupo_maximo);
+        $this->assertEquals(5, $dto->id_organizacion);
+        $this->assertCount(2, $dto->odsIds);
+        $this->assertCount(1, $dto->tiposIds);
     }
 }

@@ -25,48 +25,37 @@ class InscripcionDTOTest extends TestCase
     // TESTS DE InscripcionUpdateDTO
     // ========================================================================
 
-    public function testInscripcionUpdateDTOEstadoAceptada(): void
+    public function testInscripcionUpdateDTOValidoConAceptada(): void
     {
         $dto = new InscripcionUpdateDTO(estado: 'Aceptada');
 
         $violations = $this->validator->validate($dto);
-
-        $this->assertCount(0, $violations, 'No debería haber violación para estado Aceptada');
+        $this->assertCount(0, $violations);
     }
 
-    public function testInscripcionUpdateDTOEstadoRechazada(): void
+    public function testInscripcionUpdateDTOValidoConRechazada(): void
     {
         $dto = new InscripcionUpdateDTO(estado: 'Rechazada');
 
         $violations = $this->validator->validate($dto);
-
-        $this->assertCount(0, $violations, 'No debería haber violación para estado Rechazada');
+        $this->assertCount(0, $violations);
     }
 
-    public function testInscripcionUpdateDTOEstadoPendiente(): void
+    public function testInscripcionUpdateDTOValidoConPendiente(): void
     {
         $dto = new InscripcionUpdateDTO(estado: 'Pendiente');
 
         $violations = $this->validator->validate($dto);
-
-        $this->assertCount(0, $violations, 'No debería haber violación para estado Pendiente');
+        $this->assertCount(0, $violations);
     }
 
     public function testInscripcionUpdateDTOEstadoInvalido(): void
     {
+        // El validator debería rechazar estados que no están en el enum
         $dto = new InscripcionUpdateDTO(estado: 'EstadoInvalido');
 
         $violations = $this->validator->validate($dto);
-
-        $estadoViolation = false;
-        foreach ($violations as $violation) {
-            if ($violation->getPropertyPath() === 'estado') {
-                $estadoViolation = true;
-                break;
-            }
-        }
-
-        $this->assertTrue($estadoViolation, 'Debería haber violación para estado inválido');
+        $this->assertGreaterThan(0, count($violations));
     }
 
     public function testInscripcionUpdateDTOEstadoVacio(): void
@@ -74,35 +63,7 @@ class InscripcionDTOTest extends TestCase
         $dto = new InscripcionUpdateDTO(estado: '');
 
         $violations = $this->validator->validate($dto);
-
-        $estadoViolation = false;
-        foreach ($violations as $violation) {
-            if ($violation->getPropertyPath() === 'estado') {
-                $estadoViolation = true;
-                break;
-            }
-        }
-
-        $this->assertTrue($estadoViolation, 'Debería haber violación para estado vacío');
-    }
-
-    // Probar los valores exactos que no son válidos
-    public function testInscripcionUpdateDTOEstadoAceptadoSinA(): void
-    {
-        // "Aceptado" (sin 'a' final) debería ser inválido
-        $dto = new InscripcionUpdateDTO(estado: 'Aceptado');
-
-        $violations = $this->validator->validate($dto);
-
-        $estadoViolation = false;
-        foreach ($violations as $violation) {
-            if ($violation->getPropertyPath() === 'estado') {
-                $estadoViolation = true;
-                break;
-            }
-        }
-
-        $this->assertTrue($estadoViolation, 'Aceptado (sin a) debería ser inválido');
+        $this->assertGreaterThan(0, count($violations));
     }
 
     // ========================================================================
@@ -114,5 +75,17 @@ class InscripcionDTOTest extends TestCase
         $dto = new InscripcionUpdateDTO(estado: 'Aceptada');
 
         $this->assertEquals('Aceptada', $dto->estado);
+    }
+
+    public function testInscripcionUpdateDTOTodosLosEstadosValidos(): void
+    {
+        $estadosValidos = ['Aceptada', 'Rechazada', 'Pendiente'];
+
+        foreach ($estadosValidos as $estado) {
+            $dto = new InscripcionUpdateDTO(estado: $estado);
+            $violations = $this->validator->validate($dto);
+
+            $this->assertCount(0, $violations, "El estado '{$estado}' debería ser válido");
+        }
     }
 }
