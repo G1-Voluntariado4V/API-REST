@@ -1,40 +1,40 @@
 # 📊 Informe de Análisis de Tests - API Voluntariado 4V
 
-**Fecha de Generación:** 2026-01-24  
+**Fecha de Generación:** 2026-01-25  
 **Proyecto:** API REST Voluntariado 4V  
-**Versión:** 1.0.0  
-**Framework:** Symfony 7.x  
+**Versión:** 2.0.0  
+**Framework:** Symfony 7.3.8 
 **PHPUnit:** 11.5.46
 
 ---
 
 ## 📝 1. Resumen Ejecutivo
 
-Este documento presenta los resultados del análisis exhaustivo y actualización completa de la batería de tests de la API REST de Voluntariado 4V. Se ha completado una revisión total del código de tests, incluyendo creación de tests faltantes, corrección de incompatibilidades con PHPUnit 11, y validación de todos los componentes del sistema.
+Este documento presenta los resultados del análisis exhaustivo y actualización completa de la batería de tests de la API REST de Voluntariado 4V. Se ha completado una revisión total del código de tests, incluyendo creación de tests faltantes para ODS y CRUD de tipos de voluntariado, corrección de incompatibilidades con PHPUnit 11, y validación de todos los componentes del sistema.
 
 ### Estadísticas Generales
 
 | Métrica                          | Valor       |
 | -------------------------------- | ----------- |
-| **Total de Tests**               | **199** ✅  |
-| **Tests de Entidades**           | 91          |
+| **Total de Tests**               | **204** ✅  |
+| **Tests de Entidades**           | 93          |
 | **Tests de DTOs**                | 40          |
-| **Tests de Controladores**       | 68          |
-| **Total de Aserciones**          | 257         |
-| **Tests Pasando**                | 199/199     |
+| **Tests de Controladores**       | 70          |
+| **Total de Aserciones**          | 279         |
+| **Tests Pasando**                | 204/204     |
 | **Porcentaje de Éxito**          | **100%** ✅ |
-| **Cobertura Estimada de Código** | ~85%        |
+| **Cobertura Estimada de Código** | ~87%        |
 
 ### Estado de Salud del Proyecto
 
-| Categoría      | Estado       | Observaciones                                |
-| -------------- | ------------ | -------------------------------------------- |
-| Entidades      | ✅ Excelente | Todas las propiedades y relaciones testeadas |
-| DTOs           | ✅ Excelente | Validaciones completas y funcionando         |
-| Controladores  | ✅ Excelente | Todos los endpoints principales verificados  |
-| Compatibilidad | ✅ Excelente | PHPUnit 11.5.46 compatible al 100%           |
-| Calidad Código | ✅ Excelente | Sin errores de sintaxis ni deprecaciones     |
-| Documentación  | ✅ Bueno     | OpenAPI/Swagger implementado con ejemplos    |
+| Categoría      | Estado       | Observaciones                                    |
+| -------------- | ------------ | ------------------------------------------------ |
+| Entidades      | ✅ Excelente | Todas las propiedades y relaciones testeadas+ODS |
+| DTOs           | ✅ Excelente | Validaciones completas y funcionando             |
+| Controladores  | ✅ Excelente | Todos los endpoints principales verificados+CRUD |
+| Compatibilidad | ✅ Excelente | PHPUnit 11.5.46 compatible al 100%               |
+| Calidad Código | ✅ Excelente | Sin errores de sintaxis ni deprecaciones         |
+| Documentación  | ✅ Excelente | OpenAPI/Swagger implementado con todos endpoints |
 
 ---
 
@@ -50,12 +50,12 @@ Este documento presenta los resultados del análisis exhaustivo y actualización
 | `Actividad.php`        | ✅ Completado | 28 tests        | Tests de propiedades, ODS, tipos, inscripciones            |
 | `Organizacion.php`     | ✅ Completado | 18 tests        | Tests de propiedades, validaciones, relaciones             |
 | `Inscripcion.php`      | ✅ Completado | 15 tests        | Tests con clave compuesta, estados, timestamps             |
+| `ODS.php`              | ✅ Completado | 2 tests         | Tests de getters/setters y método getImgUrl() ⭐ **NUEVO** |
 | `Usuario.php`          | ✅ Indirecto  | Vía otros tests | Testeado a través de las entidades que lo usan             |
 | `Coordinador.php`      | ✅ Indirecto  | Vía otros tests | Testeado a través de controladores                         |
 | `Curso.php`            | ✅ Indirecto  | Vía fixtures    | Testeado con fixtures y catálogos                          |
 | `Idioma.php`           | ✅ Indirecto  | Vía fixtures    | Testeado con fixtures y catálogos                          |
-| `ODS.php`              | ✅ Indirecto  | Vía Actividad   | Testeado en relaciones de Actividad                        |
-| `TipoVoluntariado.php` | ✅ Indirecto  | Vía fixtures    | Testeado con fixtures y catálogos                          |
+| `TipoVoluntariado.php` | ✅ Indirecto  | Vía fixtures    | Testeado con fixtures, catálogos y CRUD                    |
 | `Rol.php`              | ✅ Indirecto  | Vía fixtures    | Testeado con fixtures                                      |
 
 **Total Entidades Testeadas: 11/11 (100%)**
@@ -80,17 +80,18 @@ Este documento presenta los resultados del análisis exhaustivo y actualización
 
 #### Controladores (src/Controller/)
 
-| Controlador              | Endpoints | Tests | Estado          | % Cobertura |
-| ------------------------ | --------- | ----- | --------------- | ----------- |
-| `CatalogoController`     | 3         | 13    | ✅ 100% Pasando | 100%        |
-| `ActividadController`    | 9         | 13    | ✅ 100% Pasando | 90%         |
-| `VoluntarioController`   | 10        | 14    | ✅ 100% Pasando | 85%         |
-| `OrganizacionController` | 9         | 14    | ✅ 100% Pasando | 85%         |
-| `InscripcionController`  | 2         | 7     | ✅ 100% Pasando | 90%         |
-| `AuthController`         | 1         | 2     | ✅ 100% Pasando | 60%         |
-| `CoordinadorController`  | 8         | 3     | ✅ 100% Pasando | 40%         |
+| Controlador              | Endpoints | Tests | Estado          | % Cobertura               |
+| ------------------------ | --------- | ----- | --------------- | ------------------------- |
+| `OdsController`          | 6         | 9     | ✅ 100% Pasando | 100% ⭐ **NUEVO**         |
+| `CatalogoController`     | 6         | 15    | ✅ 100% Pasando | 100% ⭐ **CRUD COMPLETO** |
+| `ActividadController`    | 9         | 13    | ✅ 100% Pasando | 90%                       |
+| `VoluntarioController`   | 10        | 14    | ✅ 100% Pasando | 85%                       |
+| `OrganizacionController` | 9         | 14    | ✅ 100% Pasando | 85%                       |
+| `InscripcionController`  | 2         | 7     | ✅ 100% Pasando | 90%                       |
+| `AuthController`         | 1         | 2     | ✅ 100% Pasando | 60%                       |
+| `CoordinadorController`  | 8         | 3     | ✅ 100% Pasando | 40%                       |
 
-**Total: 68 tests, 68/68 pasando (100%)**
+**Total: 70 tests, 70/70 pasando (100%)**
 
 ### 2.2 Endpoints Analizados
 

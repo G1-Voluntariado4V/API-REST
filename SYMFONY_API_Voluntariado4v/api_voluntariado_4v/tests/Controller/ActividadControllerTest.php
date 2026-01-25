@@ -160,7 +160,9 @@ class ActividadControllerTest extends WebTestCase
                 'fecha_inicio' => '2025-08-01 10:00:00',
                 'duracion_horas' => 5,
                 'cupo_maximo' => 25,
-                'ubicacion' => 'Nueva ubicación'
+                'ubicacion' => 'Nueva ubicación',
+                'odsIds' => [],
+                'tiposIds' => [1]
             ])
         );
 

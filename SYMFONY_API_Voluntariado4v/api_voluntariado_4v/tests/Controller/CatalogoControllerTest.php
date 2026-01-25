@@ -119,16 +119,12 @@ class CatalogoControllerTest extends WebTestCase
     {
         $client = static::createClient();
 
-        // POST no permitido
+        // POST no permitido (Cursos)
         $client->request('POST', '/catalogos/cursos');
         $this->assertEquals(Response::HTTP_METHOD_NOT_ALLOWED, $client->getResponse()->getStatusCode());
 
-        // PUT no permitido
+        // PUT no permitido (Idiomas)
         $client->request('PUT', '/catalogos/idiomas');
-        $this->assertEquals(Response::HTTP_METHOD_NOT_ALLOWED, $client->getResponse()->getStatusCode());
-
-        // DELETE no permitido
-        $client->request('DELETE', '/catalogos/tipos-voluntariado');
         $this->assertEquals(Response::HTTP_METHOD_NOT_ALLOWED, $client->getResponse()->getStatusCode());
     }
 
@@ -194,5 +190,60 @@ class CatalogoControllerTest extends WebTestCase
         }
 
         $this->assertTrue(true);
+    }
+    // ========================================================================
+    // TESTS CRUD TIPOS VOLUNTARIADO
+    // ========================================================================
+
+    public function testCrearTipoVoluntariado(): void
+    {
+        $client = static::createClient();
+        $client->request('POST', '/catalogos/tipos-voluntariado', [], [], ['CONTENT_TYPE' => 'application/json'], json_encode([
+            'nombreTipo' => 'Tipo Test'
+        ]));
+
+        $this->assertEquals(Response::HTTP_CREATED, $client->getResponse()->getStatusCode());
+        $content = json_decode($client->getResponse()->getContent(), true);
+        $this->assertArrayHasKey('id', $content);
+        $this->assertEquals('Tipo Test', $content['nombreTipo']);
+    }
+
+    public function testActualizarTipoVoluntariado(): void
+    {
+        $client = static::createClient();
+        // Primero creamos uno
+        $client->request('POST', '/catalogos/tipos-voluntariado', [], [], ['CONTENT_TYPE' => 'application/json'], json_encode([
+            'nombreTipo' => 'Para Actualizar'
+        ]));
+        $data = json_decode($client->getResponse()->getContent(), true);
+        $id = $data['id'];
+
+        // Ahora actualizamos
+        $client->request('PUT', '/catalogos/tipos-voluntariado/' . $id, [], [], ['CONTENT_TYPE' => 'application/json'], json_encode([
+            'nombreTipo' => 'Actualizado'
+        ]));
+
+        $this->assertEquals(Response::HTTP_OK, $client->getResponse()->getStatusCode());
+        $content = json_decode($client->getResponse()->getContent(), true);
+        $this->assertEquals('Actualizado', $content['nombreTipo']);
+    }
+
+    public function testEliminarTipoVoluntariado(): void
+    {
+        $client = static::createClient();
+        // Primero creamos uno
+        $client->request('POST', '/catalogos/tipos-voluntariado', [], [], ['CONTENT_TYPE' => 'application/json'], json_encode([
+            'nombreTipo' => 'Para Borrar'
+        ]));
+        $data = json_decode($client->getResponse()->getContent(), true);
+        $id = $data['id'];
+
+        // Ahora borramos
+        $client->request('DELETE', '/catalogos/tipos-voluntariado/' . $id);
+        $this->assertEquals(Response::HTTP_NO_CONTENT, $client->getResponse()->getStatusCode());
+
+        // Verificamos que ya no existe intentando borrarlo de nuevo (404)
+        $client->request('DELETE', '/catalogos/tipos-voluntariado/' . $id);
+        $this->assertEquals(Response::HTTP_NOT_FOUND, $client->getResponse()->getStatusCode());
     }
 }

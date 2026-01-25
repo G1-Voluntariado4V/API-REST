@@ -124,12 +124,17 @@ class InscripcionControllerTest extends WebTestCase
         $this->assertEquals(Response::HTTP_METHOD_NOT_ALLOWED, $client->getResponse()->getStatusCode());
     }
 
-    public function testInscripcionesNoAceptaDELETE(): void
+    public function testInscripcionesAceptaDELETE(): void
     {
         $client = static::createClient();
 
         $client->request('DELETE', '/actividades/1/inscripciones/1');
 
-        $this->assertEquals(Response::HTTP_METHOD_NOT_ALLOWED, $client->getResponse()->getStatusCode());
+        // DELETE está permitido, debería devolver 200 o 404 (si no existe)
+        $statusCode = $client->getResponse()->getStatusCode();
+        $this->assertTrue(
+            in_array($statusCode, [Response::HTTP_OK, Response::HTTP_NOT_FOUND]),
+            "El código debería ser 200 o 404, pero fue: $statusCode"
+        );
     }
 }
