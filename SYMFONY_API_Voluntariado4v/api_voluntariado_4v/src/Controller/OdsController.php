@@ -163,4 +163,97 @@ final class OdsController extends AbstractController
 
         return $this->json(['mensaje' => 'Imagen de ODS eliminada correctamente'], Response::HTTP_OK);
     }
+    // ========================================================================
+    // 4. CREAR NUEVO ODS (POST)
+    // ========================================================================
+    #[Route('/ods', name: 'crear_ods', methods: ['POST'])]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'nombre', type: 'string'),
+                new OA\Property(property: 'descripcion', type: 'string'),
+                new OA\Property(property: 'numero', type: 'integer', example: 1)
+            ]
+        )
+    )]
+    #[OA\Response(response: 201, description: 'ODS creado correctamente')]
+    #[OA\Response(response: 400, description: 'Datos inválidos')]
+    public function create(Request $request, EntityManagerInterface $em, ODSRepository $repo): JsonResponse
+    {
+        $data = json_decode($request->getContent(), true);
+        
+        if (!isset($data['nombre']) || !isset($data['descripcion'])) {
+            return $this->json(['error' => 'Faltan datos obligatorios (nombre, descripcion)'], Response::HTTP_BAD_REQUEST);
+        }
+
+        // Calcular ID manual porque la tabla no es autoincremental
+        $maxId = $em->createQuery('SELECT MAX(o.id) FROM App\Entity\ODS o')->getSingleScalarResult();
+        $nextId = $maxId ? ($maxId + 1) : 1;
+
+        $ods = new \App\Entity\ODS();
+        $ods->setId($nextId);
+        $ods->setNombre($data['nombre']);
+        $ods->setDescripcion($data['descripcion']);
+        
+        $em->persist($ods);
+        $em->flush();
+
+        return $this->json($ods, Response::HTTP_CREATED);
+    }
+
+    // ========================================================================
+    // 5. ACTUALIZAR ODS (PUT)
+    // ========================================================================
+    #[Route('/ods/{id}', name: 'update_ods', methods: ['PUT'])]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'nombre', type: 'string'),
+                new OA\Property(property: 'descripcion', type: 'string')
+            ]
+        )
+    )]
+    #[OA\Response(response: 200, description: 'ODS actualizado')]
+    #[OA\Response(response: 404, description: 'ODS no encontrado')]
+    public function update(int $id, Request $request, ODSRepository $repo, EntityManagerInterface $em): JsonResponse
+    {
+        $ods = $repo->find($id);
+        if (!$ods) {
+            return $this->json(['error' => 'ODS no encontrado'], Response::HTTP_NOT_FOUND);
+        }
+
+        $data = json_decode($request->getContent(), true);
+
+        if (isset($data['nombre'])) {
+            $ods->setNombre($data['nombre']);
+        }
+        if (isset($data['descripcion'])) {
+            $ods->setDescripcion($data['descripcion']);
+        }
+
+        $em->flush();
+
+        return $this->json($ods, Response::HTTP_OK);
+    }
+
+    // ========================================================================
+    // 6. ELIMINAR ODS (DELETE)
+    // ========================================================================
+    #[Route('/ods/{id}', name: 'delete_ods', methods: ['DELETE'])]
+    #[OA\Response(response: 204, description: 'ODS eliminado')]
+    #[OA\Response(response: 404, description: 'ODS no encontrado')]
+    public function delete(int $id, ODSRepository $repo, EntityManagerInterface $em): JsonResponse
+    {
+        $ods = $repo->find($id);
+        if (!$ods) {
+            return $this->json(['error' => 'ODS no encontrado'], Response::HTTP_NOT_FOUND);
+        }
+
+        $em->remove($ods);
+        $em->flush();
+
+        return $this->json(null, Response::HTTP_NO_CONTENT);
+    }
 }

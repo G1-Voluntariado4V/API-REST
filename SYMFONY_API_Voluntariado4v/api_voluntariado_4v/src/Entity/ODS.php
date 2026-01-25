@@ -32,10 +32,8 @@ class ODS
     #[Groups(['actividad:read', 'curso:read'])]
     private ?string $imgOds = null;
 
-    public function __construct(int $id, string $nombre)
+    public function __construct()
     {
-        $this->id = $id;
-        $this->nombre = $nombre;
     }
 
     public function getId(): ?int
