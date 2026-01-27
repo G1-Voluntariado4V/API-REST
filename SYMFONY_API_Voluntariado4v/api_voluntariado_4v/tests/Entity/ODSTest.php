@@ -10,12 +10,12 @@ class ODSTest extends TestCase
     public function testGettersAndSetters(): void
     {
         $ods = new ODS();
-        $ods->setId(1);
+        // $ods->setId(1); // Eliminado porque ahora es autogenerado
         $ods->setNombre('Test ODS');
         $ods->setDescripcion('Desc');
         $ods->setImgOds('imagen.jpg');
 
-        $this->assertEquals(1, $ods->getId());
+        // $this->assertEquals(1, $ods->getId()); // Eliminado
         $this->assertEquals('Test ODS', $ods->getNombre());
         $this->assertEquals('Desc', $ods->getDescripcion());
         $this->assertEquals('imagen.jpg', $ods->getImgOds());

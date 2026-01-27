@@ -48,7 +48,8 @@ final class ActividadController extends AbstractController
                     new OA\Property(property: 'estado_publicacion', type: 'string', example: 'Publicada'),
                     new OA\Property(property: 'tipo', type: 'string', example: 'Ambiental, Social'),
                     new OA\Property(property: 'nombre_organizacion', type: 'string', example: 'ONG Mar Limpio'),
-                    new OA\Property(property: 'imagen_actividad', type: 'string', nullable: true, example: 'act_10_abc.jpg')
+                    new OA\Property(property: 'imagen_actividad', type: 'string', nullable: true, example: 'act_10_abc.jpg'),
+                    new OA\Property(property: 'img_url', type: 'string', nullable: true, example: '/uploads/actividades/act_10_abc.jpg')
                 ],
                 type: 'object'
             )
@@ -96,8 +97,10 @@ final class ActividadController extends AbstractController
                     }
 
                     $actividad['imagen_actividad'] = $entity->getImgActividad();
+                    $actividad['img_url'] = $entity->getImgActividad() ? '/uploads/actividades/' . $entity->getImgActividad() : null;
                 } else {
                     $actividad['imagen_actividad'] = null;
+                    $actividad['img_url'] = null;
                 }
             }
             unset($actividad);

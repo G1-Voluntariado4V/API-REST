@@ -40,7 +40,7 @@ final class OdsController extends AbstractController
     {
         return $this->json($repo->findAll(), 200, [
             'Cache-Control' => 'public, max-age=3600'
-        ]);
+        ], ['groups' => 'ods:read']);
     }
 
     // ========================================================================
@@ -182,24 +182,19 @@ final class OdsController extends AbstractController
     public function create(Request $request, EntityManagerInterface $em, ODSRepository $repo): JsonResponse
     {
         $data = json_decode($request->getContent(), true);
-        
+
         if (!isset($data['nombre']) || !isset($data['descripcion'])) {
             return $this->json(['error' => 'Faltan datos obligatorios (nombre, descripcion)'], Response::HTTP_BAD_REQUEST);
         }
 
-        // Calcular ID manual porque la tabla no es autoincremental
-        $maxId = $em->createQuery('SELECT MAX(o.id) FROM App\Entity\ODS o')->getSingleScalarResult();
-        $nextId = $maxId ? ($maxId + 1) : 1;
-
         $ods = new \App\Entity\ODS();
-        $ods->setId($nextId);
         $ods->setNombre($data['nombre']);
         $ods->setDescripcion($data['descripcion']);
-        
+
         $em->persist($ods);
         $em->flush();
 
-        return $this->json($ods, Response::HTTP_CREATED);
+        return $this->json($ods, Response::HTTP_CREATED, [], ['groups' => 'ods:read']);
     }
 
     // ========================================================================
@@ -235,7 +230,7 @@ final class OdsController extends AbstractController
 
         $em->flush();
 
-        return $this->json($ods, Response::HTTP_OK);
+        return $this->json($ods, Response::HTTP_OK, [], ['groups' => 'ods:read']);
     }
 
     // ========================================================================

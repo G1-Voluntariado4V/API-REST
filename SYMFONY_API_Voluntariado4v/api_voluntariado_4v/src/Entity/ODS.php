@@ -12,16 +12,17 @@ use Symfony\Component\Validator\Constraints as Assert;
 class ODS
 {
     #[ORM\Id]
+    #[ORM\GeneratedValue(strategy: 'AUTO')]
     #[ORM\Column(name: 'id_ods')]
-    #[Groups(['actividad:read', 'curso:read'])]
+    #[Groups(['actividad:read', 'curso:read', 'ods:read'])]
     private ?int $id = null;
 
     #[ORM\Column(length: 150)]
-    #[Groups(['actividad:read', 'curso:read'])]
+    #[Groups(['actividad:read', 'curso:read', 'ods:read'])]
     private ?string $nombre = null;
 
     #[ORM\Column(type: 'text', nullable: true)]
-    #[Groups(['actividad:read', 'curso:read'])]
+    #[Groups(['actividad:read', 'curso:read', 'ods:read'])]
     #[Assert\Length(
         max: 500,
         maxMessage: 'La descripción del ODS no puede superar los {{ limit }} caracteres.'
@@ -29,23 +30,17 @@ class ODS
     private ?string $descripcion = null;
 
     #[ORM\Column(length: 255, nullable: true, name: 'img_ods')]
-    #[Groups(['actividad:read', 'curso:read'])]
+    #[Groups(['actividad:read', 'curso:read', 'ods:read'])]
     private ?string $imgOds = null;
 
-    public function __construct()
-    {
-    }
+    public function __construct() {}
 
     public function getId(): ?int
     {
         return $this->id;
     }
 
-    public function setId(int $id): static
-    {
-        $this->id = $id;
-        return $this;
-    }
+
 
     public function getNombre(): ?string
     {
@@ -80,7 +75,7 @@ class ODS
         return $this;
     }
 
-    #[Groups(['actividad:read', 'curso:read'])]
+    #[Groups(['actividad:read', 'curso:read', 'ods:read'])]
     public function getImgUrl(): ?string
     {
         return $this->imgOds ? '/uploads/ods/' . $this->imgOds : null;

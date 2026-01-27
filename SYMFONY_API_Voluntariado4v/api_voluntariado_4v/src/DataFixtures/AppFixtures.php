@@ -25,7 +25,7 @@ class AppFixtures extends Fixture
     {
         $this->manager = $manager;
 
-        echo ">>> 🚀 Iniciando carga de Fixtures (Estructura Simplificada con ImgPerfil/ImgActividad)...\n";
+        echo ">>> 🚀 Iniciando carga de Fixtures...\n";
 
         // ======================================================
         // 1. CATÁLOGOS 
@@ -50,7 +50,7 @@ class AppFixtures extends Fixture
             $this->createOrUpdateTipo($nombre);
         }
 
-        // ODS (Con IDs manuales y DESCRIPCIONES)
+        // ODS
         $odsData = [
             [1, 'Fin de la Pobreza', 'Poner fin a la pobreza en todas sus formas en todo el mundo.'],
             [2, 'Hambre Cero', 'Poner fin al hambre, lograr la seguridad alimentaria y la mejora de la nutrición.'],
@@ -68,7 +68,9 @@ class AppFixtures extends Fixture
             [16, 'Paz, Justicia e Instituciones Sólidas', 'Promover sociedades justas, pacíficas e inclusivas.']
         ];
         foreach ($odsData as $d) {
-            $this->createOrUpdateODS($d[0], $d[1], $d[2]);
+            // Generamos el nombre de la imagen: 1 -> '01.jpg'
+            $imgName = sprintf('%02d.jpg', $d[0]);
+            $this->createOrUpdateODS($d[0], $d[1], $d[2], $imgName);
         }
 
         // CURSOS CUATROVIENTOS (REALES)
@@ -95,7 +97,7 @@ class AppFixtures extends Fixture
 
             // Crear 1º Curso
             $this->createOrUpdateCurso("1º " . $nombreBase, "1" . $abrevBase, $grado, $nivelDb);
-            
+
             // Crear 2º Curso
             $this->createOrUpdateCurso("2º " . $nombreBase, "2" . $abrevBase, $grado, $nivelDb);
         }
@@ -103,7 +105,7 @@ class AppFixtures extends Fixture
         $manager->flush();
 
         // ======================================================
-        // 2. USUARIOS (SIN IMÁGENES POR AHORA)
+        // 2. USUARIOS
         // ======================================================
 
         // --- Coordinador ---
@@ -174,7 +176,7 @@ class AppFixtures extends Fixture
                 'Pérez',
                 'pepe@test.com',
                 'uid_pepe',
-                '2DAM', 
+                '2DAM',
                 ['Tecnológico / Digital'],
                 'Estudiante de 2º de DAM apasionado por la tecnología y el desarrollo de apps. Me encanta ayudar a otras personas a aprender programación.'
             ],
@@ -183,7 +185,7 @@ class AppFixtures extends Fixture
                 'Gómez',
                 'laura@test.com',
                 'uid_laura',
-                '1SMR', 
+                '1SMR',
                 ['Salud / Sanitario'],
                 'Técnica en sistemas con interés en la salud digital. Busco experiencias de voluntariado en el sector sanitario.'
             ],
@@ -192,7 +194,7 @@ class AppFixtures extends Fixture
                 'Ruiz',
                 'carlos@test.com',
                 'uid_carlos',
-                '2TL', 
+                '2TL',
                 ['Deportivo', 'Protección Animal'],
                 'Amante del deporte y los animales. Estudiante de Transporte y Logística con ganas de ayudar en refugios y eventos deportivos.'
             ],
@@ -201,7 +203,7 @@ class AppFixtures extends Fixture
                 'López',
                 'ana@test.com',
                 'uid_ana',
-                '1GVEC', 
+                '1GVEC',
                 ['Acción Social', 'Educación'],
                 'Estudiante de Gestión de Ventas y Espacios Comerciales. Me motiva el trabajo social y la educación de jóvenes.'
             ]
@@ -225,7 +227,7 @@ class AppFixtures extends Fixture
         }
 
         // --- Voluntarios de PRUEBA con diferentes estados ---
-        
+
         // Voluntario BLOQUEADO
         $uBloqueado = $this->createOrUpdateUsuario('Voluntario', 'bloqueado@test.com', 'uid_bloqueado');
         $uBloqueado->setEstadoCuenta('Bloqueada');
@@ -257,12 +259,12 @@ class AppFixtures extends Fixture
         $manager->flush();
 
         // ======================================================
-        // 3. ACTIVIDADES (SIN IMÁGENES POR AHORA)
+        // 3. ACTIVIDADES
         // ======================================================
         $acts = [];
 
         // Act 1
-        $a1 = $this->createOrUpdateActividad($ongs[0], 'Taller de Alfabetización Digital', 'Publicada');
+        $a1 = $this->createOrUpdateActividad($ongs[0], 'Taller de Alfabetización Digital', 'Publicada', 'tallerAlfabetizacion.jpg');
         $a1->setDescripcion('Clases de informática básica.');
         $a1->setFechaInicio((new \DateTime())->modify('+5 days')->setTime(17, 0));
         if (isset($this->cache['TipoVoluntariado']['Tecnológico / Digital'])) {
@@ -275,7 +277,7 @@ class AppFixtures extends Fixture
         $acts[] = $a1;
 
         // Act 2
-        $a2 = $this->createOrUpdateActividad($ongs[1], 'Limpieza del Río Arga', 'Publicada');
+        $a2 = $this->createOrUpdateActividad($ongs[1], 'Limpieza del Río Arga', 'Publicada', 'limpiezaArga.jpg');
         $a2->setDescripcion('Recogida de plásticos.');
         $a2->setFechaInicio((new \DateTime())->modify('+2 days')->setTime(9, 0));
         if (isset($this->cache['TipoVoluntariado']['Medioambiente'])) {
@@ -288,7 +290,7 @@ class AppFixtures extends Fixture
         $acts[] = $a2;
 
         // Act 3
-        $a3 = $this->createOrUpdateActividad($ongs[2], 'Paseo Canino Solidario', 'Publicada');
+        $a3 = $this->createOrUpdateActividad($ongs[2], 'Paseo Canino Solidario', 'Publicada', 'paseoCanino.jpg');
         $a3->setDescripcion('Pasear perros del refugio.');
         $a3->setFechaInicio((new \DateTime())->modify('+1 week')->setTime(10, 0));
         if (isset($this->cache['TipoVoluntariado']['Protección Animal'])) {
@@ -300,7 +302,7 @@ class AppFixtures extends Fixture
         $acts[] = $a3;
 
         // Act 4
-        $a4 = $this->createOrUpdateActividad($ongs[3], 'Gran Recogida de Alimentos', 'Finalizada');
+        $a4 = $this->createOrUpdateActividad($ongs[3], 'Gran Recogida de Alimentos', 'Finalizada', 'RecogidaAlimentos.jpg');
         $a4->setDescripcion('Campaña de Navidad.');
         $a4->setFechaInicio((new \DateTime())->modify('-1 month')->setTime(9, 0));
         if ($odsPobreza) {
@@ -344,7 +346,7 @@ class AppFixtures extends Fixture
         $usuario->setDeletedAt(null);
         $usuario->setEstadoCuenta('Activa');
 
-       
+
         $usuario->setImgPerfil(null);
 
         if (isset($this->cache['Rol'][$rolName])) {
@@ -411,7 +413,7 @@ class AppFixtures extends Fixture
         return $coord;
     }
 
-    private function createOrUpdateActividad(Organizacion $org, string $titulo, string $estado): Actividad
+    private function createOrUpdateActividad(Organizacion $org, string $titulo, string $estado, ?string $imgName = null): Actividad
     {
         $repo = $this->manager->getRepository(Actividad::class);
         $act = $repo->findOneBy(['titulo' => $titulo, 'organizacion' => $org]);
@@ -426,8 +428,12 @@ class AppFixtures extends Fixture
         $act->setDeletedAt(null);
         $act->setEstadoPublicacion($estado);
 
-        
-        $act->setImgActividad(null);
+
+        if ($imgName) {
+            $act->setImgActividad($imgName);
+        } else {
+            $act->setImgActividad(null);
+        }
 
         $this->manager->persist($act);
         return $act;
@@ -487,18 +493,21 @@ class AppFixtures extends Fixture
         $this->cache['TipoVoluntariado'][$nombre] = $tipo;
     }
 
-    private function createOrUpdateODS(int $id, string $nombre, string $descripcion): void
+    private function createOrUpdateODS(int $id, string $nombre, string $descripcion, string $imgName): void
     {
         $repo = $this->manager->getRepository(ODS::class);
-        $ods = $repo->find($id);
+        // Buscamos por nombre para evitar duplicados
+        $ods = $repo->findOneBy(['nombre' => $nombre]);
 
         if (!$ods) {
-            $ods = new ODS($id, $nombre);
-            $ods->setDescripcion($descripcion);
-            $this->manager->persist($ods);
-        } else {
+            $ods = new ODS();
             $ods->setNombre($nombre);
             $ods->setDescripcion($descripcion);
+            $ods->setImgOds($imgName); // Asignamos la imagen
+            $this->manager->persist($ods);
+        } else {
+            $ods->setDescripcion($descripcion);
+            $ods->setImgOds($imgName); // Actualizamos imagen si ya existe
         }
     }
 

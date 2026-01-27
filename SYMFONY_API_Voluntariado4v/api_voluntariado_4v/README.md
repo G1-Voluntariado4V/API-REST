@@ -149,6 +149,10 @@ La lógica avanzada de SQL Server se añade en una migración separada.
     ```bash
     php bin/console make:migration
     ```
+    o si no te crea una nueva migración también puedes utilizar
+    ```bash
+    php bin/console doctrine:migrations:generate
+    ```
 2.  Abre el nuevo archivo generado en la carpeta `migrations/`.
 3.  Copia el contenido del archivo `bbdd/migracionTriggers.txt` y úsalo para reemplazar el contenido de la migración generada.
 4.  Ejecuta esta migración:

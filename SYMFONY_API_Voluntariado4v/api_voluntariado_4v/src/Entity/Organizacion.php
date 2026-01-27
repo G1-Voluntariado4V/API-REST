@@ -34,7 +34,7 @@ class Organizacion
     private ?string $cif = null;
 
     #[ORM\Column(length: 100, nullable: true)]
-    #[Groups(['usuario:read', 'actividad:read'])] // <--- AQUÍ ESTÁ EL CAMBIO (Para que salga el nombre en la actividad)
+    #[Groups(['usuario:read', 'actividad:read'])]
     private ?string $nombre = null;
 
     #[ORM\Column(type: Types::TEXT, nullable: true)]

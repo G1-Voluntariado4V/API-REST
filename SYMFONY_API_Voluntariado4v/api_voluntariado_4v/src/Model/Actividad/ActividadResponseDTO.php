@@ -43,7 +43,9 @@ class ActividadResponseDTO
         #[OA\Property(type: 'array', items: new OA\Items(properties: [new OA\Property(property: 'id', example: 1), new OA\Property(property: 'nombre', example: 'Social')]))]
         public array $tipos = [],
         #[OA\Property(example: "act_10_img.jpg", nullable: true)]
-        public ?string $imagen_actividad = null
+        public ?string $imagen_actividad = null,
+        #[OA\Property(example: "/uploads/actividades/act_10_img.jpg", nullable: true)]
+        public ?string $img_url = null
     ) {}
 
     public static function fromEntity(Actividad $act): self
@@ -86,7 +88,8 @@ class ActividadResponseDTO
             img_organizacion: null,
             ods: $odsList,
             tipos: $tiposList,
-            imagen_actividad: $act->getImgActividad()
+            imagen_actividad: $act->getImgActividad(),
+            img_url: $act->getImgActividad() ? '/uploads/actividades/' . $act->getImgActividad() : null
         );
     }
 }

@@ -37,7 +37,7 @@ class ActividadCreateDTO
         #[OA\Property(example: 5)]
         public int $id_organizacion,
 
-        /** @var OdsDTO[] */
+        /** @var int[] */
         #[OA\Property(example: [13, 14], type: 'array', items: new OA\Items(type: 'integer'))]
         public array $odsIds = [],
 
