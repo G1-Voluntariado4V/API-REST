@@ -83,7 +83,7 @@ final class OrganizacionController extends AbstractController
             ref: new Model(type: OrganizacionResponseDTO::class)
         )
     )]
-    public function show(int $id, UsuarioRepository $userRepo, OrganizacionRepository $orgRepo): JsonResponse
+    public function show(int $id, Request $request, UsuarioRepository $userRepo, OrganizacionRepository $orgRepo): JsonResponse
     {
         $usuario = $userRepo->find($id);
         if (!$usuario || $usuario->getDeletedAt()) {
@@ -95,7 +95,8 @@ final class OrganizacionController extends AbstractController
             return $this->json(['error' => 'Perfil de organización no configurado'], Response::HTTP_NOT_FOUND);
         }
 
-        return $this->json(OrganizacionResponseDTO::fromEntity($organizacion), Response::HTTP_OK);
+        $baseUrl = $request->getSchemeAndHttpHost();
+        return $this->json(OrganizacionResponseDTO::fromEntity($organizacion, $baseUrl), Response::HTTP_OK);
     }
 
     // ========================================================================
@@ -340,29 +341,29 @@ final class OrganizacionController extends AbstractController
             )->fetchAssociative()['total'];
 
             $totalInscripciones = $conn->executeQuery(
-                'SELECT COUNT(*) as total FROM INSCRIPCION i 
-                 INNER JOIN ACTIVIDAD a ON i.id_actividad = a.id_actividad 
+                'SELECT COUNT(*) as total FROM INSCRIPCION i
+                 INNER JOIN ACTIVIDAD a ON i.id_actividad = a.id_actividad
                  WHERE a.id_organizacion = :org AND a.deleted_at IS NULL',
                 ['org' => $id]
             )->fetchAssociative()['total'];
 
             $inscripcionesConfirmadas = $conn->executeQuery(
-                'SELECT COUNT(*) as total FROM INSCRIPCION i 
-                 INNER JOIN ACTIVIDAD a ON i.id_actividad = a.id_actividad 
+                'SELECT COUNT(*) as total FROM INSCRIPCION i
+                 INNER JOIN ACTIVIDAD a ON i.id_actividad = a.id_actividad
                  WHERE a.id_organizacion = :org AND i.estado_solicitud = :estado AND a.deleted_at IS NULL',
                 ['org' => $id, 'estado' => 'Confirmada']
             )->fetchAssociative()['total'];
 
             $inscripcionesPendientes = $conn->executeQuery(
-                'SELECT COUNT(*) as total FROM INSCRIPCION i 
-                 INNER JOIN ACTIVIDAD a ON i.id_actividad = a.id_actividad 
+                'SELECT COUNT(*) as total FROM INSCRIPCION i
+                 INNER JOIN ACTIVIDAD a ON i.id_actividad = a.id_actividad
                  WHERE a.id_organizacion = :org AND i.estado_solicitud = :estado AND a.deleted_at IS NULL',
                 ['org' => $id, 'estado' => 'Pendiente']
             )->fetchAssociative()['total'];
 
             $totalVoluntarios = $conn->executeQuery(
-                'SELECT COUNT(DISTINCT i.id_voluntario) as total FROM INSCRIPCION i 
-                 INNER JOIN ACTIVIDAD a ON i.id_actividad = a.id_actividad 
+                'SELECT COUNT(DISTINCT i.id_voluntario) as total FROM INSCRIPCION i
+                 INNER JOIN ACTIVIDAD a ON i.id_actividad = a.id_actividad
                  WHERE a.id_organizacion = :org AND a.deleted_at IS NULL',
                 ['org' => $id]
             )->fetchAssociative()['total'];
@@ -438,7 +439,7 @@ final class OrganizacionController extends AbstractController
         $conn = $em->getConnection();
         try {
             $voluntarios = $conn->executeQuery(
-                'SELECT 
+                'SELECT
                     v.id_usuario as id_voluntario,
                     v.nombre,
                     v.apellidos,
@@ -497,8 +498,12 @@ final class OrganizacionController extends AbstractController
             ]
         )
     )]
-    public function crear(Request $request, EntityManagerInterface $em, RolRepository $rolRepo): JsonResponse
-    {
+    public function crear(
+        Request $request,
+        EntityManagerInterface $em,
+        RolRepository $rolRepo,
+        #[\Symfony\Component\DependencyInjection\Attribute\Autowire('%uploads_directory%')] string $uploadsDirectory
+    ): JsonResponse {
         $data = json_decode($request->getContent(), true);
 
         if (!isset($data['correo']) || !isset($data['nombre']) || !isset($data['cif'])) {
@@ -521,7 +526,19 @@ final class OrganizacionController extends AbstractController
             $usuario->setEstadoCuenta('Pendiente');
 
             $em->persist($usuario);
-            $em->flush();
+            $em->flush(); // Necesario para obtener el ID para el nombre de la imagen
+
+            if (isset($data['img_perfil']) && str_starts_with($data['img_perfil'], 'http')) {
+                $filename = $this->saveGoogleImage($data['img_perfil'], $usuario->getId(), $uploadsDirectory);
+                if ($filename) {
+                    $usuario->setImgPerfil($filename);
+                }
+            } elseif (isset($data['img_perfil'])) {
+                $usuario->setImgPerfil($data['img_perfil']);
+            }
+
+            $em->persist($usuario);
+            // ELIMINADO: $em->flush() intermedio
 
             $organizacion = new Organizacion();
             $organizacion->setUsuario($usuario);
@@ -614,18 +631,18 @@ final class OrganizacionController extends AbstractController
                     COUNT(DISTINCT a.id_actividad) as total_actividades
                 FROM ORGANIZACION o
                 INNER JOIN USUARIO u ON o.id_usuario = u.id_usuario
-                INNER JOIN ACTIVIDAD a ON o.id_usuario = a.id_organizacion 
+                INNER JOIN ACTIVIDAD a ON o.id_usuario = a.id_organizacion
                 INNER JOIN INSCRIPCION i ON a.id_actividad = i.id_actividad
-                WHERE u.deleted_at IS NULL 
+                WHERE u.deleted_at IS NULL
                     AND u.estado_cuenta = 'Activa'
                     AND a.deleted_at IS NULL
                     AND i.estado_solicitud IN ('Aceptada', 'Finalizada')
-                GROUP BY 
-                    o.id_usuario, 
-                    o.nombre, 
-                    o.cif, 
-                    o.descripcion, 
-                    o.telefono, 
+                GROUP BY
+                    o.id_usuario,
+                    o.nombre,
+                    o.cif,
+                    o.descripcion,
+                    o.telefono,
                     o.sitio_web
                 HAVING COUNT(DISTINCT i.id_voluntario) > 0
                 ORDER BY total_voluntarios DESC, total_actividades DESC
@@ -655,6 +672,29 @@ final class OrganizacionController extends AbstractController
                 ['error' => 'Error al obtener el ranking: ' . $e->getMessage()],
                 Response::HTTP_INTERNAL_SERVER_ERROR
             );
+        }
+    }
+
+    private function saveGoogleImage(string $url, int $userId, string $uploadsDirectory): ?string
+    {
+        try {
+            $opts = [
+                'http' => [
+                    'method' => 'GET',
+                    'header' => "User-Agent: PHP\r\n"
+                ]
+            ];
+            $context = stream_context_create($opts);
+            $content = @file_get_contents($url, false, $context);
+            if ($content === false) return null;
+
+            $filename = 'google_' . $userId . '_' . uniqid() . '.jpg';
+            $targetDir = $uploadsDirectory . '/usuarios';
+            if (!is_dir($targetDir)) mkdir($targetDir, 0777, true);
+            file_put_contents($targetDir . '/' . $filename, $content);
+            return $filename;
+        } catch (\Exception $e) {
+            return null;
         }
     }
 }

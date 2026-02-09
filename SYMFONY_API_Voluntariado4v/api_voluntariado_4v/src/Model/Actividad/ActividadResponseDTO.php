@@ -48,11 +48,15 @@ class ActividadResponseDTO
         public ?string $img_url = null
     ) {}
 
-    public static function fromEntity(Actividad $act): self
+    public static function fromEntity(Actividad $act, ?string $baseUrl = null): self
     {
         $odsList = [];
         foreach ($act->getOds() as $o) {
-            $odsList[] = ['id' => $o->getId(), 'nombre' => $o->getNombre()];
+            $odsList[] = [
+                'id' => $o->getId(),
+                'nombre' => $o->getNombre(),
+                'img_url' => $o->getImgOds() ? ($baseUrl ? $baseUrl . '/uploads/ods/' . $o->getImgOds() : '/uploads/ods/' . $o->getImgOds()) : null
+            ];
         }
 
         $tiposList = [];
@@ -61,6 +65,7 @@ class ActividadResponseDTO
         }
 
         $org = $act->getOrganizacion();
+        $usuOrg = $org ? $org->getUsuario() : null;
 
         $inscritosConfirmados = 0;
         $inscritosPendientes = 0;
@@ -70,6 +75,11 @@ class ActividadResponseDTO
             } elseif ($insc->getEstadoSolicitud() === 'Pendiente') {
                 $inscritosPendientes++;
             }
+        }
+
+        $imgOrg = $usuOrg ? $usuOrg->getImgPerfil() : null;
+        if ($imgOrg && !str_starts_with($imgOrg, 'http')) {
+            $imgOrg = $baseUrl ? $baseUrl . '/uploads/usuarios/' . $imgOrg : '/uploads/usuarios/' . $imgOrg;
         }
 
         return new self(
@@ -85,11 +95,11 @@ class ActividadResponseDTO
             estado_publicacion: $act->getEstadoPublicacion(),
             id_organizacion: $org ? $org->getId() : 0,
             nombre_organizacion: $org ? $org->getNombre() : 'Desconocida',
-            img_organizacion: null,
+            img_organizacion: $imgOrg,
             ods: $odsList,
             tipos: $tiposList,
             imagen_actividad: $act->getImgActividad(),
-            img_url: $act->getImgActividad() ? '/uploads/actividades/' . $act->getImgActividad() : null
+            img_url: $act->getImgActividad() ? ($baseUrl ? $baseUrl . '/uploads/actividades/' . $act->getImgActividad() : '/uploads/actividades/' . $act->getImgActividad()) : null
         );
     }
 }

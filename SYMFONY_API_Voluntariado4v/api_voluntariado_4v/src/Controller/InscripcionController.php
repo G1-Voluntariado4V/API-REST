@@ -74,37 +74,58 @@ final class InscripcionController extends AbstractController
     public function cambiarEstado(
         int $idActividad,
         int $idVoluntario,
-        #[MapRequestPayload] InscripcionUpdateDTO $dto,
+        Request $request,
         EntityManagerInterface $em
     ): JsonResponse {
-
-        $inscripcion = $em->getRepository(Inscripcion::class)->findOneBy([
-            'actividad' => $idActividad,
-            'voluntario' => $idVoluntario
-        ]);
-
-        if (!$inscripcion) {
-            return $this->json(['error' => 'Inscripción no encontrada'], Response::HTTP_NOT_FOUND);
-        }
-
-        $inscripcion->setEstadoSolicitud($dto->estado);
+        // Log entry
+        file_put_contents(__DIR__ . '/../../var/debug_patch_entry.log', date('Y-m-d H:i:s') . " - Entrando a cambiarEstado MANUAL: Act:$idActividad, Vol:$idVoluntario\n", FILE_APPEND);
 
         try {
+            $content = json_decode($request->getContent(), true);
+            $estado = $content['estado'] ?? null;
+
+            if (!$estado || !in_array($estado, ['Aceptada', 'Rechazada'])) {
+                return $this->json(['error' => "Estado inválido o ausente. Recibido: " . print_r($content, true)], Response::HTTP_BAD_REQUEST);
+            }
+
+            $actividad = $em->getRepository(Actividad::class)->find($idActividad);
+            $voluntario = $em->getRepository(\App\Entity\Voluntario::class)->find($idVoluntario);
+
+            if (!$actividad || !$voluntario) {
+                return $this->json(['error' => 'Actividad o Voluntario no encontrado'], Response::HTTP_NOT_FOUND);
+            }
+
+            $inscripcion = $em->getRepository(Inscripcion::class)->findOneBy([
+                'actividad' => $actividad,
+                'voluntario' => $voluntario
+            ]);
+
+            if (!$inscripcion) {
+                return $this->json(['error' => 'Inscripción no encontrada'], Response::HTTP_NOT_FOUND);
+            }
+
+            $inscripcion->setEstadoSolicitud($estado);
+
             $em->flush();
 
             return $this->json([
-                'mensaje' => "Inscripción actualizada a: {$dto->estado}",
+                'mensaje' => "Inscripción actualizada a: {$estado}",
                 'voluntario' => $idVoluntario,
                 'actividad' => $idActividad
             ], Response::HTTP_OK);
-        } catch (\Exception $e) {
-            if (str_contains($e->getMessage(), 'ERROR DE NEGOCIO') || str_contains($e->getMessage(), 'cupo')) {
+
+        } catch (\Throwable $e) {
+             // Log error para depuracion
+             $logContent = date('Y-m-d H:i:s') . " - Error PATCH Inscripcion: " . $e->getMessage() . "\n" . $e->getTraceAsString() . "\n\n";
+             file_put_contents(__DIR__ . '/../../var/debug_patch_error.log', $logContent, FILE_APPEND);
+
+             if (str_contains($e->getMessage(), 'ERROR DE NEGOCIO') || str_contains($e->getMessage(), 'cupo')) {
                 return $this->json([
                     'error' => 'No se puede aceptar: El cupo de la actividad está lleno.'
                 ], Response::HTTP_CONFLICT);
             }
 
-            return $this->json(['error' => 'Error al actualizar: ' . $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return $this->json(['error' => 'Error interno al actualizar inscripción: ' . $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 }

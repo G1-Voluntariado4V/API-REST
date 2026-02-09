@@ -19,3 +19,4 @@
 # Mantener la estructura de carpetas
 !/migrations/.gitignore
 ###< doctrine/doctrine-migrations-bundle ###
+public/

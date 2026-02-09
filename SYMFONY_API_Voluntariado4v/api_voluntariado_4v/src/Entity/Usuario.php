@@ -124,7 +124,15 @@ class Usuario implements UserInterface
     #[Groups(['usuario:read'])]
     public function getImgPerfilUrl(): ?string
     {
-        return $this->imgPerfil ? '/uploads/usuarios/' . $this->imgPerfil : null;
+        if (!$this->imgPerfil) {
+            return null;
+        }
+
+        if (str_starts_with($this->imgPerfil, 'http')) {
+            return $this->imgPerfil;
+        }
+
+        return '/uploads/usuarios/' . $this->imgPerfil;
     }
 
     public function getRol(): ?Rol

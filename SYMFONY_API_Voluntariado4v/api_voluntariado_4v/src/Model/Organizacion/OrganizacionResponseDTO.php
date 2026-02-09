@@ -30,12 +30,22 @@ class OrganizacionResponseDTO
         public ?string $web,
 
         #[OA\Property(example: "G12345678")]
-        public string $cif
+        public string $cif,
+
+        #[OA\Property(example: "/uploads/usuarios/org_5.jpg", nullable: true)]
+        public ?string $img_perfil = null,
+
+        #[OA\Property(example: "Activa")]
+        public ?string $estado_cuenta = null
     ) {}
 
-    public static function fromEntity(Organizacion $org): self
+    public static function fromEntity(Organizacion $org, ?string $baseUrl = null): self
     {
         $usuario = $org->getUsuario();
+        $img = $usuario->getImgPerfil();
+        if ($img && !str_starts_with($img, 'http')) {
+            $img = $baseUrl ? $baseUrl . '/uploads/usuarios/' . $img : '/uploads/usuarios/' . $img;
+        }
 
         return new self(
             $org->getUsuario()->getId(),
@@ -45,7 +55,9 @@ class OrganizacionResponseDTO
             $org->getTelefono(),
             $org->getDireccion(),
             $org->getSitioWeb(),
-            $org->getCif() ?? ''
+            $org->getCif() ?? '',
+            $img,
+            $usuario->getEstadoCuenta()
         );
     }
 }

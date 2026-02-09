@@ -85,13 +85,44 @@ final class VoluntarioController extends AbstractController
     public function registrar(
         #[MapRequestPayload] VoluntarioCreateDTO $dto,
         EntityManagerInterface $em,
-        RolRepository $rolRepository
+        RolRepository $rolRepository,
+        #[\Symfony\Component\DependencyInjection\Attribute\Autowire('%uploads_directory%')] string $uploadsDirectory
     ): JsonResponse {
 
+        // 1. COMPROBACIONES MANUALES PREVIAS (Para evitar usuarios huérfanos)
+        $usuarioExistente = $em->getRepository(Usuario::class)->findOneBy(['correo' => $dto->correo]);
+        if ($usuarioExistente) {
+            return $this->json(['error' => 'Este correo electrónico ya está registrado'], 409);
+        }
+
+        $dniExistente = $em->getRepository(Voluntario::class)->findOneBy(['dni' => $dto->dni]);
+        if ($dniExistente) {
+            return $this->json(['error' => 'El DNI introducido ya está registrado en el sistema'], 409);
+        }
+
+        $em->beginTransaction();
         try {
             $usuario = new Usuario();
             $usuario->setCorreo($dto->correo);
             $usuario->setGoogleId($dto->google_id);
+
+            // Si viene de Google, descargamos la imagen localmente
+            if ($dto->img_perfil && str_starts_with($dto->img_perfil, 'http')) {
+                // El ID aún no existe, pero podemos usar un delay o simplemente persistir el usuario primero
+                $em->persist($usuario);
+                $em->flush(); // Ahora tenemos ID
+
+                $filename = $this->saveGoogleImage($dto->img_perfil, $usuario->getId(), $uploadsDirectory);
+                if ($filename) {
+                    $usuario->setImgPerfil($filename);
+                }
+            } else {
+                $em->persist($usuario);
+                if ($dto->img_perfil) {
+                    $usuario->setImgPerfil($dto->img_perfil);
+                }
+            }
+
             $usuario->setEstadoCuenta('Pendiente');
 
             $rolVoluntario = $rolRepository->findOneBy(['nombre' => 'Voluntario']);
@@ -99,10 +130,10 @@ final class VoluntarioController extends AbstractController
             $usuario->setRol($rolVoluntario);
 
             $em->persist($usuario);
-            $em->flush();
+            $em->flush(); // Necesario para obtener el ID del usuario (dentro de transacción)
 
             $voluntario = new Voluntario();
-            $voluntario->setUsuario($usuario);
+            $voluntario->setUsuario($usuario); // Esto ahora asignará el ID correctamente
             $voluntario->setNombre($dto->nombre);
             $voluntario->setApellidos($dto->apellidos);
             $voluntario->setDni($dto->dni);
@@ -139,15 +170,29 @@ final class VoluntarioController extends AbstractController
             }
 
             $em->flush();
+            $em->commit();
             $em->refresh($voluntario);
 
             return $this->json(VoluntarioResponseDTO::fromEntity($voluntario), Response::HTTP_CREATED);
         } catch (\Exception $e) {
-            if (str_contains($e->getMessage(), 'Duplicate') || str_contains($e->getMessage(), 'UNIQUE')) {
-                return $this->json(['error' => 'El usuario (correo/DNI) ya existe'], 409);
+            if ($em->getConnection()->isTransactionActive()) {
+                $em->rollback();
             }
 
-            return $this->json(['error' => 'Error al registrar el voluntario. Por favor, revisa los datos e inténtalo de nuevo.'], Response::HTTP_INTERNAL_SERVER_ERROR);
+            $msg = $e->getMessage();
+            if (
+                str_contains($msg, 'Duplicate') ||
+                str_contains($msg, 'UNIQUE') ||
+                str_contains($msg, '2601') ||
+                str_contains($msg, '2627')
+            ) {
+                if (str_contains($msg, 'dni') || str_contains($msg, 'DNI')) {
+                    return $this->json(['error' => 'El DNI introducido ya está registrado en el sistema'], 409);
+                }
+                return $this->json(['error' => 'Este correo electrónico ya está registrado'], 409);
+            }
+
+            return $this->json(['error' => '[REF_FAIL] Error técnico al registrar: ' . $msg], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -456,6 +501,29 @@ final class VoluntarioController extends AbstractController
                 ['error' => 'Error al calcular horas totales'],
                 Response::HTTP_INTERNAL_SERVER_ERROR
             );
+        }
+    }
+
+    private function saveGoogleImage(string $url, int $userId, string $uploadsDirectory): ?string
+    {
+        try {
+            $opts = [
+                'http' => [
+                    'method' => 'GET',
+                    'header' => "User-Agent: PHP\r\n"
+                ]
+            ];
+            $context = stream_context_create($opts);
+            $content = @file_get_contents($url, false, $context);
+            if ($content === false) return null;
+
+            $filename = 'google_' . $userId . '_' . uniqid() . '.jpg';
+            $targetDir = $uploadsDirectory . '/usuarios';
+            if (!is_dir($targetDir)) mkdir($targetDir, 0777, true);
+            file_put_contents($targetDir . '/' . $filename, $content);
+            return $filename;
+        } catch (\Exception $e) {
+            return null;
         }
     }
 }

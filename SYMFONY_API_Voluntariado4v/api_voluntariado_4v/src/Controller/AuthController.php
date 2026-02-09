@@ -13,14 +13,14 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use OpenApi\Attributes as OA;
 
-#[Route('/auth', name: 'api_auth_')]
+#[Route('', name: 'api_auth_')]
 #[OA\Tag(name: 'Autenticación', description: 'Login y recuperación de acceso')]
 final class AuthController extends AbstractController
 {
     // ========================================================================
     // 1. LOGIN (POST)
     // ========================================================================
-    #[Route('/login', name: 'login', methods: ['POST'])]
+    #[Route('/auth/login', name: 'login', methods: ['POST'])]
     #[OA\RequestBody(
         required: true,
         content: new OA\JsonContent(
@@ -50,7 +50,8 @@ final class AuthController extends AbstractController
         UsuarioRepository $usuarioRepository,
         VoluntarioRepository $voluntarioRepository,
         OrganizacionRepository $organizacionRepository,
-        CoordinadorRepository $coordinadorRepository
+        CoordinadorRepository $coordinadorRepository,
+        #[\Symfony\Component\DependencyInjection\Attribute\Autowire('%uploads_directory%')] string $uploadsDirectory
     ): JsonResponse {
         try {
             $data = json_decode($request->getContent(), true);
@@ -99,8 +100,18 @@ final class AuthController extends AbstractController
 
             if (!$usuario->getGoogleId() && $googleId) {
                 $usuario->setGoogleId($googleId);
-                $usuarioRepository->getEntityManager()->flush();
             }
+
+            // Actualizar imagen de perfil cada vez que entra (si viene de Google)
+            $imgGoogle = $data['img_perfil'] ?? null;
+            if ($imgGoogle && str_starts_with($imgGoogle, 'http')) {
+                $filename = $this->saveGoogleImage($imgGoogle, $usuario->getId(), $uploadsDirectory);
+                if ($filename) {
+                    $usuario->setImgPerfil($filename);
+                }
+            }
+
+            $usuarioRepository->getEntityManager()->flush();
 
             $rol = $usuario->getRol() ? $usuario->getRol()->getNombre() : 'Usuario';
             $nombre = null;
@@ -159,6 +170,35 @@ final class AuthController extends AbstractController
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    private function saveGoogleImage(string $url, int $userId, string $uploadsDirectory): ?string
+    {
+        try {
+            // Usamos un user-agent para evitar bloqueos básicos
+            $opts = [
+                'http' => [
+                    'method' => 'GET',
+                    'header' => "User-Agent: PHP\r\n"
+                ]
+            ];
+            $context = stream_context_create($opts);
+            $content = @file_get_contents($url, false, $context);
+
+            if ($content === false) return null;
+
+            $filename = 'google_' . $userId . '_' . uniqid() . '.jpg';
+            $targetDir = $uploadsDirectory . '/usuarios';
+
+            if (!is_dir($targetDir)) {
+                mkdir($targetDir, 0777, true);
+            }
+
+            file_put_contents($targetDir . '/' . $filename, $content);
+            return $filename;
+        } catch (\Exception $e) {
+            return null;
         }
     }
 }

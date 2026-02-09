@@ -63,6 +63,9 @@ class VoluntarioCreateDTO
                 ]
             )
         )]
-        public array $idiomas = []
+        public array $idiomas = [],
+
+        #[OA\Property(example: "https://lh3.googleusercontent.com/a/ALm5wu...")]
+        public ?string $img_perfil = null
     ) {}
 }
