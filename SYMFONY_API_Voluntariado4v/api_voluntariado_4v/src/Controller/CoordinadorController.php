@@ -239,7 +239,126 @@ final class CoordinadorController extends AbstractController
         ";
         $data = $conn->executeQuery($sql, ['base_url' => $baseUrl])->fetchAllAssociative();
         return $this->json($data, Response::HTTP_OK);
-}
+    }
+
+    #[Route('/coord/voluntarios', name: 'coord_listar_voluntarios', methods: ['GET'])]
+    public function listarVoluntarios(Request $request, UsuarioRepository $userRepo, EntityManagerInterface $em): JsonResponse
+    {
+        if (!$this->checkCoordinador($request, $userRepo)) return $this->json(['error' => 'Acceso denegado'], Response::HTTP_FORBIDDEN);
+
+        $baseUrl = $request->getSchemeAndHttpHost();
+        $conn = $em->getConnection();
+        $sql = "
+            SELECT
+                u.id_usuario, u.correo, u.estado_cuenta,
+                CASE
+                    WHEN u.img_perfil IS NULL OR u.img_perfil = '' THEN NULL
+                    WHEN u.img_perfil LIKE 'http%' THEN u.img_perfil
+                    ELSE :base_url + '/uploads/usuarios/' + u.img_perfil
+                END as img_perfil,
+                v.nombre, v.apellidos, v.dni, v.telefono, v.fecha_nac, v.carnet_conducir, v.descripcion,
+                c.nombre_curso as curso, v.id_curso_actual as id_curso,
+                (SELECT COUNT(*) FROM INSCRIPCION i WHERE i.id_voluntario = u.id_usuario AND i.estado_solicitud = 'Aceptada') as actividades_realizadas
+            FROM USUARIO u
+            JOIN VOLUNTARIO v ON u.id_usuario = v.id_usuario
+            LEFT JOIN CURSO c ON v.id_curso_actual = c.id_curso
+            WHERE u.deleted_at IS NULL
+            ORDER BY u.id_usuario DESC
+        ";
+        $data = $conn->executeQuery($sql, ['base_url' => $baseUrl])->fetchAllAssociative();
+
+        // Mapear campos para el frontend
+        foreach ($data as &$v) {
+            $v['nombre_completo'] = $v['nombre'] . ' ' . $v['apellidos'];
+
+            // Idiomas
+            $v['idiomas'] = $conn->fetchAllAssociative("
+                SELECT i.id_idioma, i.nombre_idioma as idioma, vi.nivel
+                FROM VOLUNTARIO_IDIOMA vi
+                JOIN IDIOMA i ON vi.id_idioma = i.id_idioma
+                WHERE vi.id_voluntario = :id
+            ", ['id' => $v['id_usuario']]);
+
+            // Preferencias
+            $v['preferencias'] = $conn->fetchFirstColumn("
+                SELECT t.nombre_tipo
+                FROM PREFERENCIA_VOLUNTARIO pv
+                JOIN TIPO_VOLUNTARIADO t ON pv.id_tipo = t.id_tipo
+                WHERE pv.id_voluntario = :id
+            ", ['id' => $v['id_usuario']]);
+        }
+
+        return $this->json($data, Response::HTTP_OK);
+    }
+
+    #[Route('/coord/voluntarios/{id}/detalle', name: 'coord_voluntario_detalle', methods: ['GET'])]
+    public function getVoluntarioDetalle(int $id, Request $request, UsuarioRepository $userRepo, EntityManagerInterface $em): JsonResponse
+    {
+        if (!$this->checkCoordinador($request, $userRepo)) return $this->json(['error' => 'Acceso denegado'], Response::HTTP_FORBIDDEN);
+
+        $baseUrl = $request->getSchemeAndHttpHost();
+        $conn = $em->getConnection();
+        $sql = "
+            SELECT
+                u.id_usuario, u.correo, u.estado_cuenta,
+                CASE
+                    WHEN u.img_perfil IS NULL OR u.img_perfil = '' THEN NULL
+                    WHEN u.img_perfil LIKE 'http%' THEN u.img_perfil
+                    ELSE :base_url + '/uploads/usuarios/' + u.img_perfil
+                END as img_perfil,
+                v.nombre, v.apellidos, v.dni, v.telefono, v.fecha_nac, v.carnet_conducir, v.descripcion,
+                c.nombre_curso as curso, v.id_curso_actual as id_curso
+            FROM USUARIO u
+            JOIN VOLUNTARIO v ON u.id_usuario = v.id_usuario
+            LEFT JOIN CURSO c ON v.id_curso_actual = c.id_curso
+            WHERE u.id_usuario = :id AND u.deleted_at IS NULL
+        ";
+        $v = $conn->executeQuery($sql, ['id' => $id, 'base_url' => $baseUrl])->fetchAssociative();
+
+        if (!$v) return $this->json(['error' => 'No encontrado'], 404);
+
+        // Idiomas
+        $v['idiomas'] = $conn->fetchAllAssociative("
+            SELECT i.id_idioma, i.nombre_idioma as idioma, vi.nivel
+            FROM VOLUNTARIO_IDIOMA vi
+            JOIN IDIOMA i ON vi.id_idioma = i.id_idioma
+            WHERE vi.id_voluntario = :id
+        ", ['id' => $id]);
+
+        // Preferencias
+        $v['preferencias'] = $conn->fetchFirstColumn("
+            SELECT t.nombre_tipo
+            FROM PREFERENCIA_VOLUNTARIO pv
+            JOIN TIPO_VOLUNTARIADO t ON pv.id_tipo = t.id_tipo
+            WHERE pv.id_voluntario = :id
+        ", ['id' => $id]);
+
+        return $this->json($v, Response::HTTP_OK);
+    }
+
+    #[Route('/coord/voluntarios/{id}', name: 'coord_actualizar_voluntario', methods: ['PUT'])]
+    public function actualizaVoluntario(int $id, Request $request, UsuarioRepository $userRepo, EntityManagerInterface $em): JsonResponse
+    {
+        if (!$this->checkCoordinador($request, $userRepo)) return $this->json(['error' => 'Acceso denegado'], Response::HTTP_FORBIDDEN);
+
+        $data = json_decode($request->getContent(), true);
+        $voluntario = $em->getRepository(\App\Entity\Voluntario::class)->find($id);
+        if (!$voluntario) return $this->json(['error' => 'Voluntario no encontrado'], 404);
+
+        if (isset($data['nombre'])) $voluntario->setNombre($data['nombre']);
+        if (isset($data['apellidos'])) $voluntario->setApellidos($data['apellidos']);
+        if (isset($data['telefono'])) $voluntario->setTelefono($data['telefono']);
+        if (isset($data['fecha_nac'])) $voluntario->setFechaNac(new \DateTime($data['fecha_nac']));
+        if (isset($data['descripcion'])) $voluntario->setDescripcion($data['descripcion']);
+
+        if (isset($data['id_curso'])) {
+            $curso = $em->getRepository(\App\Entity\Curso::class)->find($data['id_curso']);
+            if ($curso) $voluntario->setCursoActual($curso);
+        }
+
+        $em->flush();
+        return $this->json(['mensaje' => 'Perfil actualizado'], 200);
+    }
 
     #[Route('/coord/organizaciones/pendientes', name: 'coord_organizaciones_pendientes', methods: ['GET'])]
     public function listarOrganizacionesPendientes(Request $request, UsuarioRepository $userRepo, EntityManagerInterface $em): JsonResponse
@@ -522,19 +641,21 @@ final class CoordinadorController extends AbstractController
 
                     // --- DATOS DEL VOLUNTARIO COMPLETO ---
                     'voluntario' => [
-                        'id' => $voluntario->getId(),
+                        'id_usuario' => $voluntario->getId(),
                         'nombre' => $voluntario->getNombre(),
                         'apellidos' => $voluntario->getApellidos(),
-                        'email' => $usuarioVol->getCorreo(),
+                        'correo' => $usuarioVol->getCorreo(),
                         'dni' => $voluntario->getDni(),
                         'telefono' => $voluntario->getTelefono(),
-                        'fecha_nacimiento' => $voluntario->getFechaNac() ? $voluntario->getFechaNac()->format('Y-m-d') : null,
+                        'fecha_nac' => $voluntario->getFechaNac() ? $voluntario->getFechaNac()->format('Y-m-d') : null,
                         'descripcion' => $voluntario->getDescripcion(),
                         'carnet_conducir' => $voluntario->isCarnetConducir(),
                         'curso' => $voluntario->getCursoActual() ? $voluntario->getCursoActual()->getNombre() : 'Sin curso',
-                        'img_perfil_url' => $imgPerfilUrl,
+                        'id_curso' => $voluntario->getCursoActual() ? $voluntario->getCursoActual()->getId() : null,
+                        'img_perfil' => $imgPerfilUrl, // Ya es absoluta o nula
                         'idiomas' => $idiomas,
-                        'preferencias' => $preferencias
+                        'preferencias' => $preferencias,
+                        'estado_cuenta' => $usuarioVol->getEstadoCuenta()
                     ],
 
                     // --- DATOS BÁSICOS PARA LA TABLA (COMPATIBILIDAD) ---
@@ -709,5 +830,35 @@ final class CoordinadorController extends AbstractController
         $em->flush();
 
         return $this->json(['mensaje' => "Estado actualizado a $nuevoEstado"], 200);
+    }
+
+    #[Route('/actividades/{idActividad}/inscripciones/{idVoluntario}', name: 'coord_update_inscripcion_status', methods: ['PATCH'])]
+    public function updateEstadoInscripcion(
+        int $idActividad,
+        int $idVoluntario,
+        Request $request,
+        UsuarioRepository $userRepo,
+        EntityManagerInterface $em
+    ): JsonResponse {
+        if (!$this->checkCoordinador($request, $userRepo)) return $this->json(['error' => 'Acceso denegado'], Response::HTTP_FORBIDDEN);
+
+        $data = json_decode($request->getContent(), true);
+        $nuevoEstado = $data['estado'] ?? null;
+
+        if (!in_array($nuevoEstado, ['Aceptada', 'Rechazada', 'Pendiente'])) {
+            return $this->json(['error' => 'Estado inválido'], 400);
+        }
+
+        $inscripcion = $em->getRepository(\App\Entity\Inscripcion::class)->findOneBy([
+            'actividad' => $idActividad,
+            'voluntario' => $idVoluntario
+        ]);
+
+        if (!$inscripcion) return $this->json(['error' => 'Inscripción no encontrada'], 404);
+
+        $inscripcion->setEstadoInscripcion($nuevoEstado);
+        $em->flush();
+
+        return $this->json(['mensaje' => "Inscripción actualizada a $nuevoEstado"], 200);
     }
 }

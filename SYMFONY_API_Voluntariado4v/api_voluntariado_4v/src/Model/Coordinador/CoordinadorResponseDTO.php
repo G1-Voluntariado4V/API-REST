@@ -3,29 +3,40 @@
 namespace App\Model\Coordinador;
 
 use App\Entity\Coordinador;
+use OpenApi\Attributes as OA;
 
 class CoordinadorResponseDTO
 {
     public function __construct(
-        public int $id,
-        public ?string $nombre,
+        #[OA\Property(example: 34)]
+        public int $id_usuario,
+
+        #[OA\Property(example: "Juan")]
+        public string $nombre,
+
+        #[OA\Property(example: "Pérez")]
         public ?string $apellidos,
+
+        #[OA\Property(example: "+34 600 11 22 33")]
         public ?string $telefono,
-        public string $rol,
+
+        #[OA\Property(example: "coordinador@escuela.org")]
         public string $correo,
-        public string $estado_cuenta
+
+        #[OA\Property(example: "/uploads/usuarios/usr_34.png")]
+        public ?string $img_perfil
     ) {}
 
     public static function fromEntity(Coordinador $coord): self
     {
+        $usuario = $coord->getUsuario();
         return new self(
-            $coord->getUsuario()->getId(),
-            $coord->getNombre(),
-            $coord->getApellidos(),
-            $coord->getTelefono(),
-            $coord->getUsuario()->getRol()->getNombre(),
-            $coord->getUsuario()->getCorreo(),
-            $coord->getUsuario()->getEstadoCuenta()
+            id_usuario: $usuario->getId(),
+            nombre: $coord->getNombre() ?? '',
+            apellidos: $coord->getApellidos(),
+            telefono: $coord->getTelefono(),
+            correo: $usuario->getCorreo(),
+            img_perfil: $usuario->getImgPerfilUrl()
         );
     }
 }

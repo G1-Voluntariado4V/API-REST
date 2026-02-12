@@ -102,12 +102,15 @@ final class AuthController extends AbstractController
                 $usuario->setGoogleId($googleId);
             }
 
-            // Actualizar imagen de perfil cada vez que entra (si viene de Google)
+            // Actualizar imagen de perfil solo si no tiene una o es la de Google
             $imgGoogle = $data['img_perfil'] ?? null;
             if ($imgGoogle && str_starts_with($imgGoogle, 'http')) {
-                $filename = $this->saveGoogleImage($imgGoogle, $usuario->getId(), $uploadsDirectory);
-                if ($filename) {
-                    $usuario->setImgPerfil($filename);
+                $currentImg = $usuario->getImgPerfil();
+                if (!$currentImg || str_starts_with($currentImg, 'google_')) {
+                    $filename = $this->saveGoogleImage($imgGoogle, $usuario->getId(), $uploadsDirectory);
+                    if ($filename) {
+                        $usuario->setImgPerfil($filename);
+                    }
                 }
             }
 
@@ -156,7 +159,8 @@ final class AuthController extends AbstractController
                 'estado_cuenta' => $estadoCuenta,
                 'nombre'     => $nombre,
                 'apellidos'  => $apellidos,
-                'telefono'   => $telefono
+                'telefono'   => $telefono,
+                'img_perfil' => $usuario->getImgPerfilUrl()
             ];
 
             foreach ($datosExtra as $key => $value) {
@@ -188,7 +192,7 @@ final class AuthController extends AbstractController
 
             if ($content === false) return null;
 
-            $filename = 'google_' . $userId . '_' . uniqid() . '.jpg';
+            $filename = 'google_' . $userId . '.jpg';
             $targetDir = $uploadsDirectory . '/usuarios';
 
             if (!is_dir($targetDir)) {
