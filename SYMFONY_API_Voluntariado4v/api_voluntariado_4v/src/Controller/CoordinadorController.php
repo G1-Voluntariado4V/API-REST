@@ -12,6 +12,9 @@ use App\Repository\ActividadRepository;
 use App\Repository\RolRepository;
 use App\Repository\UsuarioRepository;
 use App\Repository\CoordinadorRepository;
+use App\Repository\OrganizacionRepository;
+use App\Repository\ODSRepository;
+use App\Repository\TipoVoluntariadoRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -72,27 +75,27 @@ final class CoordinadorController extends AbstractController
         $conn = $em->getConnection();
 
         try {
-            $rawStats = [];
-            try {
-                $rawStats = $conn->executeQuery('EXEC SP_Dashboard_Stats')->fetchAssociative();
-            } catch (\Exception $e) {
-                $rawStats = [
-                    'voluntarios_activos' => $conn->fetchOne("SELECT COUNT(*) FROM USUARIO u JOIN ROL r ON u.id_rol = r.id_rol WHERE UPPER(r.nombre_rol) = 'VOLUNTARIO' AND u.deleted_at IS NULL"),
-                    'organizaciones_activas' => $conn->fetchOne("SELECT COUNT(*) FROM USUARIO u JOIN ROL r ON u.id_rol = r.id_rol WHERE UPPER(r.nombre_rol) = 'ORGANIZACION' AND u.deleted_at IS NULL"),
-                    'coordinadores_activos' => $conn->fetchOne("SELECT COUNT(*) FROM USUARIO u JOIN ROL r ON u.id_rol = r.id_rol WHERE UPPER(r.nombre_rol) = 'COORDINADOR' AND u.deleted_at IS NULL"),
-                    'actividades_publicadas' => $conn->fetchOne("SELECT COUNT(*) FROM ACTIVIDAD WHERE UPPER(estado_publicacion) = 'PUBLICADA' AND deleted_at IS NULL"),
-                    'voluntarios_pendientes' => $conn->fetchOne("SELECT COUNT(*) FROM USUARIO WHERE UPPER(estado_cuenta) = 'PENDIENTE' AND deleted_at IS NULL"),
-                    'actividades_pendientes' => $conn->fetchOne("SELECT COUNT(*) FROM ACTIVIDAD WHERE UPPER(estado_publicacion) IN ('EN REVISION', 'PENDIENTE') AND deleted_at IS NULL")
-                ];
-            }
+            // Intentamos obtener estadísticas básicas con conteos directos para máxima fiabilidad
+            $volActivos = (int)$conn->fetchOne("SELECT COUNT(*) FROM USUARIO u JOIN ROL r ON u.id_rol = r.id_rol WHERE UPPER(r.nombre_rol) = 'VOLUNTARIO' AND UPPER(u.estado_cuenta) = 'ACTIVA' AND u.deleted_at IS NULL");
+            $orgActivas = (int)$conn->fetchOne("SELECT COUNT(*) FROM USUARIO u JOIN ROL r ON u.id_rol = r.id_rol WHERE UPPER(r.nombre_rol) = 'ORGANIZACION' AND UPPER(u.estado_cuenta) = 'ACTIVA' AND u.deleted_at IS NULL");
+            $coordActivos = (int)$conn->fetchOne("SELECT COUNT(*) FROM USUARIO u JOIN ROL r ON u.id_rol = r.id_rol WHERE UPPER(r.nombre_rol) = 'COORDINADOR' AND u.deleted_at IS NULL");
+
+            // Actividades: Usamos LIKE para ser más flexibles con posibles variaciones de texto
+            $actPublicadas = (int)$conn->fetchOne("SELECT COUNT(*) FROM ACTIVIDAD WHERE (UPPER(estado_publicacion) LIKE 'PUBLICA%') AND deleted_at IS NULL");
+            $actPendientes = (int)$conn->fetchOne("SELECT COUNT(*) FROM ACTIVIDAD WHERE (UPPER(estado_publicacion) LIKE 'EN REVISION%' OR UPPER(estado_publicacion) LIKE 'PENDIENTE%') AND deleted_at IS NULL");
+
+            // Pendientes de aprobación
+            $volPendientes = (int)$conn->fetchOne("SELECT COUNT(*) FROM USUARIO u JOIN ROL r ON u.id_rol = r.id_rol WHERE UPPER(r.nombre_rol) = 'VOLUNTARIO' AND UPPER(u.estado_cuenta) = 'PENDIENTE' AND u.deleted_at IS NULL");
+            $orgPendientes = (int)$conn->fetchOne("SELECT COUNT(*) FROM USUARIO u JOIN ROL r ON u.id_rol = r.id_rol WHERE UPPER(r.nombre_rol) = 'ORGANIZACION' AND UPPER(u.estado_cuenta) = 'PENDIENTE' AND u.deleted_at IS NULL");
 
             $safeStats = [
-                'voluntarios_activos'    => (int)($rawStats['voluntarios_activos'] ?? $rawStats['total_usuarios'] ?? 0),
-                'organizaciones_activas' => (int)($rawStats['organizaciones_activas'] ?? $rawStats['total_organizaciones'] ?? 0),
-                'coordinadores_activos'  => (int)($rawStats['coordinadores_activos'] ?? $conn->fetchOne("SELECT COUNT(*) FROM USUARIO u JOIN ROL r ON u.id_rol = r.id_rol WHERE r.nombre_rol = 'Coordinador' AND u.deleted_at IS NULL")),
-                'actividades_publicadas' => (int)($rawStats['actividades_publicadas'] ?? 0),
-                'voluntarios_pendientes' => (int)($rawStats['voluntarios_pendientes'] ?? $rawStats['inscripciones_pendientes'] ?? 0),
-                'actividades_pendientes' => (int)($rawStats['actividades_pendientes'] ?? $rawStats['actividades_revision'] ?? 0),
+                'voluntarios_activos'       => $volActivos,
+                'organizaciones_activas'    => $orgActivas,
+                'coordinadores_activos'     => $coordActivos,
+                'actividades_publicadas'    => $actPublicadas,
+                'voluntarios_pendientes'    => $volPendientes,
+                'organizaciones_pendientes' => $orgPendientes,
+                'actividades_pendientes'    => $actPendientes,
             ];
 
             return $this->json([
@@ -222,7 +225,9 @@ final class CoordinadorController extends AbstractController
                     WHEN u.img_perfil LIKE 'http%' THEN u.img_perfil
                     ELSE :base_url + '/uploads/usuarios/' + u.img_perfil
                 END as img_perfil,
-                v.nombre, v.apellidos, v.dni, v.telefono, v.fecha_nac, v.carnet_conducir, v.descripcion,
+                v.nombre, v.apellidos, v.dni, v.telefono,
+                CONVERT(VARCHAR, v.fecha_nac, 23) as fecha_nacimiento_raw,
+                v.carnet_conducir, v.descripcion,
                 c.nombre_curso as curso,
                 (SELECT STRING_AGG(t.nombre_tipo, ', ')
                  FROM PREFERENCIA_VOLUNTARIO pv
@@ -256,7 +261,9 @@ final class CoordinadorController extends AbstractController
                     WHEN u.img_perfil LIKE 'http%' THEN u.img_perfil
                     ELSE :base_url + '/uploads/usuarios/' + u.img_perfil
                 END as img_perfil,
-                v.nombre, v.apellidos, v.dni, v.telefono, v.fecha_nac, v.carnet_conducir, v.descripcion,
+                v.nombre, v.apellidos, v.dni, v.telefono,
+                CONVERT(VARCHAR, v.fecha_nac, 23) as fecha_nac,
+                v.carnet_conducir, v.descripcion,
                 c.nombre_curso as curso, v.id_curso_actual as id_curso,
                 (SELECT COUNT(*) FROM INSCRIPCION i WHERE i.id_voluntario = u.id_usuario AND i.estado_solicitud = 'Aceptada') as actividades_realizadas
             FROM USUARIO u
@@ -306,7 +313,9 @@ final class CoordinadorController extends AbstractController
                     WHEN u.img_perfil LIKE 'http%' THEN u.img_perfil
                     ELSE :base_url + '/uploads/usuarios/' + u.img_perfil
                 END as img_perfil,
-                v.nombre, v.apellidos, v.dni, v.telefono, v.fecha_nac, v.carnet_conducir, v.descripcion,
+                v.nombre, v.apellidos, v.dni, v.telefono,
+                CONVERT(VARCHAR, v.fecha_nac, 23) as fecha_nac,
+                v.carnet_conducir, v.descripcion,
                 c.nombre_curso as curso, v.id_curso_actual as id_curso
             FROM USUARIO u
             JOIN VOLUNTARIO v ON u.id_usuario = v.id_usuario
@@ -381,7 +390,32 @@ final class CoordinadorController extends AbstractController
             WHERE UPPER(u.estado_cuenta) = 'PENDIENTE' AND u.deleted_at IS NULL
         ";
         return $this->json($conn->executeQuery($sql, ['base_url' => $baseUrl])->fetchAllAssociative(), Response::HTTP_OK);
-}
+    }
+
+    #[Route('/coord/organizaciones', name: 'coord_listar_organizaciones', methods: ['GET'])]
+    public function listarOrganizaciones(Request $request, UsuarioRepository $userRepo, EntityManagerInterface $em): JsonResponse
+    {
+        if (!$this->checkCoordinador($request, $userRepo)) return $this->json(['error' => 'Acceso denegado'], Response::HTTP_FORBIDDEN);
+
+        $baseUrl = $request->getSchemeAndHttpHost();
+        $conn = $em->getConnection();
+        $sql = "
+            SELECT
+                u.id_usuario, u.correo, u.estado_cuenta,
+                CASE
+                    WHEN u.img_perfil IS NULL OR u.img_perfil = '' THEN NULL
+                    WHEN u.img_perfil LIKE 'http%' THEN u.img_perfil
+                    ELSE :base_url + '/uploads/usuarios/' + u.img_perfil
+                END as img_perfil,
+                o.nombre, o.cif, o.telefono, o.sitio_web, o.direccion, o.descripcion
+            FROM USUARIO u
+            JOIN ORGANIZACION o ON u.id_usuario = o.id_usuario
+            WHERE u.deleted_at IS NULL
+            ORDER BY u.id_usuario DESC
+        ";
+        $data = $conn->executeQuery($sql, ['base_url' => $baseUrl])->fetchAllAssociative();
+        return $this->json($data, Response::HTTP_OK);
+    }
 
     #[Route('/coord/{rol}/{id}/estado', name: 'coord_cambiar_estado_usuario', methods: ['PATCH'], requirements: ['rol' => 'voluntarios|organizaciones'])]
     #[OA\Parameter(name: 'X-Admin-Id', in: 'header', required: true, schema: new OA\Schema(type: 'integer'))]
@@ -419,8 +453,13 @@ final class CoordinadorController extends AbstractController
                 a.cupo_maximo, a.ubicacion, a.estado_publicacion,
                 CASE
                     WHEN a.img_actividad IS NULL OR a.img_actividad = '' THEN NULL
-                    ELSE :base_url + '/uploads/actividades/' + a.img_actividad
+                    ELSE CONCAT(:base_url, '/uploads/actividades/', a.img_actividad)
                 END as imagen_actividad,
+                CASE
+                    WHEN u.img_perfil IS NULL OR u.img_perfil = '' THEN NULL
+                    WHEN u.img_perfil LIKE 'http%' THEN u.img_perfil
+                    ELSE CONCAT(:base_url, '/uploads/usuarios/', u.img_perfil)
+                END as img_organizacion,
                 (SELECT COUNT(*) FROM INSCRIPCION i WHERE i.id_actividad = a.id_actividad AND i.estado_solicitud = 'Aceptada') as inscritos_confirmados,
                 COALESCE(o.nombre, 'Organización Desconocida') as nombre_organizacion,
                 COALESCE(u.id_usuario, 0) as id_organizacion
@@ -433,6 +472,39 @@ final class CoordinadorController extends AbstractController
 
         try {
             $actividades = $conn->executeQuery($sql, ['base_url' => $baseUrl])->fetchAllAssociative();
+
+            foreach ($actividades as &$a) {
+                try {
+                    // ODS
+                    $a['ods'] = $conn->fetchAllAssociative("
+                        SELECT
+                            o.id_ods as id,
+                            o.nombre as nombre,
+                            CASE
+                                WHEN o.img_ods IS NULL OR o.img_ods = '' THEN NULL
+                                ELSE CONCAT(:base_url, '/uploads/ods/', o.img_ods)
+                            END as img_url
+                        FROM ACTIVIDAD_ODS ao
+                        JOIN ODS o ON ao.id_ods = o.id_ods
+                        WHERE ao.id_actividad = :id
+                    ", ['id' => $a['id_actividad'], 'base_url' => $baseUrl]);
+                } catch (\Exception $e) {
+                    $a['ods'] = [];
+                }
+
+                try {
+                    // Tipos
+                    $a['tipos'] = $conn->fetchAllAssociative("
+                        SELECT t.id_tipo as id, t.nombre_tipo as nombre
+                        FROM ACTIVIDAD_TIPO actt
+                        JOIN TIPO_VOLUNTARIADO t ON actt.id_tipo = t.id_tipo
+                        WHERE actt.id_actividad = :id
+                    ", ['id' => $a['id_actividad']]);
+                } catch (\Exception $e) {
+                    $a['tipos'] = [];
+                }
+            }
+
             return $this->json($actividades, Response::HTTP_OK);
         } catch (\Exception $e) {
             return $this->json(['error' => 'Error: ' . $e->getMessage()], 500);
@@ -507,9 +579,132 @@ final class CoordinadorController extends AbstractController
     // ========================================================================
     // 9. EDITAR ACTIVIDAD (PUT)
     // ========================================================================
+    #[Route('/coord/actividades/{id}', name: 'coord_editar_actividad', methods: ['PUT'])]
+    #[OA\Parameter(name: 'X-Admin-Id', in: 'header', required: true, schema: new OA\Schema(type: 'integer'))]
+    public function editarActividad(
+        int $id,
+        Request $request,
+        UsuarioRepository $userRepo,
+        EntityManagerInterface $em,
+        ODSRepository $odsRepo,
+        TipoVoluntariadoRepository $tipoRepo
+    ): JsonResponse
+    {
+        if (!$this->checkCoordinador($request, $userRepo)) return $this->json(['error' => 'Acceso denegado'], Response::HTTP_FORBIDDEN);
+
+        $data = json_decode($request->getContent(), true);
+        $actividad = $em->getRepository(Actividad::class)->find($id);
+        if (!$actividad) return $this->json(['error' => 'Actividad no encontrada'], Response::HTTP_NOT_FOUND);
+
+        if (isset($data['titulo'])) $actividad->setTitulo($data['titulo']);
+        if (isset($data['descripcion'])) $actividad->setDescripcion($data['descripcion']);
+        if (isset($data['ubicacion'])) $actividad->setUbicacion($data['ubicacion']);
+        if (isset($data['duracion_horas'])) $actividad->setDuracionHoras((int)$data['duracion_horas']);
+        if (isset($data['cupo_maximo'])) $actividad->setCupoMaximo((int)$data['cupo_maximo']);
+        if (isset($data['fecha_inicio'])) {
+            try {
+                $actividad->setFechaInicio(new \DateTime($data['fecha_inicio']));
+            } catch (\Exception $e) { /* silent fail or handle */ }
+        }
+
+        // Relaciones ODS
+        if (isset($data['odsIds']) && is_array($data['odsIds'])) {
+            foreach ($actividad->getOds() as $ods) $actividad->removeOd($ods);
+            foreach ($data['odsIds'] as $idOds) {
+                $ods = $odsRepo->find($idOds);
+                if ($ods) $actividad->addOd($ods);
+            }
+        }
+
+        // Relaciones Tipos
+        if (isset($data['tiposIds']) && is_array($data['tiposIds'])) {
+            foreach ($actividad->getTiposVoluntariado() as $tipo) $actividad->removeTiposVoluntariado($tipo);
+            foreach ($data['tiposIds'] as $idTipo) {
+                $tipo = $tipoRepo->find($idTipo);
+                if ($tipo) $actividad->addTiposVoluntariado($tipo);
+            }
+        }
+
+        $actividad->setUpdatedAt(new \DateTime());
+        $em->flush();
+
+        return $this->json(['mensaje' => 'Actividad actualizada con éxito'], Response::HTTP_OK);
+    }
+
     // ========================================================================
-    // 10. LISTAR INSCRIPCIONES PENDIENTES (GET)
+    // 9b. CREAR ACTIVIDAD (POST)
     // ========================================================================
+    #[Route('/coord/actividades', name: 'coord_crear_actividad', methods: ['POST'])]
+    #[OA\Parameter(name: 'X-Admin-Id', in: 'header', required: true, schema: new OA\Schema(type: 'integer'))]
+    public function crearActividad(
+        Request $request,
+        UsuarioRepository $userRepo,
+        OrganizacionRepository $orgRepo,
+        EntityManagerInterface $em,
+        ODSRepository $odsRepo,
+        TipoVoluntariadoRepository $tipoRepo
+    ): JsonResponse
+    {
+        try {
+            if (!$this->checkCoordinador($request, $userRepo)) return $this->json(['error' => 'Acceso denegado'], Response::HTTP_FORBIDDEN);
+
+            $data = json_decode($request->getContent(), true);
+
+            if (!isset($data['id_organizacion']) || !isset($data['titulo'])) {
+                return $this->json(['error' => 'Faltan datos obligatorios (id_organizacion, titulo)'], Response::HTTP_BAD_REQUEST);
+            }
+
+            $orgUser = $userRepo->find($data['id_organizacion']);
+            if (!$orgUser) return $this->json(['error' => 'Usuario de organización no encontrado'], Response::HTTP_NOT_FOUND);
+
+            $org = $orgRepo->findOneBy(['usuario' => $orgUser]);
+            if (!$org) return $this->json(['error' => 'Organización no encontrada'], Response::HTTP_NOT_FOUND);
+
+            $actividad = new Actividad();
+            $actividad->setOrganizacion($org);
+            $actividad->setTitulo($data['titulo']);
+            $actividad->setDescripcion($data['descripcion'] ?? '');
+            $actividad->setUbicacion($data['ubicacion'] ?? '');
+            $actividad->setDuracionHoras((int)($data['duracion_horas'] ?? 1));
+            $actividad->setCupoMaximo((int)($data['cupo_maximo'] ?? 10));
+            $actividad->setEstadoPublicacion($data['estado'] ?? 'En revision');
+
+            if (isset($data['fecha_inicio'])) {
+                try {
+                    $actividad->setFechaInicio(new \DateTime($data['fecha_inicio']));
+                } catch (\Exception $e) {
+                    $actividad->setFechaInicio(new \DateTime());
+                }
+            } else {
+                $actividad->setFechaInicio(new \DateTime());
+            }
+
+            // ODS
+            if (isset($data['odsIds']) && is_array($data['odsIds'])) {
+                foreach ($data['odsIds'] as $idOds) {
+                    $ods = $odsRepo->find($idOds);
+                    if ($ods) $actividad->addOd($ods);
+                }
+            }
+
+            // Tipos
+            if (isset($data['tiposIds']) && is_array($data['tiposIds'])) {
+                foreach ($data['tiposIds'] as $idTipo) {
+                    $tipo = $tipoRepo->find($idTipo);
+                    if ($tipo) $actividad->addTiposVoluntariado($tipo);
+                }
+            }
+
+            $em->persist($actividad);
+            $em->flush();
+
+            return $this->json(['mensaje' => 'Actividad creada con éxito', 'id' => $actividad->getId()], Response::HTTP_CREATED);
+        } catch (\Throwable $e) {
+            $logContent = date('Y-m-d H:i:s') . " - Error 500 en crearActividad: " . $e->getMessage() . "\n" . $e->getTraceAsString() . "\n\n";
+            file_put_contents(__DIR__ . '/../../var/debug_500.log', $logContent, FILE_APPEND);
+            return $this->json(['error' => $e->getMessage()], 500);
+        }
+    }
     #[Route('/coord/inscripciones/pendientes', name: 'coord_listar_inscripciones', methods: ['GET'])]
     #[OA\Parameter(name: 'X-Admin-Id', in: 'header', required: true, schema: new OA\Schema(type: 'integer'))]
     public function listarInscripcionesPendientes(
