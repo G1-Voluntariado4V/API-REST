@@ -56,13 +56,26 @@ final class OrganizacionController extends AbstractController
             )
         )
     )]
-    public function index(EntityManagerInterface $em): JsonResponse
+    public function index(Request $request, EntityManagerInterface $em): JsonResponse
     {
+        $baseUrl = $request->getSchemeAndHttpHost();
         $conn = $em->getConnection();
-        $sql = 'SELECT * FROM VW_Organizaciones_Activas';
+        $sql = "
+            SELECT
+                u.id_usuario, u.correo as correo_usuario, u.estado_cuenta,
+                o.nombre as nombre_organizacion, o.cif, o.telefono, o.sitio_web, o.direccion, o.descripcion,
+                CASE
+                    WHEN u.img_perfil IS NULL OR u.img_perfil = '' THEN NULL
+                    WHEN u.img_perfil LIKE 'http%' THEN u.img_perfil
+                    ELSE :base_url + '/uploads/usuarios/' + u.img_perfil
+                END as img_perfil
+            FROM USUARIO u
+            JOIN ORGANIZACION o ON u.id_usuario = o.id_usuario
+            WHERE u.estado_cuenta = 'Activa' AND u.deleted_at IS NULL
+        ";
 
         try {
-            $organizaciones = $conn->executeQuery($sql)->fetchAllAssociative();
+            $organizaciones = $conn->executeQuery($sql, ['base_url' => $baseUrl])->fetchAllAssociative();
             return $this->json($organizaciones, Response::HTTP_OK);
         } catch (\Exception $e) {
             return $this->json(
@@ -234,6 +247,131 @@ final class OrganizacionController extends AbstractController
                 ['error' => 'Error al crear actividad: ' . $e->getMessage()],
                 Response::HTTP_INTERNAL_SERVER_ERROR
             );
+        }
+    }
+
+    // ========================================================================
+    // 4b. EDITAR ACTIVIDAD (PUT)
+    // ========================================================================
+    #[Route('/organizaciones/{id}/actividades/{actividadId}', name: 'editar_actividad_organizacion', methods: ['PUT'])]
+    public function editarActividad(
+        int $id,
+        int $actividadId,
+        Request $request,
+        UsuarioRepository $userRepo,
+        OrganizacionRepository $orgRepo,
+        ActividadRepository $actividadRepo,
+        ODSRepository $odsRepo,
+        TipoVoluntariadoRepository $tipoRepo,
+        EntityManagerInterface $em
+    ): JsonResponse {
+        $usuario = $userRepo->find($id);
+        if (!$usuario || $usuario->getDeletedAt()) {
+            return $this->json(['error' => 'Organización no encontrada'], Response::HTTP_NOT_FOUND);
+        }
+
+        $organizacion = $orgRepo->findOneBy(['usuario' => $usuario]);
+        if (!$organizacion) {
+            return $this->json(['error' => 'Perfil no encontrado'], Response::HTTP_NOT_FOUND);
+        }
+
+        $actividad = $actividadRepo->find($actividadId);
+        if (!$actividad || $actividad->getDeletedAt()) {
+            return $this->json(['error' => 'Actividad no encontrada'], Response::HTTP_NOT_FOUND);
+        }
+
+        if ($actividad->getOrganizacion()->getId() !== $organizacion->getId()) {
+            return $this->json(['error' => 'No tienes permiso para editar esta actividad'], Response::HTTP_FORBIDDEN);
+        }
+
+        $data = json_decode($request->getContent(), true);
+
+        if (isset($data['titulo'])) $actividad->setTitulo($data['titulo']);
+        if (isset($data['descripcion'])) $actividad->setDescripcion($data['descripcion']);
+        if (isset($data['ubicacion'])) $actividad->setUbicacion($data['ubicacion']);
+        if (isset($data['duracion_horas'])) $actividad->setDuracionHoras((int)$data['duracion_horas']);
+        if (isset($data['cupo_maximo'])) $actividad->setCupoMaximo((int)$data['cupo_maximo']);
+
+        if (isset($data['fecha_inicio'])) {
+            try {
+                $actividad->setFechaInicio(new \DateTime($data['fecha_inicio']));
+            } catch (\Exception $e) {}
+        }
+
+        // Si se edita, vuelve a revisión si ya estaba publicada (o se mantiene en revisión)
+        $actividad->setEstadoPublicacion('En revision');
+
+        // Relaciones ODS
+        if (isset($data['odsIds']) && is_array($data['odsIds'])) {
+            foreach ($actividad->getOds() as $ods) $actividad->removeOd($ods);
+            foreach ($data['odsIds'] as $idOds) {
+                $ods = $odsRepo->find($idOds);
+                if ($ods) $actividad->addOd($ods);
+            }
+        }
+
+        // Relaciones Tipos
+        if (isset($data['tiposIds']) && is_array($data['tiposIds'])) {
+            foreach ($actividad->getTiposVoluntariado() as $tipo) $actividad->removeTiposVoluntariado($tipo);
+            foreach ($data['tiposIds'] as $idTipo) {
+                $tipo = $tipoRepo->find($idTipo);
+                if ($tipo) $actividad->addTiposVoluntariado($tipo);
+            }
+        }
+
+        try {
+            $em->flush();
+            return $this->json(ActividadResponseDTO::fromEntity($actividad), Response::HTTP_OK);
+        } catch (\Exception $e) {
+            return $this->json(['error' => 'Error al actualizar: ' . $e->getMessage()], 500);
+        }
+    }
+
+    // ========================================================================
+    // 4c. BORRAR ACTIVIDAD (DELETE)
+    // ========================================================================
+    #[Route('/organizaciones/{id}/actividades/{actividadId}', name: 'borrar_actividad_organizacion', methods: ['DELETE'])]
+    public function borrarActividad(
+        int $id,
+        int $actividadId,
+        UsuarioRepository $userRepo,
+        OrganizacionRepository $orgRepo,
+        ActividadRepository $actividadRepo,
+        EntityManagerInterface $em
+    ): JsonResponse {
+        $usuario = $userRepo->find($id);
+        if (!$usuario || $usuario->getDeletedAt()) {
+            return $this->json(['error' => 'Organización no encontrada'], Response::HTTP_NOT_FOUND);
+        }
+
+        $organizacion = $orgRepo->findOneBy(['usuario' => $usuario]);
+        if (!$organizacion) {
+            return $this->json(['error' => 'Perfil no encontrado'], Response::HTTP_NOT_FOUND);
+        }
+
+        $actividad = $actividadRepo->find($actividadId);
+        if (!$actividad) return $this->json(['error' => 'Actividad no encontrada'], Response::HTTP_NOT_FOUND);
+
+        if ($actividad->getOrganizacion()->getId() !== $organizacion->getId()) {
+            return $this->json(['error' => 'No tienes permiso para borrar esta actividad'], Response::HTTP_FORBIDDEN);
+        }
+
+        try {
+            // Usamos Soft Delete si existe el SP, o remove si no.
+            // En CoordinadorController se usa el SP.
+            $sql = 'EXEC SP_SoftDelete_Actividad @id_actividad = :id';
+            $em->getConnection()->executeStatement($sql, ['id' => $actividadId]);
+
+            return $this->json(['mensaje' => 'Actividad eliminada'], Response::HTTP_OK);
+        } catch (\Exception $e) {
+            // Fallback al remove de Doctrine si falla el SP (por si no está en este ambiente o no es MSSQL)
+            try {
+                $actividad->setDeletedAt(new \DateTime());
+                $em->flush();
+                return $this->json(['mensaje' => 'Actividad eliminada (soft delete via Doctrine)'], Response::HTTP_OK);
+            } catch (\Exception $e2) {
+                return $this->json(['error' => 'Error al eliminar: ' . $e->getMessage()], 500);
+            }
         }
     }
 
