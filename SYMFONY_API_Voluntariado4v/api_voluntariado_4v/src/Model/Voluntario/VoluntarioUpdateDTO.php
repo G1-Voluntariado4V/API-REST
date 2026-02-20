@@ -36,4 +36,16 @@ class VoluntarioUpdateDTO
 
     #[OA\Property(example: 3)]
     public ?int $id_curso_actual = null;
+
+    #[OA\Property(
+        description: "Idiomas del voluntario",
+        type: "array",
+        items: new OA\Items(
+            properties: [
+                new OA\Property(property: "id_idioma", type: "integer", example: 1),
+                new OA\Property(property: "nivel", type: "string", example: "B2")
+            ]
+        )
+    )]
+    public ?array $idiomas = null;
 }

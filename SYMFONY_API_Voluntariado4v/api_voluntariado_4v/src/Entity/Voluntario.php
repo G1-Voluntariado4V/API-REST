@@ -69,7 +69,7 @@ class Voluntario
     #[ORM\Column(type: Types::DATETIME_MUTABLE, nullable: true, name: 'updated_at')]
     private ?\DateTimeInterface $updatedAt = null;
 
-    #[ORM\OneToMany(mappedBy: 'voluntario', targetEntity: VoluntarioIdioma::class, cascade: ['persist', 'remove'])]
+    #[ORM\OneToMany(mappedBy: 'voluntario', targetEntity: VoluntarioIdioma::class, cascade: ['persist', 'remove'], orphanRemoval: true)]
     #[Groups(['usuario:read'])]
     private Collection $voluntarioIdiomas;
 

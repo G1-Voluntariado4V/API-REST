@@ -41,6 +41,119 @@ final class VoluntarioController extends AbstractController
         return $headerId && (int)$headerId === $resourceId;
     }
 
+    #[Route('/voluntarios/{id}/estadisticas', name: 'voluntario_estadisticas', methods: ['GET'])]
+    public function estadisticas(int $id, Request $request, UsuarioRepository $userRepo, EntityManagerInterface $em): JsonResponse
+    {
+        if (!$this->checkOwner($request, $id)) return $this->json(['error' => 'Acceso denegado'], 403);
+
+        $usuario = $userRepo->find($id);
+        $voluntario = ($usuario) ? $em->getRepository(Voluntario::class)->findOneBy(['usuario' => $usuario]) : null;
+        if (!$voluntario) return $this->json(['error' => 'Voluntario no encontrado'], 404);
+
+        $inscripciones = $em->getRepository(Inscripcion::class)->findBy(['voluntario' => $voluntario]);
+
+        $horasTotales = 0;
+        $activas = 0;
+        $total = 0;
+        $completadas = 0;
+        $pendientes = 0;
+
+        foreach ($inscripciones as $insc) {
+            $total++;
+            $estado = $insc->getEstadoSolicitud();
+            if ($estado === 'Aceptada' || $estado === 'Confirmada') {
+                $activas++;
+            } elseif ($estado === 'Finalizada') {
+                $completadas++;
+                $act = $insc->getActividad();
+                if ($act) {
+                    $horasTotales += $act->getDuracionHoras() ?? 0;
+                }
+            } elseif ($estado === 'Pendiente') {
+                $pendientes++;
+            }
+        }
+
+        return $this->json([
+            'inscripciones_activas' => $activas,
+            'horas_totales' => $horasTotales,
+            'total_inscripciones' => $total,
+            'actividades_completadas' => $completadas,
+            'inscripciones_pendientes' => $pendientes
+        ], 200);
+    }
+
+    #[Route('/voluntarios/{id}/inscripciones', name: 'voluntario_inscripciones', methods: ['GET'])]
+    public function inscripciones(int $id, Request $request, UsuarioRepository $userRepo, EntityManagerInterface $em): JsonResponse
+    {
+        if (!$this->checkOwner($request, $id)) return $this->json(['error' => 'Acceso denegado'], 403);
+
+        $usuario = $userRepo->find($id);
+        $voluntario = ($usuario) ? $em->getRepository(Voluntario::class)->findOneBy(['usuario' => $usuario]) : null;
+        if (!$voluntario) return $this->json(['error' => 'Voluntario no encontrado'], 404);
+
+        try {
+            $inscripciones = $em->getRepository(Inscripcion::class)->findBy(['voluntario' => $voluntario], ['fechaSolicitud' => 'DESC']);
+
+            $baseUrl = $request->getSchemeAndHttpHost();
+            $actividades = [];
+            foreach ($inscripciones as $ins) {
+                $act = $ins->getActividad();
+                if (!$act) continue;
+
+                $ods = [];
+                foreach ($act->getOds() as $od) {
+                    $ods[] = [
+                        'id' => $od->getId(),
+                        'nombre' => $od->getNombre(),
+                        'img_url' => $od->getImgOds() ? $baseUrl . '/uploads/ods/' . $od->getImgOds() : null
+                    ];
+                }
+
+                $tipos = [];
+                foreach ($act->getTiposVoluntariado() as $t) {
+                    $tipos[] = ['id' => $t->getId(), 'nombre' => $t->getNombreTipo()];
+                }
+
+                $confirmados = 0;
+                foreach ($act->getInscripciones() as $other) {
+                    if (in_array($other->getEstadoSolicitud(), ['Aceptada', 'Confirmada'])) {
+                        $confirmados++;
+                    }
+                }
+
+                $actividades[] = [
+                    'id' => ($ins->getVoluntario()->getUsuario()->getId()) . '-' . $act->getId(),
+                    'estado' => $ins->getEstadoSolicitud(),
+                    'actividad' => [
+                        'id' => $act->getId(),
+                        'titulo' => $act->getTitulo(),
+                        'descripcion' => $act->getDescripcion(),
+                        'fecha_inicio' => $act->getFechaInicio() ? $act->getFechaInicio()->format('Y-m-d H:i:s') : null,
+                        'duracion_horas' => $act->getDuracionHoras(),
+                        'cupo_maximo' => $act->getCupoMaximo(),
+                        'inscritos_confirmados' => $confirmados,
+                        'ubicacion' => $act->getUbicacion() ?? '',
+                        'modalidad' => 'Presencial',
+                        'img_url' => $act->getImgActividad() ? $baseUrl . '/uploads/actividades/' . $act->getImgActividad() : null,
+                        'id_organizacion' => $act->getOrganizacion()->getId(),
+                        'nombre_organizacion' => $act->getOrganizacion()->getNombre(),
+                        'img_organizacion' => ($act->getOrganizacion()->getUsuario() && $act->getOrganizacion()->getUsuario()->getImgPerfil())
+                                ? $baseUrl . '/uploads/usuarios/' . $act->getOrganizacion()->getUsuario()->getImgPerfil()
+                                : null,
+                        'ods' => $ods,
+                        'tipos' => $tipos,
+                    ]
+                ];
+            }
+
+            return $this->json($actividades, 200);
+        } catch (\Exception $e) {
+            file_put_contents(__DIR__ . '/../../var/debug_500_insc.log', date('Y-m-d H:i:s') . " - Error: " . $e->getMessage() . "\n" . $e->getTraceAsString() . "\n", FILE_APPEND);
+            return $this->json(['error' => 'Internal Server Error', 'detalle' => $e->getMessage()], 500);
+        }
+    }
+
     // ========================================================================
     // 1. LISTADO (GET)
     // ========================================================================
@@ -67,7 +180,18 @@ final class VoluntarioController extends AbstractController
     public function index(EntityManagerInterface $em): JsonResponse
     {
         $conn = $em->getConnection();
-        $sql = 'SELECT * FROM VW_Voluntarios_Activos';
+        $sql = "
+            SELECT
+                u.id_usuario, u.correo as correo_usuario, u.estado_cuenta, u.fecha_registro,
+                v.nombre, v.apellidos, v.dni, v.telefono,
+                CONVERT(VARCHAR, v.fecha_nac, 23) as fecha_nac,
+                v.carnet_conducir,
+                u.img_perfil as foto_perfil, c.nombre_curso as curso
+            FROM USUARIO u
+            INNER JOIN VOLUNTARIO v ON u.id_usuario = v.id_usuario
+            LEFT JOIN CURSO c ON v.id_curso_actual = c.id_curso
+            WHERE u.deleted_at IS NULL
+        ";
         try {
             $voluntarios = $conn->executeQuery($sql)->fetchAllAssociative();
             return $this->json($voluntarios, Response::HTTP_OK);
@@ -226,60 +350,91 @@ final class VoluntarioController extends AbstractController
         UsuarioRepository $usuarioRepo,
         EntityManagerInterface $em
     ): JsonResponse {
-
-        if (!$this->checkOwner($request, $id)) {
-            return $this->json(['error' => 'No tienes permiso para editar este perfil'], Response::HTTP_FORBIDDEN);
-        }
-
-        $usuario = $usuarioRepo->find($id);
-        if (!$usuario) return $this->json(['error' => 'Usuario no encontrado'], 404);
-
-        $voluntario = $em->getRepository(Voluntario::class)->findOneBy(['usuario' => $usuario]);
-        if (!$voluntario) return $this->json(['error' => 'Perfil de voluntario no encontrado'], 404);
-
-        $voluntario->setNombre($dto->nombre);
-        $voluntario->setApellidos($dto->apellidos);
-        $voluntario->setTelefono($dto->telefono);
-
-        if ($dto->descripcion !== null) {
-            $voluntario->setDescripcion($dto->descripcion);
-        }
-
-        if ($dto->fechaNac) {
-            try {
-                $voluntario->setFechaNac(new \DateTime($dto->fechaNac));
-            } catch (\Exception $e) {
-            }
-        }
-
-        if ($dto->carnet_conducir !== null) {
-            $voluntario->setCarnetConducir($dto->carnet_conducir);
-        }
-
-        if ($dto->id_curso_actual) {
-            $curso = $em->getRepository(Curso::class)->find($dto->id_curso_actual);
-            if ($curso) {
-                $voluntario->setCursoActual($curso);
-            }
-        }
-
-        if ($dto->preferencias_ids !== null) {
-            foreach ($voluntario->getPreferencias() as $pref) {
-                $voluntario->removePreferencia($pref);
+        try {
+            if (!$this->checkOwner($request, $id)) {
+                return $this->json(['error' => 'No tienes permiso para editar este perfil'], Response::HTTP_FORBIDDEN);
             }
 
-            if (!empty($dto->preferencias_ids)) {
-                $tipoRepo = $em->getRepository(TipoVoluntariado::class);
-                foreach ($dto->preferencias_ids as $idTipo) {
-                    $tipo = $tipoRepo->find($idTipo);
-                    if ($tipo) $voluntario->addPreferencia($tipo);
+            $usuario = $usuarioRepo->find($id);
+            if (!$usuario) return $this->json(['error' => 'Usuario no encontrado'], 404);
+
+            $voluntario = $em->getRepository(Voluntario::class)->findOneBy(['usuario' => $usuario]);
+            if (!$voluntario) return $this->json(['error' => 'Perfil de voluntario no encontrado'], 404);
+
+            $voluntario->setNombre($dto->nombre);
+            $voluntario->setApellidos($dto->apellidos);
+            $voluntario->setTelefono($dto->telefono);
+
+            if ($dto->descripcion !== null) {
+                $voluntario->setDescripcion($dto->descripcion);
+            }
+
+            if ($dto->fechaNac) {
+                try {
+                    $voluntario->setFechaNac(new \DateTime($dto->fechaNac));
+                } catch (\Exception $e) {
                 }
             }
+
+            if ($dto->carnet_conducir !== null) {
+                $voluntario->setCarnetConducir($dto->carnet_conducir);
+            }
+
+            if ($dto->id_curso_actual) {
+                $curso = $em->getRepository(Curso::class)->find($dto->id_curso_actual);
+                if ($curso) {
+                    $voluntario->setCursoActual($curso);
+                }
+            }
+
+            if ($dto->preferencias_ids !== null) {
+                foreach ($voluntario->getPreferencias() as $pref) {
+                    $voluntario->removePreferencia($pref);
+                }
+
+                if (!empty($dto->preferencias_ids)) {
+                    $tipoRepo = $em->getRepository(TipoVoluntariado::class);
+                    foreach ($dto->preferencias_ids as $idTipo) {
+                        $tipo = $tipoRepo->find($idTipo);
+                        if ($tipo) $voluntario->addPreferencia($tipo);
+                    }
+                }
+            }
+
+            if ($dto->idiomas !== null) {
+                // 1. Limpiar colección (orphanRemoval se encarga del borrado físico)
+                $voluntario->getVoluntarioIdiomas()->clear();
+                $em->flush(); // Forzamos el borrado para evitar colisiones de PK
+
+                // 2. Añadir nuevos
+                $idiomaRepo = $em->getRepository(Idioma::class);
+                foreach ($dto->idiomas as $idiomaData) {
+                    $entidadIdioma = $idiomaRepo->find($idiomaData['id_idioma']);
+                    if ($entidadIdioma) {
+                        $vi = new VoluntarioIdioma();
+                        $vi->setVoluntario($voluntario);
+                        $vi->setIdioma($entidadIdioma);
+                        $vi->setNivel($idiomaData['nivel']);
+
+                        $voluntario->addVoluntarioIdioma($vi);
+                        $em->persist($vi);
+                    }
+                }
+            }
+
+            $em->flush();
+            $em->refresh($voluntario); // <-- CRITICAL: Sincroniza la colección de idiomas antes de devolver el JSON
+
+            return $this->json(VoluntarioResponseDTO::fromEntity($voluntario), 200);
+
+        } catch (\Exception $e) {
+            return $this->json([
+                'error' => 'Error al actualizar perfil',
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine()
+            ], 500);
         }
-
-        $em->flush();
-
-        return $this->json(VoluntarioResponseDTO::fromEntity($voluntario), 200);
     }
 
     // ========================================================================
