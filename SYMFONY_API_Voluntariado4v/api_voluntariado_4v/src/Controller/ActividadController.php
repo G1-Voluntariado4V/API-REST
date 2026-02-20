@@ -30,7 +30,7 @@ final class ActividadController extends AbstractController
     )]
     public function index(ActividadRepository $repo, Request $request): JsonResponse
     {
-        $actividades = $repo->findBy(['estado' => 'Publicada']);
+        $actividades = $repo->findBy(['estadoPublicacion' => 'Publicada']);
         $baseUrl = $request->getSchemeAndHttpHost();
 
         $dtos = array_map(fn($a) => ActividadResponseDTO::fromEntity($a, $baseUrl), $actividades);
@@ -73,6 +73,7 @@ final class ActividadController extends AbstractController
         Request $request,
         ActividadRepository $actRepo,
         UsuarioRepository $userRepo,
+        \App\Repository\VoluntarioRepository $volRepo,
         InscripcionRepository $inscRepo,
         EntityManagerInterface $em
     ): JsonResponse
@@ -83,7 +84,12 @@ final class ActividadController extends AbstractController
         }
 
         $usuario = $userRepo->find($userId);
-        if (!$usuario || $usuario->getRol()->getNombreRol() !== 'Voluntario') {
+        if (!$usuario) {
+            return $this->json(['error' => 'Usuario no encontrado'], 404);
+        }
+
+        $rolNormalizado = strtolower(str_replace(['á', 'é', 'í', 'ó', 'ú'], ['a', 'e', 'i', 'o', 'u'], $usuario->getRol()->getNombre()));
+        if (strpos($rolNormalizado, 'voluntar') === false) {
             return $this->json(['error' => 'Solo los voluntarios pueden inscribirse'], 403);
         }
 
@@ -92,30 +98,40 @@ final class ActividadController extends AbstractController
             return $this->json(['error' => 'Actividad no encontrada'], 404);
         }
 
-        if ($actividad->getEstado() !== 'Publicada') {
+        if ($actividad->getEstadoPublicacion() !== 'Publicada') {
             return $this->json(['error' => 'Esta actividad no está disponible'], 400);
+        }
+
+        $voluntario = $volRepo->findOneBy(['usuario' => $usuario]);
+        if (!$voluntario) {
+            return $this->json(['error' => 'Perfil de voluntario no encontrado'], 404);
         }
 
         // Verificar si ya está inscrito
         $existente = $inscRepo->findOneBy([
-            'voluntario' => $usuario->getVoluntario(),
+            'voluntario' => $voluntario,
             'actividad' => $actividad
         ]);
         if ($existente) {
             return $this->json(['error' => 'Ya estás inscrito en esta actividad'], 400);
         }
 
-        // Verificar cupo
-        $inscripciones = $inscRepo->count(['actividad' => $actividad, 'estadoInscripcion' => 'Aceptada']);
+        $inscripciones = 0;
+        foreach ($actividad->getInscripciones() as $inscb) {
+            if ($inscb->getEstadoSolicitud() === 'Aceptada' || $inscb->getEstadoSolicitud() === 'Confirmada') {
+                $inscripciones++;
+            }
+        }
+
         if ($inscripciones >= $actividad->getCupoMaximo()) {
             return $this->json(['error' => 'No hay cupo disponible'], 400);
         }
 
         $inscripcion = new Inscripcion();
-        $inscripcion->setVoluntario($usuario->getVoluntario());
+        $inscripcion->setVoluntario($voluntario);
         $inscripcion->setActividad($actividad);
-        $inscripcion->setFechaInscripcion(new \DateTime());
-        $inscripcion->setEstadoInscripcion('Pendiente');
+        $inscripcion->setFechaSolicitud(new \DateTime());
+        $inscripcion->setEstadoSolicitud('Pendiente');
 
         $em->persist($inscripcion);
         $em->flush();
@@ -152,8 +168,13 @@ final class ActividadController extends AbstractController
             return $this->json(['error' => 'Actividad no encontrada'], 404);
         }
 
+        $voluntario = $em->getRepository(\App\Entity\Voluntario::class)->findOneBy(['usuario' => $usuario]);
+        if (!$voluntario) {
+            return $this->json(['error' => 'Perfil de voluntario no encontrado'], 404);
+        }
+
         $inscripcion = $inscRepo->findOneBy([
-            'voluntario' => $usuario->getVoluntario(),
+            'voluntario' => $voluntario,
             'actividad' => $actividad
         ]);
 
@@ -298,7 +319,7 @@ final class ActividadController extends AbstractController
     public function proximas(ActividadRepository $repo, Request $request): JsonResponse
     {
         $actividades = $repo->createQueryBuilder('a')
-            ->where('a.estado = :estado')
+            ->where('a.estadoPublicacion = :estado')
             ->andWhere('a.fechaInicio >= :now')
             ->setParameter('estado', 'Publicada')
             ->setParameter('now', new \DateTime())
@@ -324,7 +345,7 @@ final class ActividadController extends AbstractController
         $ods = $request->query->get('ods');
 
         $qb = $repo->createQueryBuilder('a')
-            ->where('a.estado = :estado')
+            ->where('a.estadoPublicacion = :estado')
             ->setParameter('estado', 'Publicada');
 
         if ($query) {

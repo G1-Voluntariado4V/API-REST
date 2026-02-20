@@ -79,14 +79,14 @@ class InscripcionResponseDTO
         return new self(
             $compositeId,
             $ins->getEstadoSolicitud(),
-            $ins->getFechaSolicitud()->format('Y-m-d H:i:s'),
+            $ins->getFechaSolicitud() ? $ins->getFechaSolicitud()->format('Y-m-d H:i:s') : '',
 
             $act->getId(),
             $act->getTitulo(),
             $act->getDescripcion() ?? '',
             $act->getUbicacion() ?? '',
-            $act->getDuracionHoras(),
-            $act->getFechaInicio()->format('Y-m-d H:i:s'),
+            $act->getDuracionHoras() ?? 0,
+            $act->getFechaInicio() ? $act->getFechaInicio()->format('Y-m-d H:i:s') : '',
             $act->getOrganizacion()->getId(),
             $act->getOrganizacion()->getNombre(),
             $act->getCupoMaximo(),
