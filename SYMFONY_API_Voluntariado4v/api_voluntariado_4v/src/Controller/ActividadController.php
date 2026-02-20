@@ -226,7 +226,7 @@ final class ActividadController extends AbstractController
             return $this->json(['error' => 'Inscripción no encontrada'], 404);
         }
 
-        $inscripcion->setEstadoInscripcion($nuevoEstado);
+        $inscripcion->setEstadoSolicitud($nuevoEstado);
         $em->flush();
 
         return $this->json(['mensaje' => 'Estado de inscripción actualizado'], 200);

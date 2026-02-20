@@ -547,6 +547,7 @@ final class OrganizacionController extends AbstractController
     public function voluntariosActividad(
         int $id,
         int $actividadId,
+        Request $request,
         UsuarioRepository $userRepo,
         OrganizacionRepository $orgRepo,
         ActividadRepository $actividadRepo,
@@ -574,28 +575,61 @@ final class OrganizacionController extends AbstractController
             );
         }
 
+        $baseUrl = $request->getSchemeAndHttpHost();
         $conn = $em->getConnection();
         try {
-            $voluntarios = $conn->executeQuery(
-                'SELECT
+            $sql = "
+                SELECT
                     v.id_usuario as id_voluntario,
+                    v.id_usuario,
                     v.nombre,
                     v.apellidos,
                     v.dni,
                     v.telefono,
-                    v.descripcion as bio,
-                    v.fecha_nac,
-                    u.correo as email,
+                    v.descripcion,
+                    CONVERT(VARCHAR, v.fecha_nac, 23) as fecha_nac,
+                    v.carnet_conducir,
+                    u.correo,
+                    u.estado_cuenta,
+                    CASE
+                        WHEN u.img_perfil IS NULL OR u.img_perfil = '' THEN NULL
+                        WHEN u.img_perfil LIKE 'http%' THEN u.img_perfil
+                        ELSE :base_url + '/uploads/usuarios/' + u.img_perfil
+                    END as img_perfil,
                     i.fecha_solicitud,
-                    i.estado_solicitud
+                    i.estado_solicitud,
+                    c.nombre_curso as curso
                  FROM INSCRIPCION i
                  INNER JOIN VOLUNTARIO v ON i.id_voluntario = v.id_usuario
                  INNER JOIN USUARIO u ON v.id_usuario = u.id_usuario
+                 LEFT JOIN CURSO c ON v.id_curso_actual = c.id_curso
                  WHERE i.id_actividad = :actividad
                  AND u.deleted_at IS NULL
-                 ORDER BY i.fecha_solicitud DESC',
-                ['actividad' => $actividadId]
+                 ORDER BY i.fecha_solicitud DESC
+            ";
+
+            $voluntarios = $conn->executeQuery(
+                $sql,
+                ['actividad' => $actividadId, 'base_url' => $baseUrl]
             )->fetchAllAssociative();
+
+            // Enriquecer con idiomas y preferencias
+            foreach ($voluntarios as &$vol) {
+                $vid = $vol['id_voluntario'];
+                $vol['idiomas'] = $conn->fetchAllAssociative("
+                    SELECT i.id_idioma, i.nombre_idioma as idioma, vi.nivel
+                    FROM VOLUNTARIO_IDIOMA vi
+                    JOIN IDIOMA i ON vi.id_idioma = i.id_idioma
+                    WHERE vi.id_voluntario = :vid
+                ", ['vid' => $vid]);
+
+                $vol['preferencias'] = $conn->fetchFirstColumn("
+                    SELECT t.nombre_tipo
+                    FROM PREFERENCIA_VOLUNTARIO pv
+                    JOIN TIPO_VOLUNTARIADO t ON pv.id_tipo = t.id_tipo
+                    WHERE pv.id_voluntario = :vid
+                ", ['vid' => $vid]);
+            }
 
             return $this->json($voluntarios, Response::HTTP_OK);
         } catch (\Exception $e) {

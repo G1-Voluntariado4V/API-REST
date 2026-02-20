@@ -461,6 +461,7 @@ final class CoordinadorController extends AbstractController
                     ELSE CONCAT(:base_url, '/uploads/usuarios/', u.img_perfil)
                 END as img_organizacion,
                 (SELECT COUNT(*) FROM INSCRIPCION i WHERE i.id_actividad = a.id_actividad AND i.estado_solicitud = 'Aceptada') as inscritos_confirmados,
+                (SELECT COUNT(*) FROM INSCRIPCION i WHERE i.id_actividad = a.id_actividad AND i.estado_solicitud = 'Pendiente') as inscritos_pendientes,
                 COALESCE(o.nombre, 'Organización Desconocida') as nombre_organizacion,
                 COALESCE(u.id_usuario, 0) as id_organizacion
             FROM ACTIVIDAD a
@@ -1026,34 +1027,80 @@ final class CoordinadorController extends AbstractController
 
         return $this->json(['mensaje' => "Estado actualizado a $nuevoEstado"], 200);
     }
-
-    #[Route('/actividades/{idActividad}/inscripciones/{idVoluntario}', name: 'coord_update_inscripcion_status', methods: ['PATCH'])]
-    public function updateEstadoInscripcion(
-        int $idActividad,
-        int $idVoluntario,
+    // Metodo updateEstadoInscripcion eliminado para evitar conflicto con InscripcionController
+    #[Route('/coord/actividades/{actividadId}/voluntarios', name: 'coord_actividad_voluntarios', methods: ['GET'])]
+    public function getVoluntariosActividad(
+        int $actividadId,
         Request $request,
         UsuarioRepository $userRepo,
         EntityManagerInterface $em
     ): JsonResponse {
-        if (!$this->checkCoordinador($request, $userRepo)) return $this->json(['error' => 'Acceso denegado'], Response::HTTP_FORBIDDEN);
-
-        $data = json_decode($request->getContent(), true);
-        $nuevoEstado = $data['estado'] ?? null;
-
-        if (!in_array($nuevoEstado, ['Aceptada', 'Rechazada', 'Pendiente'])) {
-            return $this->json(['error' => 'Estado inválido'], 400);
+        if (!$this->checkCoordinador($request, $userRepo)) {
+            return $this->json(['error' => 'Acceso denegado'], Response::HTTP_FORBIDDEN);
         }
 
-        $inscripcion = $em->getRepository(\App\Entity\Inscripcion::class)->findOneBy([
-            'actividad' => $idActividad,
-            'voluntario' => $idVoluntario
-        ]);
+        $baseUrl = $request->getSchemeAndHttpHost();
+        $conn = $em->getConnection();
+        try {
+            $sql = "
+                SELECT
+                    v.id_usuario as id_voluntario,
+                    v.id_usuario,
+                    v.nombre,
+                    v.apellidos,
+                    v.dni,
+                    v.telefono,
+                    v.descripcion,
+                    CONVERT(VARCHAR, v.fecha_nac, 23) as fecha_nac,
+                    v.carnet_conducir,
+                    u.correo,
+                    u.estado_cuenta,
+                    CASE
+                        WHEN u.img_perfil IS NULL OR u.img_perfil = '' THEN NULL
+                        WHEN u.img_perfil LIKE 'http%' THEN u.img_perfil
+                        ELSE :base_url + '/uploads/usuarios/' + u.img_perfil
+                    END as img_perfil,
+                    i.fecha_solicitud,
+                    i.estado_solicitud,
+                    c.nombre_curso as curso
+                 FROM INSCRIPCION i
+                 INNER JOIN VOLUNTARIO v ON i.id_voluntario = v.id_usuario
+                 INNER JOIN USUARIO u ON v.id_usuario = u.id_usuario
+                 LEFT JOIN CURSO c ON v.id_curso_actual = c.id_curso
+                 WHERE i.id_actividad = :actividad
+                 AND u.deleted_at IS NULL
+                 ORDER BY i.fecha_solicitud DESC
+            ";
 
-        if (!$inscripcion) return $this->json(['error' => 'Inscripción no encontrada'], 404);
+            $voluntarios = $conn->executeQuery(
+                $sql,
+                ['actividad' => $actividadId, 'base_url' => $baseUrl]
+            )->fetchAllAssociative();
 
-        $inscripcion->setEstadoInscripcion($nuevoEstado);
-        $em->flush();
+            // Enriquecer con idiomas y preferencias
+            foreach ($voluntarios as &$vol) {
+                $vid = $vol['id_voluntario'];
+                $vol['idiomas'] = $conn->fetchAllAssociative("
+                    SELECT i.id_idioma, i.nombre_idioma as idioma, vi.nivel
+                    FROM VOLUNTARIO_IDIOMA vi
+                    JOIN IDIOMA i ON vi.id_idioma = i.id_idioma
+                    WHERE vi.id_voluntario = :vid
+                ", ['vid' => $vid]);
 
-        return $this->json(['mensaje' => "Inscripción actualizada a $nuevoEstado"], 200);
+                $vol['preferencias'] = $conn->fetchFirstColumn("
+                    SELECT t.nombre_tipo
+                    FROM PREFERENCIA_VOLUNTARIO pv
+                    JOIN TIPO_VOLUNTARIADO t ON pv.id_tipo = t.id_tipo
+                    WHERE pv.id_voluntario = :vid
+                ", ['vid' => $vid]);
+            }
+
+            return $this->json($voluntarios, Response::HTTP_OK);
+        } catch (\Exception $e) {
+            return $this->json(
+                ['error' => 'Error al obtener voluntarios: ' . $e->getMessage()],
+                Response::HTTP_INTERNAL_SERVER_ERROR
+            );
+        }
     }
 }
